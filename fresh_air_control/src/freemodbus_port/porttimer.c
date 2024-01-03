@@ -25,34 +25,44 @@
 /* ----------------------- Modbus includes ----------------------------------*/
 #include <freemodbus.h>
 
-/* ----------------------- static functions ---------------------------------*/
-static void prvvTIMERExpiredISR( void );
+/* ----------------------- Defines ------------------------------------------*/
+#define MB_TIMER_PRESCALER      ( 2UL )
+#define MB_TIMER_TICKS          ( F_CLK_PER / MB_TIMER_PRESCALER )
+#define MB_50US_TICKS           ( 20000UL )
+
+#define MB_TIMER_TICKS_50US
 
 /* ----------------------- Start implementation -----------------------------*/
 BOOL
 xMBPortTimersInit( USHORT usTim1Timerout50us )
 {
-    return FALSE;
-}
+    TCB1.CTRLA = TCB_CLKSEL_DIV2_gc;
+    TCB1.CTRLB = 0;
+    TCB1.INTCTRL = TCB_CAPT_bm;
+    TCB1.CNT = 0;
+    TCB1.CCMP = ( MB_TIMER_TICKS * usTim1Timerout50us ) / ( MB_50US_TICKS )
 
+    return TRUE;
+}
 
 inline void
 vMBPortTimersEnable(  )
 {
-    /* Enable the timer with the timeout passed to xMBPortTimersInit( ) */
+    TCB1.CTRLA |= TCB_ENABLE_bm;
 }
 
 inline void
 vMBPortTimersDisable(  )
 {
-    /* Disable any pending timers. */
+    TCB1.CTRLA &= ~(TCB_ENABLE_bm);
 }
 
 /* Create an ISR which is called whenever the timer has expired. This function
  * must then call pxMBPortCBTimerExpired( ) to notify the protocol stack that
  * the timer has expired.
  */
-static void prvvTIMERExpiredISR( void )
-{
-    ( void )pxMBPortCBTimerExpired(  );
+ISR(TCB1_INT_vect) {
+    if(TCB0.INTFLAGS & TCB_CAPT_bm) {
+        ( void )pxMBPortCBTimerExpired(  );
+    }
 }
