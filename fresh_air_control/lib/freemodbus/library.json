@@ -7,7 +7,8 @@
       "flags": [
         "-I src/port",
         "-I src/modbus/include",
-        "-I src/modbus/include/rtu"
+        "-I src/modbus/rtu",
+        "-I src/modbus/ascii"
       ]
     }
   }
