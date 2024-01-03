@@ -1,14 +1,14 @@
 {
-    "name": "freemodbus",
-    "version": "0.0.0",
-    "build": {
-      "includeDir": "src/modbus",
-      "headers": "freemodbus.h",
-      "flags": [
-        "-I src/port",
-        "-I src/modbus/include",
-        "-I src/modbus/rtu",
-        "-I src/modbus/ascii"
-      ]
-    }
+  "name": "freemodbus",
+  "version": "0.0.0",
+  "build": {
+    "includeDir": "src/modbus",
+    "headers": "freemodbus.h",
+    "flags": [
+      "-I src/port",
+      "-I src/modbus/include",
+      "-I src/modbus/rtu",
+      "-I src/modbus/ascii"
+    ]
   }
+}

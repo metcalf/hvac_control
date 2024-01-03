@@ -82,7 +82,7 @@ PR_BEGIN_EXTERN_C
  * the sum of all enabled functions in this file and custom function
  * handlers. If set to small adding more functions will fail.
  */
-#define MB_FUNC_HANDLERS_MAX                    ( 16 )
+#define MB_FUNC_HANDLERS_MAX                    ( 4 )
 
 /*! \brief Number of bytes which should be allocated for the <em>Report Slave ID
  *    </em>command.
@@ -95,7 +95,7 @@ PR_BEGIN_EXTERN_C
 #define MB_FUNC_OTHER_REP_SLAVEID_BUF           ( 32 )
 
 /*! \brief If the <em>Report Slave ID</em> function should be enabled. */
-#define MB_FUNC_OTHER_REP_SLAVEID_ENABLED       (  1 )
+#define MB_FUNC_OTHER_REP_SLAVEID_ENABLED       (  0 )
 
 /*! \brief If the <em>Read Input Registers</em> function should be enabled. */
 #define MB_FUNC_READ_INPUT_ENABLED              (  1 )
@@ -107,7 +107,7 @@ PR_BEGIN_EXTERN_C
 #define MB_FUNC_WRITE_HOLDING_ENABLED           (  1 )
 
 /*! \brief If the <em>Write Multiple registers</em> function should be enabled. */
-#define MB_FUNC_WRITE_MULTIPLE_HOLDING_ENABLED  (  1 )
+#define MB_FUNC_WRITE_MULTIPLE_HOLDING_ENABLED  (  0 )
 
 /*! \brief If the <em>Read Coils</em> function should be enabled. */
 #define MB_FUNC_READ_COILS_ENABLED              (  0 )
@@ -122,7 +122,7 @@ PR_BEGIN_EXTERN_C
 #define MB_FUNC_READ_DISCRETE_INPUTS_ENABLED    (  0 )
 
 /*! \brief If the <em>Read/Write Multiple Registers</em> function should be enabled. */
-#define MB_FUNC_READWRITE_HOLDING_ENABLED       (  1 )
+#define MB_FUNC_READWRITE_HOLDING_ENABLED       (  0 )
 
 /*! @} */
 #ifdef __cplusplus

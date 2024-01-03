@@ -77,7 +77,7 @@ xMBPortSerialInit( UCHAR ucPORT, ULONG ulBaudRate, UCHAR ucDataBits, eMBParity e
 
     /* prevent compiler warning. */
     (void)ucPORT;
-	
+
     UBRR = UART_BAUD_CALC( ulBaudRate, F_CPU );
 
     switch ( eParity )
@@ -154,4 +154,3 @@ SIGNAL( SIG_UART_TRANS )
     RTS_LOW;
 }
 #endif
-

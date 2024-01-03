@@ -40,7 +40,7 @@ xMBPortTimersInit( USHORT usTim1Timerout50us )
     TCB1.CTRLB = 0;
     TCB1.INTCTRL = TCB_CAPT_bm;
     TCB1.CNT = 0;
-    TCB1.CCMP = ( MB_TIMER_TICKS * usTim1Timerout50us ) / ( MB_50US_TICKS )
+    TCB1.CCMP = ( MB_TIMER_TICKS * usTim1Timerout50us ) / ( MB_50US_TICKS );
 
     return TRUE;
 }
