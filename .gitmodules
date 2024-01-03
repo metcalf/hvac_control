@@ -1,0 +1,3 @@
+[submodule "fresh_air_control/lib/BME280/src"]
+	path = fresh_air_control/lib/BME280/src
+	url = https://github.com/boschsensortec/BME280_driver.git

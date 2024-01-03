@@ -8,7 +8,8 @@
 #define MB_BAUD 9600
 #define MB_SLAVE_ID 0x21
 
-#include <modbus_client.h>
+#include "bme280_client.h"
+#include "modbus_client.h"
 
 uint16_t curr_speed_;
 volatile uint16_t tach_period_;
