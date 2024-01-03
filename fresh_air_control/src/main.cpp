@@ -3,9 +3,12 @@
 #include <avr/io.h>
 #include <avr/interrupt.h>
 
+#include <freemodbus.h>
+
 #define POWER_PIN_NUM PIN2_bm
 #define F_CLK_PER 500e3
 #define TACH_CLK F_CLK_PER/2
+#define RS485_BAUD 64 * F_CLK_PER / (16 * 9600)
 
 uint16_t curr_speed_;
 volatile uint16_t tach_period_;
