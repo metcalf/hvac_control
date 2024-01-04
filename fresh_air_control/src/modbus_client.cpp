@@ -3,15 +3,15 @@
 #include <stdint.h>
 #include <string.h>
 
-#define SPEED_ADDRESS 0x10
+#define SPEED_ptr_ADDRESS 0x10
 
-LastData *lastData_;
-uint16_t *speed_;
+LastData *last_data_ptr_;
+uint16_t *speed_ptr_;
 
 void modbus_client_init(UCHAR slave_id, ULONG baud, LastData *lastData, uint16_t *speed) {
     assert(sizeof(LastData) == 8);
-    lastData_ = lastData;
-    speed_ = speed;
+    last_data_ptr_ = lastData;
+    speed_ptr_ = speed;
 
     eMBErrorCode mbStatus = eMBInit(MB_RTU, slave_id, 0, baud, MB_PAR_NONE);
     assert(eMBErrorCode == MB_ENOERR);
@@ -26,23 +26,23 @@ eMBErrorCode eMBRegInputCB(UCHAR *pucRegBuffer, USHORT usAddress, USHORT usNRegs
         return MB_ENOREG;
     }
 
-    memcpy(pucRegBuffer, lastData_ + (usAddress * 2), usNRegs * 2);
+    memcpy(pucRegBuffer, last_data_ptr_ + (usAddress * 2), usNRegs * 2);
 }
 
 eMBErrorCode eMBRegHoldingCB(UCHAR *pucRegBuffer, USHORT usAddress, USHORT usNRegs,
                              eMBRegisterMode eMode) {
-    if (usAddress != SPEED_ADDRESS || usNRegs != 0) {
+    if (usAddress != SPEED_ptr_ADDRESS || usNRegs != 0) {
         return MB_ENOREG;
     }
 
     UCHAR *from, *to;
 
     if (eMode == MB_REG_READ) {
-        from = (UCHAR *)speed_;
+        from = (UCHAR *)speed_ptr_;
         to = pucRegBuffer;
     } else {
         from = pucRegBuffer;
-        to = (UCHAR *)speed_;
+        to = (UCHAR *)speed_ptr_;
     }
 
     memcpy(to, from, 2);

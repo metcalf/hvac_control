@@ -1,3 +1,7 @@
+# Copied from https://github.com/technoblogy/tiny-i2c/commit/b05d0c72a6dc4b2dde951e18daf60cea0227d839
+
+Needed to copy rather than using the package manager since I need to change the hardcoded frequency/baud
+
 # TinyI2C Library
 
 **TinyI2C** is a set of minimal I2C routines that allow just about any Microchip/Atmel AVR processor to connect to I2C peripherals.

@@ -7,10 +7,15 @@
 #define TACH_CLK F_CLK_PER / 2
 #define MB_BAUD 9600
 #define MB_SLAVE_ID 0x21
+#define TICK_PERIOD_US 500
+#define PHT_READ_INTERVAL_TICKS 2 * 1000 * 1000 / TICK_PERIOD_US
 
 #include "bme280_client.h"
 #include "modbus_client.h"
+#include <avr/wdt.h>
 
+uint16_t last_pht_read_ticks_;
+uint16_t tick_; // 0.5ms tick period
 uint16_t curr_speed_;
 volatile uint16_t tach_period_;
 
@@ -45,6 +50,8 @@ uint16_t getLastTach() {
 }
 
 int main(void) {
+    wdt_enable(WDTO_1S);
+
     CLKCTRL.MCLKCTRLB = CLKCTRL_PEN_bm | CLKCTRL_PDIV_32X_gc; // Divide main clock by 32 = 500khz
 
     // PB2 output for power toggle
@@ -66,17 +73,38 @@ int main(void) {
     // TCA0.SINGLE.CTRLB = TCA_SINGLE_WGMODE_SINGLESLOPE_gc;
     TCA0.SPLIT.CTRLD = TCA_SPLIT_SPLITM_bm;  // Enable split mode
     TCA0.SPLIT.CTRLB = TCA_SPLIT_HCMP1EN_bm; // Enable WO4 (WO[n+3])
-    TCA0.SPLIT.CTRLA = TCA_SPLIT_ENABLE_bm;  // Run at ~2khz (16e6 / 32 prescaler / 256 range)
+    TCA0.SPLIT.INTCTRL = TCA_SPLIT_LUNF_bm;  // Interrupt on low byte underflow for tick counter
+
+    // High-byte runs at a bit less than 2khz to support full 8 bit range
+    // 16e6 CPU / 32 prescaler / 256
+    // Low byte runs at exactly 1khz to act as a tick counter
+    // 16e6 CPU / 32 prescaler / 250
+    TCA0.SPLIT.LPER = 250;
+
+    TCA0.SPLIT.CTRLA = TCA_SPLIT_ENABLE_bm; // Run at ~2khz (16e6 / 32 prescaler / 256 range)
+
+    bme280_init();
+    last_pht_read_ticks_ = tick_;
 
     modbus_client_init(MB_SLAVE_ID, MB_BAUD, &last_data_, &curr_speed_);
 
     while (1) {
+        wdt_reset();
         last_data_.tach_freq = getLastTach();
         modbus_poll();
-        // BME280 over I2C
+
+        if (tick_ - last_pht_read_ticks_ > PHT_READ_INTERVAL_TICKS) {
+            bme280_get_latest(&last_data_.temp, &last_data_.humidity, &last_data_.pressure);
+            last_pht_read_ticks_ = tick_;
+        }
     }
 
     return 0;
+}
+
+ISR(TCA0_LUNF_vect) {
+    TCA0.SPLIT.INTFLAGS |= TCA_SPLIT_LUNF_bm;
+    tick_++;
 }
 
 ISR(TCB0_INT_vect) {
