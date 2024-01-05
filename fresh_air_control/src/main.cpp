@@ -52,7 +52,7 @@ uint16_t getLastTach() {
 int main(void) {
     wdt_enable(WDTO_1S);
 
-    CLKCTRL.MCLKCTRLB = CLKCTRL_PEN_bm | CLKCTRL_PDIV_32X_gc; // Divide main clock by 32 = 500khz
+    CLKCTRL.MCLKCTRLB = CLKCTRL_PEN_bm | CLKCTRL_PDIV_64X_gc; // Divide main clock by 32 = 500khz
 
     // PB2 output for power toggle
     VPORTB.DIR |= POWER_PIN_NUM;
@@ -64,7 +64,7 @@ int main(void) {
     TCB0.EVCTRL = TCB_CAPTEI_bm;
     TCB0.INTCTRL = TCB_CAPT_bm;
     TCB0.CTRLA =
-        (TCB_ENABLE_bm | TCB_CLKSEL_DIV2_gc); // Configure tach frequency measurement @ 250khz
+        (TCB_ENABLE_bm | TCB_CLKSEL_DIV2_gc); // Configure tach frequency measurement @ ~156khz
 
     // Speed output on PA4, TCA WO4 (PWM).
     VPORTB.DIR |= PIN4_bm; // Output
@@ -75,13 +75,13 @@ int main(void) {
     TCA0.SPLIT.CTRLB = TCA_SPLIT_HCMP1EN_bm; // Enable WO4 (WO[n+3])
     TCA0.SPLIT.INTCTRL = TCA_SPLIT_LUNF_bm;  // Interrupt on low byte underflow for tick counter
 
-    // High-byte runs at a bit less than 2khz to support full 8 bit range
-    // 16e6 CPU / 32 prescaler / 256
-    // Low byte runs at exactly 1khz to act as a tick counter
-    // 16e6 CPU / 32 prescaler / 250
-    TCA0.SPLIT.LPER = 250;
+    // High-byte runs at a bit less than 1.2khz to support full 8 bit range
+    // 16e6 CPU / 64 prescaler / 256
+    // Low byte runs at exactly 2khz to act as a tick counter
+    // 16e6 CPU / 32 prescaler / 125
+    TCA0.SPLIT.LPER = 125;
 
-    TCA0.SPLIT.CTRLA = TCA_SPLIT_ENABLE_bm; // Run at ~2khz (16e6 / 32 prescaler / 256 range)
+    TCA0.SPLIT.CTRLA = TCA_SPLIT_ENABLE_bm; // Run at ~1.2khz (16e6 / 64 prescaler / 256 range)
 
     bme280_init();
     last_pht_read_ticks_ = tick_;

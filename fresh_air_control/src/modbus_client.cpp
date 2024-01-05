@@ -3,7 +3,7 @@
 #include <stdint.h>
 #include <string.h>
 
-#define SPEED_ptr_ADDRESS 0x10
+#define SPEED_ADDRESS 0x10
 
 LastData *last_data_ptr_;
 uint16_t *speed_ptr_;
@@ -31,7 +31,7 @@ eMBErrorCode eMBRegInputCB(UCHAR *pucRegBuffer, USHORT usAddress, USHORT usNRegs
 
 eMBErrorCode eMBRegHoldingCB(UCHAR *pucRegBuffer, USHORT usAddress, USHORT usNRegs,
                              eMBRegisterMode eMode) {
-    if (usAddress != SPEED_ptr_ADDRESS || usNRegs != 0) {
+    if (usAddress != SPEED_ADDRESS || usNRegs != 0) {
         return MB_ENOREG;
     }
 
