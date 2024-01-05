@@ -1,0 +1,4 @@
+`pio run -t menuconfig`
+* Use menuconfig > Component config > Modbus to disable TCP/ASCII, may need to use to set slave ID?
+* Configure USB console: menuconfig -> Component config > ESP System Settings > Channel for console output > USB Serial/JTAG controller
+* Disable secondary output-only USB console: menuconfig -> Component config > ESP System Settings > Channel for console secondary output > No secondary console
