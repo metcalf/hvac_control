@@ -2,12 +2,10 @@
 
 #include <freemodbus.h>
 
-struct LastData {
-    int16_t temp;
-    uint16_t humidity, pressure, tach_rpm;
-};
+typedef uint8_t (*set_fancoil_func)(bool, uint8_t);
 
-void modbus_client_init(UCHAR slave_id, ULONG baud, LastData *lastData, uint16_t *speed);
+void modbus_client_init(UCHAR slave_id, ULONG baud, uint8_t *iso_input_state,
+                        set_fancoil_func set_fancoil);
 
 void modbus_poll();
 

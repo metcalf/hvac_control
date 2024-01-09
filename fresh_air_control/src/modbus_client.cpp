@@ -27,6 +27,7 @@ eMBErrorCode eMBRegInputCB(UCHAR *pucRegBuffer, USHORT usAddress, USHORT usNRegs
     }
 
     memcpy(pucRegBuffer, last_data_ptr_ + (usAddress * 2), usNRegs * 2);
+    return MB_ENOERR;
 }
 
 eMBErrorCode eMBRegHoldingCB(UCHAR *pucRegBuffer, USHORT usAddress, USHORT usNRegs,
@@ -46,6 +47,7 @@ eMBErrorCode eMBRegHoldingCB(UCHAR *pucRegBuffer, USHORT usAddress, USHORT usNRe
     }
 
     memcpy(to, from, 2);
+    return MB_ENOERR;
 }
 
 eMBErrorCode eMBRegCoilsCB(UCHAR *pucRegBuffer, USHORT usAddress, USHORT usNCoils,

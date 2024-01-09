@@ -1,10 +1,11 @@
 #pragma once
 
+#define BME280_32BIT_ENABLE
 #include <bme280.h>
 
 void bme280_init();
 
-int8_t bme280_get_latest(int16_t *temp, int16_t *hum, int16_t *pres);
+int8_t bme280_get_latest(int16_t *temp, uint16_t *hum, uint16_t *pres);
 
 /***************************************************************************/
 

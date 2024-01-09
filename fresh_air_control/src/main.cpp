@@ -2,17 +2,17 @@
 
 #include <avr/interrupt.h>
 #include <avr/io.h>
+#include <avr/wdt.h>
+
+#include "bme280_client.h"
+#include "modbus_client.h"
 
 #define POWER_PIN_NUM PIN2_bm
 #define TACH_CLK F_CLK_PER / 2
 #define MB_BAUD 9600
-#define MB_SLAVE_ID 0x21
+#define MB_SLAVE_ID 0x11
 #define TICK_PERIOD_US 500
 #define PHT_READ_INTERVAL_TICKS 2 * 1000 * 1000 / TICK_PERIOD_US
-
-#include "bme280_client.h"
-#include "modbus_client.h"
-#include <avr/wdt.h>
 
 uint16_t last_pht_read_ticks_;
 uint16_t tick_; // 0.5ms tick period
@@ -36,7 +36,7 @@ void setSpeed(uint8_t speed) {
     }
 }
 
-uint16_t getLastTach() {
+uint16_t getLastTachRPM() {
     if (tach_period_ == 0) {
         return 0; // Invalid value
     }
@@ -61,7 +61,7 @@ int main(void) {
     // Expect speeds ~500-3000RPM
     PORTB.PIN5CTRL |= PORT_PULLUPEN_bm; // Enable pull up resistor
     TCB0.CTRLB = TCB_CNTMODE_FRQ_gc;    // Frequency count mode
-    TCB0.EVCTRL = TCB_CAPTEI_bm;
+    //TCB0.EVCTRL = TCB_CAPTEI_bm; // I had this set originally but think it isn't necessary?
     TCB0.INTCTRL = TCB_CAPT_bm;
     TCB0.CTRLA =
         (TCB_ENABLE_bm | TCB_CLKSEL_DIV2_gc); // Configure tach frequency measurement @ ~156khz
@@ -90,7 +90,7 @@ int main(void) {
 
     while (1) {
         wdt_reset();
-        last_data_.tach_freq = getLastTach();
+        last_data_.tach_rpm = getLastTachRPM();
         modbus_poll();
 
         if (tick_ - last_pht_read_ticks_ > PHT_READ_INTERVAL_TICKS) {

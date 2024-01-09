@@ -32,7 +32,7 @@ static int set_speed_cmd(int argc, char **argv) {
 }
 
 static void register_set_speed() {
-    set_speed_args.speed = arg_int1(NULL, NULL, "<s>", "Speed (0-255)");
+    set_speed_args.speed = arg_int1(NULL, NULL, "<s>", "speed (0-255)");
     set_speed_args.end = arg_end(1);
 
     const esp_console_cmd_t cmd = {.command = "speed",

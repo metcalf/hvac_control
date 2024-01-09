@@ -9,10 +9,9 @@
 
 #define MB_PORT_NUM UART_NUM_1 // Number of UART port used for Modbus connection
 #define MB_DEV_SPEED 9600      // The communication speed of the UART
-// TODO: Configure UART pins
-#define MB_UART_TXD 0
-#define MB_UART_RXD 0
-#define MB_UART_RTS 0
+#define MB_UART_TXD 6
+#define MB_UART_RXD 8
+#define MB_UART_RTS 7
 
 static const char *TAG = "APP";
 
@@ -36,12 +35,6 @@ static const char *TAG = "APP";
 
 #define MB_NAME_FAN_CONTROL_INPUTS "fan_control_inputs"
 #define MB_NAME_FAN_CONTROL_SPEED "fan_control_speed"
-
-struct FanControlData {
-    int16_t temp, humidity, pressure, tach_freq, speed;
-};
-
-struct FanControlData fanControlData;
 
 // Enumeration of modbus device addresses accessed by master device
 enum {
@@ -101,11 +94,18 @@ esp_err_t read_lastest_data() {
     esp_err_t err = ESP_OK;
     uint8_t type = 0; // throwaway
 
+    uint16_t data[4];
+
     err = mbc_master_get_parameter(CID_FAN_CONTROL_INPUTS, (char *)MB_NAME_FAN_CONTROL_INPUTS,
-                                   (uint8_t *)&fanControlData, &type);
+                                   (uint8_t *)&data, &type);
     if (err == ESP_OK) {
-        ESP_LOGI(TAG, "FC data: t=%d\th=%d\tp=%drpm=%d", fanControlData.temp,
-                 fanControlData.humidity, fanControlData.pressure, fanControlData.tach_freq);
+        double temp = (double)data[0] / 100.0;
+        double humidity = (double)data[1] / 512.0; // 2^9 for a 9 bit shift of the decimal point
+        uint16_t pressure = data[2] + 87000;
+        uint16_t tach_rpm = data[4];
+
+        ESP_LOGI(TAG, "FC data: t=%.2fC\th=%.2f%%\tp=%dPa\trpm=%d", temp, humidity, pressure,
+                 tach_rpm);
     } else {
         ESP_LOGE(TAG, "Characteristic #%u (%s) read fail, err = 0x%x (%s).", CID_FAN_CONTROL_INPUTS,
                  MB_NAME_FAN_CONTROL_INPUTS, (int)err, (char *)esp_err_to_name(err));

@@ -1,0 +1,30 @@
+{
+  "folders": [
+    {
+      "path": "fresh_air_control"
+    },
+    {
+      "path": "shared_libs"
+    },
+    {
+      "path": "comms_test"
+    },
+    {
+      "name": "fancoil_makeup_aux",
+      "path": "fancoil_makeup_aux"
+    },
+    {
+      "name": "zone_io",
+      "path": "zone_io"
+    }
+  ],
+  "settings": {
+    "editor.formatOnSave": true,
+    "files.associations": {
+      "chrono": "cpp",
+      "io.h": "c",
+      "common.h": "c",
+      "usb_serial_jtag.h": "c"
+    }
+  }
+}
