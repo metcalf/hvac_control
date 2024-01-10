@@ -16,6 +16,16 @@
     {
       "name": "zone_io",
       "path": "zone_io"
+    },
+    {
+      "name": "zone_controller",
+      "path": "zone_controller"
+    },
+    {
+      "path": "boards"
+    },
+    {
+      "path": "components"
     }
   ],
   "settings": {

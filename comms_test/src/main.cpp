@@ -7,34 +7,16 @@
 
 #define USB_BUF_SIZE (1024)
 
-#define MB_PORT_NUM UART_NUM_1 // Number of UART port used for Modbus connection
+#define MB_PORT_NUM UART_NUM_0 // Number of UART port used for Modbus connection
 #define MB_DEV_SPEED 9600      // The communication speed of the UART
 #define MB_UART_TXD 6
 #define MB_UART_RXD 8
 #define MB_UART_RTS 7
 
-static const char *TAG = "APP";
-
-// The number of parameters that intended to be used in the particular control process
-#define MASTER_MAX_CIDS num_device_parameters
-
-// Number of reading of parameters from slave
-#define MASTER_MAX_RETRY 30
-
-// Timeout to update cid over Modbus
-#define UPDATE_CIDS_TIMEOUT_MS (500)
-#define UPDATE_CIDS_TIMEOUT_TICS (UPDATE_CIDS_TIMEOUT_MS / portTICK_PERIOD_MS)
-
-// Timeout between polls
-#define POLL_TIMEOUT_MS (1)
-#define POLL_TIMEOUT_TICS (POLL_TIMEOUT_MS / portTICK_PERIOD_MS)
-
-// The macro to get offset for parameter in the appropriate structure
-#define HOLD_OFFSET(field) ((uint16_t)(offsetof(holding_reg_params_t, field) + 1))
-#define INPUT_OFFSET(field) ((uint16_t)(offsetof(input_reg_params_t, field) + 1))
-
 #define MB_NAME_FAN_CONTROL_INPUTS "fan_control_inputs"
 #define MB_NAME_FAN_CONTROL_SPEED "fan_control_speed"
+
+static const char *TAG = "APP";
 
 // Enumeration of modbus device addresses accessed by master device
 enum {

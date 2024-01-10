@@ -1,0 +1,28 @@
+{
+  "build": {
+    "core": "esp32",
+    "f_cpu": "240000000L",
+    "f_flash": "80000000L",
+    "flash_mode": "qio",
+    "hwids": [["0x303A", "0x1001"]],
+    "mcu": "esp32s3",
+    "variant": "esp32s3"
+  },
+  "connectivity": ["bluetooth", "wifi"],
+  "debug": {
+    "default_tool": "esp-builtin",
+    "onboard_tools": ["esp-builtin"],
+    "openocd_target": "esp32s3.cfg"
+  },
+  "frameworks": ["espidf"],
+  "name": "Espressif ESP32-S3-WROOM-N16R2",
+  "upload": {
+    "flash_size": "16MB",
+    "maximum_ram_size": 327680,
+    "maximum_size": 16777216,
+    "require_upload_port": true,
+    "speed": 460800
+  },
+  "url": "https://www.mouser.com/datasheet/2/891/esp32_s3_wroom_1_wroom_1u_datasheet_en-2930317.pdf",
+  "vendor": "Espressif"
+}
