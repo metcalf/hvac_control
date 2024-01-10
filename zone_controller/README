@@ -1,0 +1,8 @@
+LVGL menuconfig:
+
+- Revisit fonts later
+- Can swap X/Y and invert X/Y in menuconfig
+- Touch on I2C 0
+- SPI2_HOST
+- Backlight on/off logic level, PWM, IO pin
+- I2C port pins for LVGL

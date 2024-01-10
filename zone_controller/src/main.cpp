@@ -1,4 +1,5 @@
-#include <esp_log.h>
+#include "esp_log.h"
+#include "lvgl.h"
 
 #include "driver/gpio.h"
 #include "modbus_client.h"

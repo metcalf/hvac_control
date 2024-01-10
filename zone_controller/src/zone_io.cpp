@@ -36,6 +36,8 @@ void zone_io_init() {
         .parity = UART_PARITY_DISABLE,
         .stop_bits = UART_STOP_BITS_1,
         .flow_ctrl = UART_HW_FLOWCTRL_DISABLE,
+        .rx_flow_ctrl_thresh = 0,
+        .source_clk = UART_SCLK_APB,
     };
     int intr_alloc_flags = 0;
     // Configure UART parameters
