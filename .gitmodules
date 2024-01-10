@@ -1,6 +1,13 @@
 [submodule "fresh_air_control/lib/BME280/src"]
 	path = fresh_air_control/lib/BME280/src
 	url = https://github.com/boschsensortec/BME280_driver.git
-[submodule "comms_test/components/esp-modbus"]
-	path = comms_test/components/esp-modbus
+[submodule "components/esp-modbus"]
+	path = components/esp-modbus
 	url = https://github.com/espressif/esp-modbus.git
+[submodule "components/lvgl"]
+	path = components/lvgl
+	url = https://github.com/lvgl/lvgl.git
+	branch = release/v8.3
+[submodule "components/lvgl_esp32_drivers"]
+	path = components/lvgl_esp32_drivers
+	url = https://github.com/lvgl/lvgl_esp32_drivers.git
