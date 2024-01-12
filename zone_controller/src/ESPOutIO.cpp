@@ -1,4 +1,4 @@
-#include "out_ctrl/OutIO.h"
+#include "ESPOutIO.h"
 
 #include "driver/gpio.h"
 
@@ -7,7 +7,7 @@
 
 static gpio_num_t valve_gpios_[NUM_VALVES] = {GPIO_NUM_40, GPIO_NUM_39, GPIO_NUM_38, GPIO_NUM_37};
 
-void OutIO::init() {
+void ESPOutIO::init() {
     uint64_t mask = (1ULL << LOOP_PUMP_GPIO) || (1ULL << FC_PUMP_GPIO);
     for (int i = 0; i < NUM_VALVES; i++) {
         mask |= (1ULL << valve_gpios_[i]);
@@ -23,16 +23,16 @@ void OutIO::init() {
     ESP_ERROR_CHECK(gpio_config(&io_conf));
 }
 
-void OutIO::setLoopPump(bool on) { ESP_ERROR_CHECK(gpio_set_level(LOOP_PUMP_GPIO, on)); }
+void ESPOutIO::setLoopPump(bool on) { ESP_ERROR_CHECK(gpio_set_level(LOOP_PUMP_GPIO, on)); }
 
-void OutIO::setFancoilPump(bool on) { ESP_ERROR_CHECK(gpio_set_level(FC_PUMP_GPIO, on)); }
+void ESPOutIO::setFancoilPump(bool on) { ESP_ERROR_CHECK(gpio_set_level(FC_PUMP_GPIO, on)); }
 
-void OutIO::setValve(int idx, bool on) {
+void ESPOutIO::setValve(int idx, bool on) {
     assert(idx < NUM_VALVES);
     ESP_ERROR_CHECK(gpio_set_level(valve_gpios_[idx], on));
 }
 
-bool OutIO::getValve(int idx) {
+bool ESPOutIO::getValve(int idx) {
     assert(idx < NUM_VALVES);
     return gpio_get_level(valve_gpios_[idx]);
 }

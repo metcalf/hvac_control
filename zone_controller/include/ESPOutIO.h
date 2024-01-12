@@ -1,8 +1,8 @@
 #pragma once
 
-#include "./BaseOutIO.h"
+#include "BaseOutIO.h"
 
-class OutIO : public BaseOutIO {
+class ESPOutIO : public BaseOutIO {
   public:
     void init();
     void setLoopPump(bool on) override;

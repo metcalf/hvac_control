@@ -34,7 +34,8 @@
       "chrono": "cpp",
       "io.h": "c",
       "common.h": "c",
-      "usb_serial_jtag.h": "c"
+      "usb_serial_jtag.h": "c",
+      "*.tcc": "cpp"
     }
   }
 }

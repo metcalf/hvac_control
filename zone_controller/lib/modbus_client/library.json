@@ -1,0 +1,5 @@
+{
+  "name": "modbus_client",
+  "version": "0.0.0",
+  "headers": ["ModbusClient.h", "BaseModbusClient.h"]
+}

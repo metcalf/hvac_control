@@ -1,6 +1,15 @@
-#include "out_ctrl/OutCtrl.h"
+#include "OutCtrl.h"
 
+#if defined(ESP_PLATFORM)
 #include "esp_log.h"
+#else
+#define NATIVE_LOG(tag, format, ...) printf(tag, format, ##__VA_ARGS__)
+#define ESP_LOGE(tag, format, ...) NATIVE_LOG(tag, format, ##__VA_ARGS__)
+#define ESP_LOGW(tag, format, ...) NATIVE_LOG(tag, format, ##__VA_ARGS__)
+#define ESP_LOGI(tag, format, ...) NATIVE_LOG(tag, format, ##__VA_ARGS__)
+#define ESP_LOGD(tag, format, ...) NATIVE_LOG(tag, format, ##__VA_ARGS__)
+#define ESP_LOGV(tag, format, ...) NATIVE_LOG(tag, format, ##__VA_ARGS__)
+#endif
 
 #define MAX_CONCURRENT_OPENING 2
 // Require 6 hours after last heating call before cooling
@@ -14,7 +23,8 @@
 // Only track 7 days of last event times to avoid overflows
 #define EVENT_MAX_TICKS 7 * 24 * 60 * 60 * 1000 / portTICK_RATE_MS
 
-static_assert(NUM_VALVES == ZONE_IO_NUM_TS);
+static_assert(NUM_VALVES == ZONE_IO_NUM_TS,
+              "Expect to have the same number of valves as thermostats");
 static uint8_t valve_seq_[2][NUM_VALVES] = {{1, 3, 2, 4}, {3, 2, 4, 1}};
 
 static const char *TAG = "OUT";
@@ -51,7 +61,7 @@ bool OutCtrl::checkModeLockout(TickType_t lastTargetModeTick_, TickType_t lastOt
     return since_other < lockout_ticks;
 }
 
-OutputMode OutCtrl::selectMode(bool system_on, ZoneIOState zio_state) {
+OutputMode OutCtrl::selectMode(bool system_on, InputState zio_state) {
     if (!system_on) {
         return OutputMode::Off;
     }
@@ -201,7 +211,7 @@ void OutCtrl::setCxOpMode(OutputMode output_mode) {
     }
 }
 
-void OutCtrl::setValves(ZoneIOState zio_state) {
+void OutCtrl::setValves(InputState zio_state) {
     TickType_t now = clk_();
     uint8_t can_set_open = MAX_CONCURRENT_OPENING + static_cast<uint8_t>(zio_state.valve_sw);
     bool to_open[NUM_VALVES] = {false, false, false, false};
@@ -238,7 +248,7 @@ void OutCtrl::setValves(ZoneIOState zio_state) {
     // TODO: Detect and report error when valve does not report open/closed after too long
 }
 
-void OutCtrl::setPumps(OutputMode mode, ZoneIOState zio_state) {
+void OutCtrl::setPumps(OutputMode mode, InputState zio_state) {
     if (!(mode == OutputMode::Heat || mode == OutputMode::Cool)) {
         outIO_->setLoopPump(false);
         outIO_->setLoopPump(false);
@@ -249,7 +259,7 @@ void OutCtrl::setPumps(OutputMode mode, ZoneIOState zio_state) {
     // one valve is open. Do not enable the pump if we don't know the state
     // of the heat pump to avoid running condensing cold water.
     bool run_hydronic = false;
-    if (mode == OutputMode::Heat && zio_state.valve_sw != ValveSW::None &&
+    if (mode == OutputMode::Heat && zio_state.valve_sw != ValveSWState::None &&
         lastCxOpMode_ != CxOpMode::Error) {
         for (int i = 0; i < ZONE_IO_NUM_TS; i++) {
             if (zio_state.ts[i].w) {
@@ -272,7 +282,7 @@ void OutCtrl::setPumps(OutputMode mode, ZoneIOState zio_state) {
     outIO_->setFancoilPump(run_fc);
 }
 
-void OutCtrl::update(bool system_on, ZoneIOState zio_state) {
+void OutCtrl::update(bool system_on, InputState zio_state) {
     clampLastEventTicks(); // Clamp last mode ticks to avoid overflows
 
     OutputMode mode = selectMode(system_on, zio_state);
@@ -289,7 +299,7 @@ void OutCtrl::update(bool system_on, ZoneIOState zio_state) {
         setValves(zio_state);
     } else {
         // Close all valves if we're not heating
-        ZoneIOState empty_state;
+        InputState empty_state;
         setValves(empty_state);
     }
 

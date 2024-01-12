@@ -3,7 +3,6 @@
   "version": "0.0.0",
   "build": {
     "includeDir": "src/modbus",
-    "headers": "freemodbus.h",
     "flags": [
       "-I src/port",
       "-I src/modbus/include",

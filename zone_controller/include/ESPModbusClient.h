@@ -4,13 +4,13 @@
 
 #include "mbcontroller.h"
 
-class ModbusClient : public BaseModbusClient {
+class ESPModbusClient : public BaseModbusClient {
   public:
-    ModbusClient() {
+    ESPModbusClient() {
         numDeviceParams_ = cx_registers_.size();
         deviceParameters_ = new mb_parameter_descriptor_t[numDeviceParams_];
     }
-    ~ModbusClient() { delete deviceParameters_; }
+    ~ESPModbusClient() { delete deviceParameters_; }
 
     esp_err_t init();
 

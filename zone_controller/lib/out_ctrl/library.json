@@ -1,0 +1,8 @@
+{
+  "name": "out_ctrl",
+  "version": "0.0.0",
+  "headers": ["OutCtrl.h", "BaseOutIO.h", "OutIO.h", "InputState.h"],
+  "dependencies": {
+    "modbus_client": "*"
+  }
+}

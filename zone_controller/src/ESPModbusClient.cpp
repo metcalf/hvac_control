@@ -1,4 +1,4 @@
-#include "modbus_client/ModbusClient.h"
+#include "ESPModbusClient.h"
 
 #include "esp_log.h"
 
@@ -15,7 +15,7 @@
 
 static const char *TAG = "MBC";
 
-esp_err_t ModbusClient::init() {
+esp_err_t ESPModbusClient::init() {
     int i = 0;
     for (auto const item : cx_registers_) {
         uint16_t id = static_cast<uint16_t>(item.first);
@@ -75,11 +75,11 @@ esp_err_t ModbusClient::init() {
     return err;
 }
 
-esp_err_t ModbusClient::getParam(CxRegister reg, uint16_t *value) {
+esp_err_t ESPModbusClient::getParam(CxRegister reg, uint16_t *value) {
     esp_err_t err = ESP_OK;
     uint8_t type = 0; // throwaway
 
-    const char *name = cx_registers_[reg];
+    const char *name = cx_registers_.at(reg);
     uint16_t id = static_cast<uint16_t>(reg);
 
     ESP_LOGD(TAG, "Getting heatpump %s(%d)", name, id);
@@ -94,11 +94,11 @@ esp_err_t ModbusClient::getParam(CxRegister reg, uint16_t *value) {
     return err;
 }
 
-esp_err_t ModbusClient::setParam(CxRegister reg, uint16_t value) {
+esp_err_t ESPModbusClient::setParam(CxRegister reg, uint16_t value) {
     esp_err_t err = ESP_OK;
     uint8_t type = 0; // throwaway
 
-    const char *name = cx_registers_[reg];
+    const char *name = cx_registers_.at(reg);
     uint16_t id = static_cast<uint16_t>(reg);
 
     ESP_LOGD(TAG, "Setting heatpump %s(%d)=%d", name, id, value);

@@ -52,7 +52,7 @@ uint16_t getLastTachRPM() {
 int main(void) {
     wdt_enable(WDTO_1S);
 
-    CLKCTRL.MCLKCTRLB = CLKCTRL_PEN_bm | CLKCTRL_PDIV_64X_gc; // Divide main clock by 32 = 500khz
+    CLKCTRL.MCLKCTRLB = CLKCTRL_PEN_bm | CLKCTRL_PDIV_64X_gc; // Divide main clock by 64 = 312500hz
 
     // PB2 output for power toggle
     VPORTB.DIR |= POWER_PIN_NUM;

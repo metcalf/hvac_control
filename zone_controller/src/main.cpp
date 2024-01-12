@@ -3,9 +3,9 @@
 #include "freertos/task.h"
 #include "lvgl.h"
 
-#include "modbus_client/ModbusClient.h"
-#include "out_ctrl/OutCtrl.h"
-#include "out_ctrl/OutIO.h"
+#include "ESPModbusClient.h"
+#include "ESPOutIO.h"
+#include "OutCtrl.h"
 #include "zone_io.h"
 
 #define ZONE_IO_TASK_PRIORITY 10
@@ -39,10 +39,10 @@ void output_task(void *) {
 extern "C" void app_main() {
     zone_io_init();
 
-    ModbusClient *mb_client = new ModbusClient();
+    ESPModbusClient *mb_client = new ESPModbusClient();
     mb_client->init(); // TODO: Check error return
 
-    OutIO *outIO = new OutIO();
+    ESPOutIO *outIO = new ESPOutIO();
     outIO->init();
     outCtrl = new OutCtrl(outIO, mb_client, xTaskGetTickCount);
 

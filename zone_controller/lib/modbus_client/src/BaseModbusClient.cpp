@@ -1,4 +1,4 @@
-#include "modbus_client/BaseModbusClient.h"
+#include "BaseModbusClient.h"
 
 esp_err_t BaseModbusClient::setCxOpMode(CxOpMode op_mode) {
     esp_err_t err = ESP_OK;
