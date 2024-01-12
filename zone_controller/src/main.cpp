@@ -1,49 +1,57 @@
 #include "esp_log.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 #include "lvgl.h"
 
-#include "driver/gpio.h"
-#include "modbus_client.h"
+#include "modbus_client/ModbusClient.h"
+#include "out_ctrl/OutCtrl.h"
+#include "out_ctrl/OutIO.h"
 #include "zone_io.h"
 
-#define VLV1_GPIO GPIO_NUM_40
-#define VLV2_GPIO GPIO_NUM_39
-#define VLV3_GPIO GPIO_NUM_38
-#define VLV4_GPIO GPIO_NUM_37
-#define LOOP_PUMP_GPIO GPIO_NUM_42
-#define FC_PUMP_GPIO GPIO_NUM_44
+#define ZONE_IO_TASK_PRIORITY 10
+#define OUTPUT_TASK_PRIORITY 10
 
-void output_init() {
-    gpio_config_t io_conf = {
-        .pin_bit_mask = ((1ULL << VLV1_GPIO) || (1ULL << VLV2_GPIO) || (1ULL << VLV3_GPIO) ||
-                         (1ULL << VLV4_GPIO) || (1ULL << LOOP_PUMP_GPIO) || (1ULL << FC_PUMP_GPIO)),
-        .mode = GPIO_MODE_OUTPUT,
-        .pull_up_en = GPIO_PULLUP_DISABLE,
-        .pull_down_en = GPIO_PULLDOWN_DISABLE,
-        .intr_type = GPIO_INTR_DISABLE,
-    };
-    gpio_config(&io_conf);
+#define ZONE_IO_TASK_STACK_SIZE 2048
+#define OUTPUT_TASK_STACK_SIZE 2048
+
+#define OUTPUT_UPDATE_PERIOD_TICKS 500 / portTICK_RATE_MS
+
+static const char *TAG = "APP";
+
+OutCtrl *outCtrl;
+
+void output_task(void *) {
+    bool system_on = true; // TODO: Implement this
+
+    while (1) {
+        TickType_t start = xTaskGetTickCount();
+        outCtrl->update(system_on, zone_io_get_state());
+        TickType_t duration = xTaskGetTickCount() - start;
+        if (duration > OUTPUT_UPDATE_PERIOD_TICKS) {
+            ESP_LOGI(TAG, "Output update took longer than period (%dms)",
+                     duration * portTICK_RATE_MS);
+        } else {
+            vTaskDelay(OUTPUT_UPDATE_PERIOD_TICKS - duration);
+        }
+    }
 }
 
 extern "C" void app_main() {
-    output_init();
     zone_io_init();
-    modbus_client_init();
 
-    // Functions:
-    // Load display library and communicate with display, build GUI, run on dedicated core, use PSRAM
-    // Setup zone valve and pump outputs
-    // Write all the logic for managing valve/pump state
-    // Connect to wifi for logging, vacation mode control
+    ModbusClient *mb_client = new ModbusClient();
+    mb_client->init(); // TODO: Check error return
 
-    while (1) {
-        // Poll zone IO buffer
-        // Poll CX water temp periodically when on
-        // Set zone valve and pump outputs appropriately
+    OutIO *outIO = new OutIO();
+    outIO->init();
+    outCtrl = new OutCtrl(outIO, mb_client, xTaskGetTickCount);
 
-        // Only turn on two zone valve at a time from separate legs (random order)
-        // Report error if zone valve doesn't switch on/off within the desired time
-        // Hydronic loop pump cannot enable unless water temp is high enough and at least one zone valve reports open
-        // zone valves only respond to heating call and only open when water temp is high enough
-        // Fancoil pump enables for heating and cooling when water temp is at threshold for that
-    }
+    // TODO:
+    // * Wifi for NTP, logging, polling Ecobee vacation API
+    // * UI (consider dedicated core, PSRAM)
+
+    xTaskCreate(zone_io_task, "zone_io_task", ZONE_IO_TASK_STACK_SIZE, NULL, ZONE_IO_TASK_PRIORITY,
+                NULL);
+    xTaskCreate(output_task, "output_task", OUTPUT_TASK_STACK_SIZE, NULL, OUTPUT_TASK_PRIORITY,
+                NULL);
 }
