@@ -1,8 +1,9 @@
 {
   "name": "out_ctrl",
   "version": "0.0.0",
-  "headers": ["OutCtrl.h", "BaseOutIO.h", "OutIO.h", "InputState.h"],
+  "headers": ["OutCtrl.h", "BaseOutIO.h", "OutIO.h"],
   "dependencies": {
+    "zone_io_client": "*",
     "modbus_client": "*"
   }
 }

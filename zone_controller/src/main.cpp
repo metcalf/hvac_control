@@ -6,12 +6,11 @@
 #include "ESPModbusClient.h"
 #include "ESPOutIO.h"
 #include "OutCtrl.h"
-#include "zone_io.h"
+#include "zone_io_client.h"
 
 #define ZONE_IO_TASK_PRIORITY 10
 #define OUTPUT_TASK_PRIORITY 10
 
-#define ZONE_IO_TASK_STACK_SIZE 2048
 #define OUTPUT_TASK_STACK_SIZE 2048
 
 #define OUTPUT_UPDATE_PERIOD_TICKS 500 / portTICK_RATE_MS

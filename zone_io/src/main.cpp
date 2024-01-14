@@ -142,6 +142,7 @@ int main(void) {
         startTx();
 
         // Delay while sending since we don't need the data very frequently
+        wdt_reset();
         _delay_ms(SEND_INTERVAL_MS);
     }
 }

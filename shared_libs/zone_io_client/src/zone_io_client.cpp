@@ -1,11 +1,16 @@
-#include "zone_io.h"
+#include "zone_io_client.h"
+
+#if defined(ESP_PLATFORM)
 
 #include "driver/uart.h"
+#include "esp_log.h"
 
 #define ZIO_UART_NUM UART_NUM_1
 #define ZIO_RXD 35
 
 #define BUF_SIZE (1024)
+
+static const char *TAG = "ZIO";
 
 static SemaphoreHandle_t mutex;
 static uint8_t zio_buf_[BUF_SIZE];
@@ -19,7 +24,19 @@ union BitByte {
     unsigned char byte;
 };
 
-static bool state_eq(InputState s1, InputState s2) {
+void zone_io_log_state(InputState s) {
+    ESP_LOGI(
+        TAG, "FC:%d%d|%d%d|%d%d|%d%d V:%c%c|%c%c|%c%c|%c%c SW: %d",
+        // Fancoils
+        s.fc[0].v, s.fc[0].ob, s.fc[1].v, s.fc[1].ob, s.fc[2].v, s.fc[2].ob, s.fc[3].v, s.fc[3].ob,
+        // Thermostats
+        s.ts[0].w ? 'w' : '_', s.ts[0].y ? 'y' : '_', s.ts[1].w ? 'w' : '_', s.ts[1].y ? 'y' : '_',
+        s.ts[2].w ? 'w' : '_', s.ts[2].y ? 'y' : '_', s.ts[3].w ? 'w' : '_', s.ts[3].y ? 'y' : '_',
+        // Valve SW
+        static_cast<int>(s.valve_sw));
+}
+
+bool zone_io_state_eq(InputState s1, InputState s2) {
     for (int i = 0; i < ZONE_IO_NUM_FC; i++) {
         if (s1.fc[i].v != s2.fc[i].v || s1.fc[i].ob != s2.fc[i].ob) {
             return false;
@@ -64,6 +81,8 @@ void zone_io_task(void *) {
             continue;
         }
 
+        ESP_LOGD(TAG, "Read %d bytes", rx_bytes);
+
         // Apply each update byte, modifying the last state
         InputState input_state = last_input_state_;
         for (int i = 0; i < rx_bytes; i++) {
@@ -83,7 +102,7 @@ void zone_io_task(void *) {
             }
         }
 
-        if (!state_eq(input_state, last_input_state_)) {
+        if (!zone_io_state_eq(input_state, last_input_state_)) {
             if (xSemaphoreTake(mutex, portMAX_DELAY)) {
                 last_input_state_ = input_state;
                 xSemaphoreGive(mutex);
@@ -98,3 +117,7 @@ InputState zone_io_get_state() {
     xSemaphoreGive(mutex);
     return state;
 }
+
+#else // defined(ESP_PLATFORM)
+
+#endif // defined(ESP_PLATFORM)

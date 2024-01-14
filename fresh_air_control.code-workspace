@@ -7,9 +7,6 @@
       "path": "shared_libs"
     },
     {
-      "path": "comms_test"
-    },
-    {
       "name": "fancoil_makeup_aux",
       "path": "fancoil_makeup_aux"
     },
@@ -26,6 +23,13 @@
     },
     {
       "path": "components"
+    },
+    {
+      "path": "manual_testing/fresh_air_control_tester"
+    },
+    {
+      "name": "zone_io_tester",
+      "path": "manual_testing/zone_io_tester"
     }
   ],
   "settings": {
