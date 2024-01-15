@@ -25,9 +25,7 @@
 #include <freemodbus.h>
 
 /* ----------------------- Start implementation -----------------------------*/
-void
-vMBPortSerialEnable( BOOL xRxEnable, BOOL xTxEnable )
-{
+void vMBPortSerialEnable(BOOL xRxEnable, BOOL xTxEnable) {
     /* If xRXEnable enable serial receive interrupts. If xTxENable enable
      * transmitter empty interrupts.
      */
@@ -40,38 +38,34 @@ vMBPortSerialEnable( BOOL xRxEnable, BOOL xTxEnable )
     (void)xTxEnable;
 }
 
-BOOL
-xMBPortSerialInit( UCHAR ucPORT, ULONG ulBaudRate, UCHAR ucDataBits, eMBParity eParity )
-{
+BOOL xMBPortSerialInit(UCHAR ucPORT, ULONG ulBaudRate, UCHAR ucDataBits, eMBParity eParity) {
     assert(eParity == MB_PAR_NONE); // Don't support parity
-    assert(ucPORT == 0x00); // Don't support selecting port
+    assert(ucPORT == 0x00);         // Don't support selecting port
 
     PORTMUX.USARTROUTEA = PORTMUX_USART1_ALT1_gc;
-    VPORTC.DIR &= ~PIN1_bm; // RxD on PC1
+    VPORTC.DIR &= ~PIN1_bm;            // RxD on PC1
     VPORTC.DIR |= (PIN2_bm | PIN3_bm); // TxD on PC2, XDIR on PC3
 
-    USART1.CTRLA = USART_RXCIE_bm | USART_DREIE_bm | USART_RS485_bm;
+    USART1.CTRLA = USART_RXCIE_bm | USART_RS485_bm;
     USART1.CTRLB = USART_TXEN_bm | USART_RXEN_bm;
     USART1.BAUD = (uint16_t)((float)(F_CLK_PER * 64 / (16 * (float)ulBaudRate)) + 0.5);
     // Configure async 8N1 (this is the default anyway, being explicit for clarity)
-    USART1.CTRLC = USART_CMODE_ASYNCHRONOUS_gc | USART_PMODE_DISABLED_gc | USART_SBMODE_1BIT_gc | USART_CHSIZE_8BIT_gc;
+    USART1.CTRLC = USART_CMODE_ASYNCHRONOUS_gc | USART_PMODE_DISABLED_gc | USART_SBMODE_1BIT_gc |
+                   USART_CHSIZE_8BIT_gc;
 
     return TRUE;
 }
 
-BOOL
-xMBPortSerialPutByte( CHAR ucByte )
-{
+BOOL xMBPortSerialPutByte(CHAR ucByte) {
     USART1_TXDATAL = ucByte;
+    USART1.CTRLA |= USART_DREIE_bm;
     /* Put a byte in the UARTs transmit buffer. This function is called
      * by the protocol stack if pxMBFrameCBTransmitterEmpty( ) has been
      * called. */
     return TRUE;
 }
 
-BOOL
-xMBPortSerialGetByte( CHAR * pucByte )
-{
+BOOL xMBPortSerialGetByte(CHAR *pucByte) {
     /* Return the byte in the UARTs receive buffer. This function is called
      * by the protocol stack after pxMBFrameCBByteReceived( ) has been called.
      */
@@ -85,9 +79,10 @@ xMBPortSerialGetByte( CHAR * pucByte )
  * a new character can be sent. The protocol stack will then call
  * xMBPortSerialPutByte( ) to send the character.
  */
-ISR(USART1_DRE_vect){
-    // Interrupt flag is cleared when data is written to the buffer
-    pxMBFrameCBTransmitterEmpty(  );
+ISR(USART1_DRE_vect) {
+    // Write complete, disable interrupt
+    USART1.CTRLA &= ~USART_DREIE_bm;
+    pxMBFrameCBTransmitterEmpty();
 }
 
 /* Create an interrupt handler for the receive interrupt for your target
@@ -95,7 +90,7 @@ ISR(USART1_DRE_vect){
  * protocol stack will then call xMBPortSerialGetByte( ) to retrieve the
  * character.
  */
-ISR(USART1_RXC_vect){
+ISR(USART1_RXC_vect) {
     // Interrupt flag is cleared when data is read from the rx buffer
-    pxMBFrameCBByteReceived(  );
+    pxMBFrameCBByteReceived();
 }

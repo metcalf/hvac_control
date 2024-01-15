@@ -7,6 +7,8 @@
 
 #define ZONE_IO_TASK_PRIORITY 10
 
+static const char *TAG = "APP";
+
 extern "C" void app_main() {
     esp_log_level_set("*", ESP_LOG_DEBUG);
 
@@ -17,6 +19,7 @@ extern "C" void app_main() {
 
     vTaskDelay(1000 / portTICK_PERIOD_MS);
     repl_start();
+    ESP_LOGD(TAG, "log test");
 
     InputState last_state = zone_io_get_state();
     while (1) {

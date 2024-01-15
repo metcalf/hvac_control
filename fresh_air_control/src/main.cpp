@@ -52,6 +52,7 @@ uint16_t getLastTachRPM() {
 int main(void) {
     wdt_enable(WDTO_1S);
 
+    CPU_CCP = CCP_IOREG_gc; /* Enable writing to protected register MCLKCTRLB */
     CLKCTRL.MCLKCTRLB = CLKCTRL_PEN_bm | CLKCTRL_PDIV_64X_gc; // Divide main clock by 64 = 312500hz
 
     // PB2 output for power toggle
@@ -87,6 +88,8 @@ int main(void) {
     last_pht_read_ticks_ = tick_;
 
     modbus_client_init(MB_SLAVE_ID, MB_BAUD, &last_data_, &curr_speed_);
+
+    sei();
 
     while (1) {
         wdt_reset();

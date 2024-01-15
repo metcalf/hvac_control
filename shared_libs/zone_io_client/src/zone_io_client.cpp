@@ -75,13 +75,12 @@ void zone_io_init() {
 void zone_io_task(void *) {
     while (1) {
         int rx_bytes = uart_read_bytes(ZIO_UART_NUM, zio_buf_, BUF_SIZE, portMAX_DELAY);
+        ESP_LOGD(TAG, "Read %d bytes", rx_bytes);
 
         if (rx_bytes < 0) {
             // TODO: Report error
             continue;
         }
-
-        ESP_LOGD(TAG, "Read %d bytes", rx_bytes);
 
         // Apply each update byte, modifying the last state
         InputState input_state = last_input_state_;

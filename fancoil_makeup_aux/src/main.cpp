@@ -26,6 +26,7 @@ uint8_t setFancoil(bool cool_mode, uint8_t speed) {
 int main(void) {
     wdt_enable(WDTO_1S);
 
+    CPU_CCP = CCP_IOREG_gc; /* Enable writing to protected register MCLKCTRLB */
     // TODO: Update F_CLK_PER in platformio.ini if this changes, it probably will!!!
     CLKCTRL.MCLKCTRLB = CLKCTRL_PEN_bm | CLKCTRL_PDIV_64X_gc; // Divide main clock by 32 = 500khz
 
@@ -52,6 +53,8 @@ int main(void) {
 
     modbus_client_init(slave_id, MB_BAUD, mode_iso_input_ ? &iso_input_state_ : NULL,
                        mode_fancoil_ ? setFancoil : NULL);
+
+    sei();
 
     while (1) {
         wdt_reset();

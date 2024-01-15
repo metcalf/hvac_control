@@ -10,21 +10,17 @@
 #define UART_BAUD 9600
 #define SEND_INTERVAL_MS 450
 
-struct Bits {
-    unsigned b0 : 1, b1 : 1, b2 : 1, b3 : 1, b4 : 1, b5 : 1, b6 : 1, b7 : 1;
-};
-union BitByte {
-    struct Bits bits;
-    unsigned char byte;
-};
-
 volatile uint16_t vlv_sw_period_;
 
 uint8_t port_states_[3];
 volatile uint8_t tx_pos_;
-BitByte tx_buffer_[3] = {(0x00 << 6), (0x01 << 6), (0x02 << 6)};
+char tx_buffer_[3];
 
 uint8_t getVlvState() {
+    if (vlv_sw_period_ == 0) {
+        return 0;
+    }
+
     uint8_t vlv_sw_freq = VLV_SW_CLK / vlv_sw_period_;
     // NB: Rectified AC is double mains frequency (120hz)
     if (vlv_sw_freq < 30) {
@@ -38,52 +34,42 @@ uint8_t getVlvState() {
 
 void setupUSART() {
     VPORTA.DIR |= PIN1_bm; // TxD on PA1
-    USART1.CTRLA = USART_DREIE_bm;
-    USART1.CTRLB = USART_TXEN_bm; // TX only
-    USART1.BAUD = (uint16_t)((float)(F_CLK_PER * 64 / (16 * (float)UART_BAUD)) + 0.5);
     // Configure async 8N1 (this is the default anyway, being explicit for clarity)
     USART1.CTRLC = USART_CMODE_ASYNCHRONOUS_gc | USART_PMODE_DISABLED_gc | USART_SBMODE_1BIT_gc |
                    USART_CHSIZE_8BIT_gc;
-}
-
-void txNext() {
-    USART1_TXDATAL = tx_buffer_[tx_pos_].byte;
-    tx_pos_ = (tx_pos_ + 1) % sizeof(tx_buffer_);
+    USART1.BAUD = (uint16_t)((float)(F_CLK_PER * 64 / (16 * (float)UART_BAUD)) + 0.5);
+    USART1.CTRLB = USART_TXEN_bm; // TX only
 }
 
 void startTx() {
-    if (tx_pos_ != 0 || (USART1.STATUS & USART_DREIF_bm)) {
+    if (USART1.CTRLA & USART_DREIE_bm) {
         return; // We're still writing, skip this Tx
     }
 
-    BitByte vlv_state = {.byte = getVlvState()};
+    tx_buffer_[0] = (VPORTA.IN & PIN2_bm && (1 << 0)) | // FC1_V
+                    (VPORTA.IN & PIN3_bm && (1 << 1)) | // FC1_OB
+                    (VPORTA.IN & PIN4_bm && (1 << 2)) | // FC2_V
+                    (VPORTA.IN & PIN5_bm && (1 << 3)) | // FC2_OB
+                    (VPORTA.IN & PIN6_bm && (1 << 4)) | // FC3_V
+                    (VPORTA.IN & PIN7_bm && (1 << 5));  // FC3_OB
 
-    tx_buffer_[0] = {.bits = {.b0 = VPORTA.IN & PIN2_bm, // FC1_V
-                              .b1 = VPORTA.IN & PIN3_bm, // FC1_OB
-                              .b2 = VPORTA.IN & PIN4_bm, // FC2_V
-                              .b3 = VPORTA.IN & PIN5_bm, // FC2_OB
-                              .b4 = VPORTA.IN & PIN6_bm, // FC3_V
-                              .b5 = VPORTA.IN & PIN7_bm, // FC3_OB
-                              .b6 = 0,
-                              .b7 = 0}};
-    tx_buffer_[1] = {.bits = {.b0 = VPORTB.IN & PIN5_bm, // FC4_V
-                              .b1 = VPORTB.IN & PIN4_bm, // FC4_OB
-                              .b2 = VPORTB.IN & PIN1_bm, // TS1_W
-                              .b3 = VPORTB.IN & PIN2_bm, // TS1_Y
-                              .b4 = VPORTB.IN & PIN3_bm, // TS2_W
-                              .b5 = VPORTB.IN & PIN0_bm, // TS2_Y
-                              .b6 = 1,
-                              .b7 = 0}};
-    tx_buffer_[2] = {.bits = {.b0 = VPORTC.IN & PIN1_bm, // TS3_W
-                              .b1 = VPORTC.IN & PIN2_bm, // TS3_Y
-                              .b2 = VPORTC.IN & PIN3_bm, // TS4_W
-                              .b3 = 0,                   // TS4_Y (not connected)
-                              .b4 = vlv_state.bits.b0,
-                              .b5 = vlv_state.bits.b1,
-                              .b6 = 0,
-                              .b7 = 1}};
+    tx_buffer_[1] = (VPORTB.IN & PIN5_bm && (1 << 0)) | // FC4_V
+                    (VPORTB.IN & PIN4_bm && (1 << 1)) | // FC4_OB
+                    (VPORTB.IN & PIN1_bm && (1 << 2)) | // TS1_W
+                    (VPORTB.IN & PIN2_bm && (1 << 3)) | // TS1_Y
+                    (VPORTB.IN & PIN3_bm && (1 << 4)) | // TS2_W
+                    (VPORTB.IN & PIN0_bm && (1 << 5)) | // TS2_Y
+                    // Payload ID 1
+                    (1 << 6);
 
-    txNext();
+    tx_buffer_[2] = (VPORTC.IN & PIN1_bm && (1 << 0)) | // TS3_W
+                    (VPORTC.IN & PIN2_bm && (1 << 1)) | // TS3_Y
+                    (VPORTC.IN & PIN3_bm && (1 << 2)) | // TS4_W
+                    (getVlvState() << 4) |
+                    // Payload ID 2
+                    (1 << 7);
+
+    USART1.CTRLA |= USART_DREIE_bm;
 }
 
 void setupPins() {
@@ -115,13 +101,16 @@ void setupVlvTimer() {
 }
 
 int main(void) {
-    wdt_enable(WDTO_1S);
+    //wdt_enable(WDTO_1S);
 
+    CPU_CCP = CCP_IOREG_gc; /* Enable writing to protected register MCLKCTRLB */
     CLKCTRL.MCLKCTRLB = CLKCTRL_PEN_bm | CLKCTRL_PDIV_64X_gc; // Divide main clock by 64 = 312500hz
 
     setupUSART();
     setupPins();
     setupVlvTimer();
+
+    sei(); // Enable interrupts
 
     while (1) {
         wdt_reset();
@@ -158,9 +147,11 @@ ISR(TCB0_INT_vect) {
 }
 
 ISR(USART1_DRE_vect) {
-    if (tx_pos_ == 0) {
-        return; // Nothing to write right now
-    }
+    USART1_TXDATAL = tx_buffer_[tx_pos_];
+    tx_pos_ = (tx_pos_ + 1) % sizeof(tx_buffer_);
 
-    txNext();
+    if (tx_pos_ == 0) {
+        // Write complete, disable interrupt
+        USART1.CTRLA &= ~USART_DREIE_bm;
+    }
 }
