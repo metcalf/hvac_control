@@ -39,7 +39,11 @@
       "io.h": "c",
       "common.h": "c",
       "usb_serial_jtag.h": "c",
-      "*.tcc": "cpp"
+      "*.tcc": "cpp",
+      "array": "cpp",
+      "string_view": "cpp",
+      "initializer_list": "cpp",
+      "utility": "cpp"
     }
   }
 }

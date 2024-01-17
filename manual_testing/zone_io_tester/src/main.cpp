@@ -10,8 +10,6 @@
 static const char *TAG = "APP";
 
 extern "C" void app_main() {
-    esp_log_level_set("*", ESP_LOG_DEBUG);
-
     zone_io_init();
 
     xTaskCreate(zone_io_task, "zone_io_task", ZONE_IO_TASK_STACK_SIZE, NULL, ZONE_IO_TASK_PRIORITY,

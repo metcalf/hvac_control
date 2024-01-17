@@ -1,0 +1,15 @@
+{
+  "configurations": [
+    {
+      "name": "Mac",
+      "includePath": ["${workspaceFolder}/**"],
+      "defines": ["ESP_PLATFORM"],
+      "macFrameworkPath": [],
+      "compilerPath": "/Users/andrew/.platformio/packages/toolchain-xtensa-esp32s3/bin/xtensa-esp32s3-elf-gcc",
+      "cStandard": "c17",
+      "cppStandard": "gnu++14",
+      "intelliSenseMode": "macos-gcc-x86"
+    }
+  ],
+  "version": 4
+}

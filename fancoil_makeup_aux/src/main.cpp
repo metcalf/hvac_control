@@ -24,7 +24,7 @@ uint8_t setFancoil(bool cool_mode, uint8_t speed) {
 }
 
 int main(void) {
-    wdt_enable(WDTO_1S);
+    wdt_enable(0x8); // 1 second (note the constants in avr/wdt are wrong for this chip)
 
     CPU_CCP = CCP_IOREG_gc; /* Enable writing to protected register MCLKCTRLB */
     // TODO: Update F_CLK_PER in platformio.ini if this changes, it probably will!!!

@@ -50,7 +50,7 @@ uint16_t getLastTachRPM() {
 }
 
 int main(void) {
-    wdt_enable(WDTO_1S);
+    wdt_enable(0x8); // 1 second (note the constants in avr/wdt are wrong for this chip)
 
     CPU_CCP = CCP_IOREG_gc; /* Enable writing to protected register MCLKCTRLB */
     CLKCTRL.MCLKCTRLB = CLKCTRL_PEN_bm | CLKCTRL_PDIV_64X_gc; // Divide main clock by 64 = 312500hz
@@ -60,9 +60,9 @@ int main(void) {
 
     // Tachometer using frequency measurement on PA5 / TCB0 W0
     // Expect speeds ~500-3000RPM
-    PORTB.PIN5CTRL |= PORT_PULLUPEN_bm; // Enable pull up resistor
-    TCB0.CTRLB = TCB_CNTMODE_FRQ_gc;    // Frequency count mode
-    //TCB0.EVCTRL = TCB_CAPTEI_bm; // I had this set originally but think it isn't necessary?
+    PORTB.PIN5CTRL = PORT_PULLUPEN_bm;         // Enable pull up resistor
+    TCB0.CTRLB = TCB_CNTMODE_FRQ_gc;           // Frequency count mode
+    TCB0.EVCTRL = TCB_CAPTEI_bm | TCB_EDGE_bm; // Measure frequency between falling edge events
     TCB0.INTCTRL = TCB_CAPT_bm;
     TCB0.CTRLA =
         (TCB_ENABLE_bm | TCB_CLKSEL_DIV2_gc); // Configure tach frequency measurement @ ~156khz
@@ -112,8 +112,9 @@ ISR(TCA0_LUNF_vect) {
 
 ISR(TCB0_INT_vect) {
     if (TCB0.INTFLAGS & TCB_OVF_bm) {
-        // If we overflowed, clear the overflow bit and set an invalid period
+        // If we overflowed, clear both flags and set an invalid period
         TCB0.INTFLAGS &= ~TCB_OVF_bm;
+        TCB0.INTFLAGS |= TCB_CAPT_bm;
         tach_period_ = 0;
     } else {
         tach_period_ = TCB0.CCMP; // reading CCMP clears interrupt flag

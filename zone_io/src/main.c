@@ -4,6 +4,7 @@
 #include <avr/interrupt.h>
 #include <avr/io.h>
 #include <avr/wdt.h>
+#include <util/atomic.h>
 #include <util/delay.h>
 
 #define VLV_SW_CLK F_CLK_PER / 2
@@ -12,16 +13,45 @@
 
 volatile uint16_t vlv_sw_period_;
 
-uint8_t port_states_[3];
 volatile uint8_t tx_pos_;
 char tx_buffer_[3];
 
+const uint8_t tx_map_[3][6] = {
+    {
+        // PORTA
+        PIN2_bm, // FC1_V
+        PIN3_bm, // FC1_OBpwm
+        PIN4_bm, // FC2_V
+        PIN5_bm, // FC2_OB
+        PIN6_bm, // FC3_V
+        PIN7_bm, // FC3_OB
+    },
+    {
+        // PORTB
+        PIN5_bm, // FC4_V
+        PIN4_bm, // FC4_OB
+        PIN1_bm, // TS1_W
+        PIN2_bm, // TS1_Y
+        PIN3_bm, // TS2_W
+        PIN0_bm, // TS2_Y
+    },
+    {
+        // PORTC
+        PIN0_bm, // TS3_W
+        PIN1_bm, // TS3_Y
+        PIN2_bm, // TS4_W
+    },
+};
+
 uint8_t getVlvState() {
-    if (vlv_sw_period_ == 0) {
+    uint16_t period;
+    ATOMIC_BLOCK(ATOMIC_FORCEON) { period = vlv_sw_period_; }
+
+    if (period == 0) {
         return 0;
     }
 
-    uint8_t vlv_sw_freq = VLV_SW_CLK / vlv_sw_period_;
+    uint32_t vlv_sw_freq = (VLV_SW_CLK + period / 2) / period;
     // NB: Rectified AC is double mains frequency (120hz)
     if (vlv_sw_freq < 30) {
         return 0; // Assume off
@@ -41,73 +71,63 @@ void setupUSART() {
     USART1.CTRLB = USART_TXEN_bm; // TX only
 }
 
-void startTx() {
+void startTx(uint8_t *port_states) {
     if (USART1.CTRLA & USART_DREIE_bm) {
         return; // We're still writing, skip this Tx
     }
 
-    tx_buffer_[0] = (VPORTA.IN & PIN2_bm && (1 << 0)) | // FC1_V
-                    (VPORTA.IN & PIN3_bm && (1 << 1)) | // FC1_OB
-                    (VPORTA.IN & PIN4_bm && (1 << 2)) | // FC2_V
-                    (VPORTA.IN & PIN5_bm && (1 << 3)) | // FC2_OB
-                    (VPORTA.IN & PIN6_bm && (1 << 4)) | // FC3_V
-                    (VPORTA.IN & PIN7_bm && (1 << 5));  // FC3_OB
+    for (int i = 0; i < 3; i++) {
+        int lim = i < 2 ? 6 : 3;
+        tx_buffer_[i] = i << 6; // Set payload ID in last 2 bits
+        for (int j = 0; j < lim; j++) {
+            if (port_states[i] & tx_map_[i][j]) {
+                tx_buffer_[i] |= (0x01 << j);
+            }
+        }
+    }
 
-    tx_buffer_[1] = (VPORTB.IN & PIN5_bm && (1 << 0)) | // FC4_V
-                    (VPORTB.IN & PIN4_bm && (1 << 1)) | // FC4_OB
-                    (VPORTB.IN & PIN1_bm && (1 << 2)) | // TS1_W
-                    (VPORTB.IN & PIN2_bm && (1 << 3)) | // TS1_Y
-                    (VPORTB.IN & PIN3_bm && (1 << 4)) | // TS2_W
-                    (VPORTB.IN & PIN0_bm && (1 << 5)) | // TS2_Y
-                    // Payload ID 1
-                    (1 << 6);
-
-    tx_buffer_[2] = (VPORTC.IN & PIN1_bm && (1 << 0)) | // TS3_W
-                    (VPORTC.IN & PIN2_bm && (1 << 1)) | // TS3_Y
-                    (VPORTC.IN & PIN3_bm && (1 << 2)) | // TS4_W
-                    (getVlvState() << 4) |
-                    // Payload ID 2
-                    (1 << 7);
+    tx_buffer_[2] |= (getVlvState() << 4);
 
     USART1.CTRLA |= USART_DREIE_bm;
 }
 
-void setupPins() {
-    PORTA.PIN2CTRL |= PORT_PULLUPEN_bm; // FC1_V
-    PORTA.PIN3CTRL |= PORT_PULLUPEN_bm; // FC1_OB
-    PORTA.PIN4CTRL |= PORT_PULLUPEN_bm; // FC2_V
-    PORTA.PIN5CTRL |= PORT_PULLUPEN_bm; // FC2_OB
-    PORTA.PIN6CTRL |= PORT_PULLUPEN_bm; // FC3_V
-    PORTA.PIN7CTRL |= PORT_PULLUPEN_bm; // FC3_OB
-    PORTB.PIN1CTRL |= PORT_PULLUPEN_bm; // TS1_W
-    PORTB.PIN2CTRL |= PORT_PULLUPEN_bm; // TS1_Y
-    PORTB.PIN3CTRL |= PORT_PULLUPEN_bm; // TS2_W
-    PORTB.PIN5CTRL |= PORT_PULLUPEN_bm; // FC4_V
-    PORTB.PIN4CTRL |= PORT_PULLUPEN_bm; // FC4_OB
-    PORTB.PIN0CTRL |= PORT_PULLUPEN_bm; // TS2_Y
-    PORTC.PIN0CTRL |= PORT_PULLUPEN_bm; // TS3_W
-    PORTC.PIN1CTRL |= PORT_PULLUPEN_bm; // TS3_W
-    PORTC.PIN2CTRL |= PORT_PULLUPEN_bm; // TS3_Y
+void setupInputPins() {
+    VPORTA.DIR = 0;
+    VPORTB.DIR = 0;
+    VPORTC.DIR = 0;
+
+    register8_t *pins[] = {
+        &PORTA.PIN2CTRL, &PORTA.PIN3CTRL, &PORTA.PIN4CTRL, &PORTA.PIN5CTRL, &PORTA.PIN6CTRL,
+        &PORTA.PIN7CTRL, &PORTB.PIN1CTRL, &PORTB.PIN2CTRL, &PORTB.PIN3CTRL, &PORTB.PIN5CTRL,
+        &PORTB.PIN4CTRL, &PORTB.PIN0CTRL, &PORTC.PIN0CTRL, &PORTC.PIN1CTRL, &PORTC.PIN2CTRL,
+    };
+
+    for (int i = 0; i < (sizeof(pins) / sizeof(pins[0])); i++) {
+        // Enable pullups on all input pins and invert inputs since NPN optos pull down
+        *pins[i] = (PORT_PULLUPEN_bm | PORT_INVEN_bm);
+    }
 }
 
 void setupVlvTimer() {
-    // Configure TCB0 on WO0/PC0 for frequency measurement for VLV_SW_IO
-    PORTMUX.TCBROUTEA = PORTMUX_TCB0_ALT1_gc;
-    TCB0.CTRLB = TCB_CNTMODE_FRQ_gc; // Frequency count mode
-    //TCB0.EVCTRL = TCB_CAPTEI_bm; // I had this set originally but think it isn't necessary?
+    // Configure TCB0 on PC3 for frequency measurement for VLV_SW_IO
+    PORTC.PIN3CTRL = PORT_PULLUPEN_bm;
+    EVSYS.CHANNEL2 = EVSYS_CHANNEL2_PORTC_PIN3_gc; // Route pin PC3
+    EVSYS.USERTCB0CAPT = EVSYS_USER_CHANNEL2_gc;   // to TCB0
+    TCB0.CTRLB = TCB_CNTMODE_FRQ_gc;               // Frequency count mode
+    TCB0.EVCTRL = TCB_CAPTEI_bm | TCB_EDGE_bm;     // Measure frequency between falling edge events
     TCB0.INTCTRL = TCB_CAPT_bm;
     TCB0.CTRLA =
-        (TCB_ENABLE_bm | TCB_CLKSEL_DIV2_gc); // Configure tach frequency measurement @ ~156khz
+        TCB_ENABLE_bm | TCB_CLKSEL_DIV2_gc; // Configure tach frequency measurement @ ~156khz
 }
 
 int main(void) {
-    //wdt_enable(WDTO_1S);
+    wdt_enable(0x8); // 1 second (note the constants in avr/wdt are wrong for this chip)
 
     CPU_CCP = CCP_IOREG_gc; /* Enable writing to protected register MCLKCTRLB */
     CLKCTRL.MCLKCTRLB = CLKCTRL_PEN_bm | CLKCTRL_PDIV_64X_gc; // Divide main clock by 64 = 312500hz
 
+    setupInputPins();
     setupUSART();
-    setupPins();
     setupVlvTimer();
 
     sei(); // Enable interrupts
@@ -115,20 +135,19 @@ int main(void) {
     while (1) {
         wdt_reset();
 
+        uint8_t port_states[3] = {0, 0, 0};
+
         // Poll pin states every 833us for 50ms. This gives us a sample rate
         // of 1200hz on a 120hz signal for 6 cycles
-        memset(port_states_, 0, sizeof(port_states_));
         for (int i = 0; i < 60; i++) {
-            // Exclude PA0(UDPI) and PA1(UART)
-            port_states_[0] |= VPORTA.IN & ~(PIN0_bm | PIN1_bm);
-            port_states_[1] |= VPORTB.IN;
-            // Exclude PC0 (VLV_SW)
-            port_states_[2] |= VPORTC.IN & ~(PIN0_bm);
+            port_states[0] |= VPORTA.IN;
+            port_states[1] |= VPORTB.IN;
+            port_states[2] |= VPORTC.IN;
 
             _delay_us(833);
         }
 
-        startTx();
+        startTx(port_states);
 
         // Delay while sending since we don't need the data very frequently
         wdt_reset();
@@ -138,8 +157,9 @@ int main(void) {
 
 ISR(TCB0_INT_vect) {
     if (TCB0.INTFLAGS & TCB_OVF_bm) {
-        // If we overflowed, clear the overflow bit and set an invalid period
-        TCB0.INTFLAGS &= ~TCB_OVF_bm;
+        // If we overflowed, clear both flags and set an invalid period
+        TCB0.INTFLAGS |= TCB_OVF_bm;
+        TCB0.INTFLAGS |= TCB_CAPT_bm;
         vlv_sw_period_ = 0;
     } else {
         vlv_sw_period_ = TCB0.CCMP; // reading CCMP clears interrupt flag

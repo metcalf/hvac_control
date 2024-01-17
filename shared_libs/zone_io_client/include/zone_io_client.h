@@ -2,7 +2,7 @@
 
 #include "InputState.h"
 
-#define ZONE_IO_TASK_STACK_SIZE 2048
+#define ZONE_IO_TASK_STACK_SIZE 4096
 
 void zone_io_init();
 

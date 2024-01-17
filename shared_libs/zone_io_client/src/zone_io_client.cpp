@@ -8,13 +8,15 @@
 #define ZIO_UART_NUM UART_NUM_1
 #define ZIO_RXD 35
 
-#define BUF_SIZE (1024)
+#define BUF_SIZE 1024
+#define QUEUE_SIZE 1024
 
 static const char *TAG = "ZIO";
 
 static SemaphoreHandle_t mutex;
 static uint8_t zio_buf_[BUF_SIZE];
 static InputState last_input_state_;
+static QueueHandle_t uart_queue;
 
 struct Bits {
     unsigned b0 : 1, b1 : 1, b2 : 1, b3 : 1, b4 : 1, b5 : 1, b6 : 1, b7 : 1;
@@ -66,45 +68,86 @@ void zone_io_init() {
     };
     int intr_alloc_flags = 0;
     // Configure UART parameters
-    ESP_ERROR_CHECK(uart_driver_install(ZIO_UART_NUM, BUF_SIZE * 2, 0, 0, NULL, intr_alloc_flags));
+    ESP_ERROR_CHECK(
+        uart_driver_install(ZIO_UART_NUM, BUF_SIZE, 0, QUEUE_SIZE, &uart_queue, intr_alloc_flags));
     ESP_ERROR_CHECK(uart_param_config(ZIO_UART_NUM, &uart_config));
     ESP_ERROR_CHECK(uart_set_pin(ZIO_UART_NUM, UART_PIN_NO_CHANGE, ZIO_RXD, UART_PIN_NO_CHANGE,
                                  UART_PIN_NO_CHANGE));
 }
 
-void zone_io_task(void *) {
-    while (1) {
-        int rx_bytes = uart_read_bytes(ZIO_UART_NUM, zio_buf_, BUF_SIZE, portMAX_DELAY);
+void do_rx(size_t to_rx) {
+    int rx_bytes = uart_read_bytes(ZIO_UART_NUM, zio_buf_, to_rx, portMAX_DELAY);
+
+    if (rx_bytes < to_rx) {
+        ESP_LOGI(TAG, "Read %d bytes (of %d expected)", rx_bytes, to_rx);
+        return;
+    } else {
         ESP_LOGD(TAG, "Read %d bytes", rx_bytes);
+    }
 
-        if (rx_bytes < 0) {
-            // TODO: Report error
-            continue;
+    // Apply each update byte, modifying the last state
+    InputState input_state = last_input_state_;
+    for (int i = 0; i < rx_bytes; i++) {
+        BitByte byte = {.byte = zio_buf_[i]};
+        if (byte.bits.b7) {
+            input_state.ts[2] = {.w = byte.bits.b0, .y = byte.bits.b1};
+            input_state.ts[3] = {.w = byte.bits.b2, .y = byte.bits.b3};
+            input_state.valve_sw = static_cast<ValveSWState>((byte.byte >> 4) & 0x03);
+        } else if (byte.bits.b6) {
+            input_state.fc[3] = {.v = byte.bits.b0, .ob = byte.bits.b1};
+            input_state.ts[0] = {.w = byte.bits.b2, .y = byte.bits.b3};
+            input_state.ts[1] = {.w = byte.bits.b4, .y = byte.bits.b5};
+        } else {
+            input_state.fc[0] = {.v = byte.bits.b0, .ob = byte.bits.b1};
+            input_state.fc[1] = {.v = byte.bits.b2, .ob = byte.bits.b3};
+            input_state.fc[2] = {.v = byte.bits.b4, .ob = byte.bits.b5};
         }
+    }
 
-        // Apply each update byte, modifying the last state
-        InputState input_state = last_input_state_;
-        for (int i = 0; i < rx_bytes; i++) {
-            BitByte byte = {.byte = zio_buf_[i]};
-            if (byte.bits.b7) {
-                input_state.ts[2] = {.w = byte.bits.b0, .y = byte.bits.b1};
-                input_state.ts[3] = {.w = byte.bits.b2, .y = byte.bits.b3};
-                input_state.valve_sw = static_cast<ValveSWState>((byte.byte >> 4) & 0x03);
-            } else if (byte.bits.b6) {
-                input_state.fc[3] = {.v = byte.bits.b0, .ob = byte.bits.b1};
-                input_state.ts[0] = {.w = byte.bits.b2, .y = byte.bits.b3};
-                input_state.ts[1] = {.w = byte.bits.b4, .y = byte.bits.b5};
-            } else {
-                input_state.fc[0] = {.v = byte.bits.b0, .ob = byte.bits.b1};
-                input_state.fc[1] = {.v = byte.bits.b2, .ob = byte.bits.b3};
-                input_state.fc[2] = {.v = byte.bits.b4, .ob = byte.bits.b5};
-            }
+    if (!zone_io_state_eq(input_state, last_input_state_)) {
+        if (xSemaphoreTake(mutex, portMAX_DELAY)) {
+            last_input_state_ = input_state;
+            xSemaphoreGive(mutex);
         }
+    }
+}
 
-        if (!zone_io_state_eq(input_state, last_input_state_)) {
-            if (xSemaphoreTake(mutex, portMAX_DELAY)) {
-                last_input_state_ = input_state;
-                xSemaphoreGive(mutex);
+void zone_io_task(void *) {
+    uart_event_t event;
+
+    while (1) {
+        //Waiting for UART event.
+        if (xQueueReceive(uart_queue, (void *)&event, (TickType_t)portMAX_DELAY)) {
+            switch (event.type) {
+            case UART_DATA:
+                do_rx(event.size);
+                break;
+            case UART_BREAK:
+                ESP_LOGD(TAG, "uart rx break");
+                break;
+            case UART_BUFFER_FULL:
+                ESP_LOGW(TAG, "ring buffer full");
+                // If buffer full happened, you should consider increasing your buffer size
+                break;
+            case UART_FIFO_OVF:
+                ESP_LOGW(TAG, "hw fifo overflow");
+                // If fifo overflow happened, you should consider adding flow control for your application.
+                break;
+            case UART_FRAME_ERR:
+                ESP_LOGW(TAG, "uart frame error");
+                break;
+            case UART_PARITY_ERR:
+                ESP_LOGW(TAG, "uart parity error");
+                break;
+            case UART_DATA_BREAK:
+                ESP_LOGW(TAG, "unexpected uart data break event");
+                break;
+            case UART_PATTERN_DET:
+                ESP_LOGW(TAG, "unexpected uart pattern event");
+                break;
+            default:
+                ESP_LOGW(TAG, "unexpected uart event type: %d", event.type);
+                break;
             }
         }
     }
@@ -116,7 +159,5 @@ InputState zone_io_get_state() {
     xSemaphoreGive(mutex);
     return state;
 }
-
-#else // defined(ESP_PLATFORM)
 
 #endif // defined(ESP_PLATFORM)
