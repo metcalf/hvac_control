@@ -1,10 +1,11 @@
 #include <stdint.h>
 #include <stdlib.h>
 
-#include <avr/io.h>
+#include "avr/io.h"
+#include "avr/wdt.h"
+#include "util/atomic.h"
 
 #include "modbus_client.h"
-#include <avr/wdt.h>
 
 #define MB_BAUD 9600
 #define INPUT_PIN_NUM PIN0_bm
@@ -14,9 +15,13 @@
 
 bool mode_fancoil_, mode_iso_input_;
 
-uint16_t tick_;
+volatile uint16_t tick_;
 uint16_t iso_input_last_on_;
 uint8_t iso_input_state_;
+
+uint16_t getTick() {
+    ATOMIC_BLOCK(ATOMIC_FORCEON) { return tick_; }
+}
 
 uint8_t setFancoil(bool cool_mode, uint8_t speed) {
     // TODO: Actually implement sending the IR codes
@@ -60,11 +65,12 @@ int main(void) {
         wdt_reset();
         modbus_poll();
 
+        uint16_t now = getTick();
         if (VPORTC.IN & INPUT_PIN_NUM) {
             // Any ON value read indicates an ON state
             iso_input_state_ = 1;
-            iso_input_last_on_ = tick_;
-        } else if ((tick_ - iso_input_last_on_) > INPUT_READ_TIME_TICKS) {
+            iso_input_last_on_ = now;
+        } else if ((now - iso_input_last_on_) > INPUT_READ_TIME_TICKS) {
             // If we haven't read an ON value in INPUT_READ_TIME_TICKS, it's off
             iso_input_state_ = 0;
         }

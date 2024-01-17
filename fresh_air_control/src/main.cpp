@@ -1,8 +1,9 @@
 #include <stdint.h>
 
-#include <avr/interrupt.h>
-#include <avr/io.h>
-#include <avr/wdt.h>
+#include "avr/interrupt.h"
+#include "avr/io.h"
+#include "avr/wdt.h"
+#include "util/atomic.h"
 
 #include "bme280_client.h"
 #include "modbus_client.h"
@@ -15,11 +16,15 @@
 #define PHT_READ_INTERVAL_TICKS 2 * 1000 * 1000 / TICK_PERIOD_US
 
 uint16_t last_pht_read_ticks_;
-uint16_t tick_; // 0.5ms tick period
+volatile uint16_t tick_; // 0.5ms tick period
 uint16_t curr_speed_;
 volatile uint16_t tach_period_;
 
 LastData last_data_;
+
+uint16_t getTick() {
+    ATOMIC_BLOCK(ATOMIC_FORCEON) { return tick_; }
+}
 
 void setSpeed(uint8_t speed) {
     if (speed == curr_speed_) {
@@ -37,35 +42,43 @@ void setSpeed(uint8_t speed) {
 }
 
 uint16_t getLastTachRPM() {
-    if (tach_period_ == 0) {
+    uint16_t period;
+    ATOMIC_BLOCK(ATOMIC_FORCEON) { period = tach_period_; }
+
+    if (period == 0) {
         return 0; // Invalid value
     }
 
-    uint32_t tach_rpm = TACH_CLK * 60 / tach_period_;
+    // Integer rounding division to convert period to frequency per minute
+    uint32_t tach_rpm = (TACH_CLK * 60UL + period / 2) / period;
     if (tach_rpm > UINT16_MAX) {
-        return 0; // Invalid value -- impossible RPM
+        return UINT16_MAX; // Invalid value -- impossible RPM
     }
 
     return (uint16_t)tach_rpm;
 }
 
+void setupTachTimer() {
+    // Tachometer using frequency measurement on PA5 / TCB0
+    // Expect speeds ~500-3000RPM
+    PORTA.PIN5CTRL = PORT_PULLUPEN_bm;             // Enable pull up resistor
+    EVSYS.CHANNEL2 = EVSYS_CHANNEL2_PORTA_PIN5_gc; // Route pin PA5
+    EVSYS.USERTCB0CAPT = EVSYS_USER_CHANNEL2_gc;   // to TCB0
+    TCB0.CTRLB = TCB_CNTMODE_FRQ_gc;               // Frequency count mode
+    TCB0.EVCTRL = TCB_CAPTEI_bm | TCB_EDGE_bm;     // Measure frequency between falling edge events
+    TCB0.INTCTRL = TCB_CAPT_bm;
+    TCB0.CTRLA =
+        (TCB_ENABLE_bm | TCB_CLKSEL_DIV2_gc); // Configure tach frequency measurement @ ~156khz
+}
+
 int main(void) {
-    wdt_enable(0x8); // 1 second (note the constants in avr/wdt are wrong for this chip)
+    wdt_enable(0x9); // 2 second (note the constants in avr/wdt are wrong for this chip)
 
     CPU_CCP = CCP_IOREG_gc; /* Enable writing to protected register MCLKCTRLB */
     CLKCTRL.MCLKCTRLB = CLKCTRL_PEN_bm | CLKCTRL_PDIV_64X_gc; // Divide main clock by 64 = 312500hz
 
     // PB2 output for power toggle
     VPORTB.DIR |= POWER_PIN_NUM;
-
-    // Tachometer using frequency measurement on PA5 / TCB0 W0
-    // Expect speeds ~500-3000RPM
-    PORTB.PIN5CTRL = PORT_PULLUPEN_bm;         // Enable pull up resistor
-    TCB0.CTRLB = TCB_CNTMODE_FRQ_gc;           // Frequency count mode
-    TCB0.EVCTRL = TCB_CAPTEI_bm | TCB_EDGE_bm; // Measure frequency between falling edge events
-    TCB0.INTCTRL = TCB_CAPT_bm;
-    TCB0.CTRLA =
-        (TCB_ENABLE_bm | TCB_CLKSEL_DIV2_gc); // Configure tach frequency measurement @ ~156khz
 
     // Speed output on PA4, TCA WO4 (PWM).
     VPORTB.DIR |= PIN4_bm; // Output
@@ -85,7 +98,7 @@ int main(void) {
     TCA0.SPLIT.CTRLA = TCA_SPLIT_ENABLE_bm; // Run at ~1.2khz (16e6 / 64 prescaler / 256 range)
 
     bme280_init();
-    last_pht_read_ticks_ = tick_;
+    last_pht_read_ticks_ = getTick();
 
     modbus_client_init(MB_SLAVE_ID, MB_BAUD, &last_data_, &curr_speed_);
 
@@ -96,9 +109,10 @@ int main(void) {
         last_data_.tach_rpm = getLastTachRPM();
         modbus_poll();
 
-        if (tick_ - last_pht_read_ticks_ > PHT_READ_INTERVAL_TICKS) {
+        uint16_t now = getTick();
+        if (now - last_pht_read_ticks_ > PHT_READ_INTERVAL_TICKS) {
             bme280_get_latest(&last_data_.temp, &last_data_.humidity, &last_data_.pressure);
-            last_pht_read_ticks_ = tick_;
+            last_pht_read_ticks_ = now;
         }
     }
 

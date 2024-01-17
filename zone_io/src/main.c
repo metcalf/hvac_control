@@ -1,11 +1,11 @@
 #include <stdint.h>
 #include <string.h>
 
-#include <avr/interrupt.h>
-#include <avr/io.h>
-#include <avr/wdt.h>
-#include <util/atomic.h>
-#include <util/delay.h>
+#include "avr/interrupt.h"
+#include "avr/io.h"
+#include "avr/wdt.h"
+#include "util/atomic.h"
+#include "util/delay.h"
 
 #define VLV_SW_CLK F_CLK_PER / 2
 #define UART_BAUD 9600
@@ -51,7 +51,9 @@ uint8_t getVlvState() {
         return 0;
     }
 
+    // Integer rounding division to convert period to frequency
     uint32_t vlv_sw_freq = (VLV_SW_CLK + period / 2) / period;
+
     // NB: Rectified AC is double mains frequency (120hz)
     if (vlv_sw_freq < 30) {
         return 0; // Assume off
