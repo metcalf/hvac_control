@@ -24,36 +24,67 @@
 
 /* ----------------------- Platform includes --------------------------------*/
 
-#include <avr/io.h>
 #include <avr/interrupt.h>
+#include <avr/io.h>
 
 /* ----------------------- Defines ------------------------------------------*/
-#define	INLINE                      inline
-#define PR_BEGIN_EXTERN_C           extern "C" {
-#define	PR_END_EXTERN_C             }
+#define INLINE inline
+#define PR_BEGIN_EXTERN_C extern "C" {
+#define PR_END_EXTERN_C }
 
-#define ENTER_CRITICAL_SECTION( )   cli()
-#define EXIT_CRITICAL_SECTION( )    sei()
+#define ENTER_CRITICAL_SECTION() cli()
+#define EXIT_CRITICAL_SECTION() sei()
 
-#define assert( x )
+#define assert(x)
 
-typedef char    BOOL;
+// The Macros below handle the endianness while transfer N byte data into buffer
+#define _XFER_4_RD(dst, src)                                                                       \
+    {                                                                                              \
+        *(uint8_t *)(dst)++ = *(uint8_t *)(src + 1);                                               \
+        *(uint8_t *)(dst)++ = *(uint8_t *)(src + 0);                                               \
+        *(uint8_t *)(dst)++ = *(uint8_t *)(src + 3);                                               \
+        *(uint8_t *)(dst)++ = *(uint8_t *)(src + 2);                                               \
+        (src) += 4;                                                                                \
+    }
+
+#define _XFER_2_RD(dst, src)                                                                       \
+    {                                                                                              \
+        *(uint8_t *)(dst)++ = *(uint8_t *)(src + 1);                                               \
+        *(uint8_t *)(dst)++ = *(uint8_t *)(src + 0);                                               \
+        (src) += 2;                                                                                \
+    }
+
+#define _XFER_4_WR(dst, src)                                                                       \
+    {                                                                                              \
+        *(uint8_t *)(dst + 1) = *(uint8_t *)(src)++;                                               \
+        *(uint8_t *)(dst + 0) = *(uint8_t *)(src)++;                                               \
+        *(uint8_t *)(dst + 3) = *(uint8_t *)(src)++;                                               \
+        *(uint8_t *)(dst + 2) = *(uint8_t *)(src)++;                                               \
+    }
+
+#define _XFER_2_WR(dst, src)                                                                       \
+    {                                                                                              \
+        *(uint8_t *)(dst + 1) = *(uint8_t *)(src)++;                                               \
+        *(uint8_t *)(dst + 0) = *(uint8_t *)(src)++;                                               \
+    }
+
+typedef char BOOL;
 
 typedef unsigned char UCHAR;
-typedef char    CHAR;
+typedef char CHAR;
 
 typedef unsigned short USHORT;
-typedef short   SHORT;
+typedef short SHORT;
 
 typedef unsigned long ULONG;
-typedef long    LONG;
+typedef long LONG;
 
 #ifndef TRUE
-#define TRUE            1
+#define TRUE 1
 #endif
 
 #ifndef FALSE
-#define FALSE           0
+#define FALSE 0
 #endif
 
 #include "./mbconfig.h"

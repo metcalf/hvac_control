@@ -22,6 +22,7 @@ static struct {
 } set_pwm_args;
 
 static repl_set_speed_func set_speed_;
+static repl_fetch_func fetch_;
 
 static struct {
     struct arg_int *speed;
@@ -122,8 +123,20 @@ static void register_set_speed() {
     ESP_ERROR_CHECK(esp_console_cmd_register(&cmd));
 }
 
-void repl_start(repl_set_speed_func set_speed) {
+static int fetch_cmd(int argc, char **argv) { return fetch_(); }
+
+static void register_fetch() {
+    const esp_console_cmd_t cmd = {.command = "fetch",
+                                   .help = "Fetch fan control data. ",
+                                   .hint = NULL,
+                                   .func = &fetch_cmd,
+                                   .argtable = NULL};
+    ESP_ERROR_CHECK(esp_console_cmd_register(&cmd));
+}
+
+void repl_start(repl_set_speed_func set_speed, repl_fetch_func fetch) {
     set_speed_ = set_speed;
+    fetch_ = fetch;
 
     esp_console_repl_t *repl = NULL;
     esp_console_repl_config_t repl_config = ESP_CONSOLE_REPL_CONFIG_DEFAULT();
@@ -133,6 +146,7 @@ void repl_start(repl_set_speed_func set_speed) {
     // See the example for more available commands https://github.com/espressif/esp-idf/blob/master/examples/system/console/basic/main/console_example_main.c
     esp_console_register_help_command();
     register_set_speed();
+    register_fetch();
 
     register_set_pwm();
     init_pwm();

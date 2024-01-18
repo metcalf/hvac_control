@@ -17,7 +17,7 @@
 
 uint16_t last_pht_read_ticks_;
 volatile uint16_t tick_; // 0.5ms tick period
-uint16_t curr_speed_;
+uint16_t last_speed_;
 volatile uint16_t tach_period_;
 
 LastData last_data_;
@@ -28,12 +28,35 @@ uint16_t getTick() {
     return tick;
 }
 
+void setupDebugUSART() {
+    PORTMUX.USARTROUTEA |= PORTMUX_USART0_ALT1_gc;
+    VPORTA.DIR |= PIN1_bm; // TxD on PA1
+    // Configure async 8N1 (this is the default anyway, being explicit for clarity)
+    USART0.CTRLC = USART_CMODE_ASYNCHRONOUS_gc | USART_PMODE_DISABLED_gc | USART_SBMODE_1BIT_gc |
+                   USART_CHSIZE_8BIT_gc;
+    USART0.BAUD = (uint16_t)((float)(F_CLK_PER * 64 / (16 * (float)9600)) + 0.5);
+    USART0.CTRLB = USART_TXEN_bm; // TX only
+}
+
+void sendDebugChar(char byte) {
+    while (!(USART0.STATUS & USART_DREIF_bm)) {
+        ;
+    }
+    USART0_TXDATAL = byte;
+}
+
 void setSpeed(uint8_t speed) {
-    if (speed == curr_speed_) {
+    if (speed == last_speed_) {
         return;
     }
 
-    TCA0.SPLIT.HCMP1 = speed; // Set PWM duty cycle
+    sendDebugChar(speed);
+
+    // Set PWM duty cycle we invert the pin and invert
+    // the duty cycle so that we can achieve 100% duty cycle
+    // on a split timer. We don't need the 0% duty cycle since
+    // we can just turn off the power pin.
+    TCA0.SPLIT.HCMP1 = (255 - speed);
 
     //  PA4 for PWM, PB2 for power toggle
     if (speed == 0) {
@@ -41,6 +64,7 @@ void setSpeed(uint8_t speed) {
     } else {
         VPORTB.OUT |= POWER_PIN_NUM;
     }
+    last_speed_ = speed;
 }
 
 uint16_t getLastTachRPM() {
@@ -73,23 +97,6 @@ void setupTachTimer() {
         (TCB_ENABLE_bm | TCB_CLKSEL_DIV2_gc); // Configure tach frequency measurement @ ~156khz
 }
 
-void setupDebugUSART() {
-    PORTMUX.USARTROUTEA = PORTMUX_USART0_ALT1_gc;
-    VPORTA.DIR |= PIN1_bm; // TxD on PA1
-    // Configure async 8N1 (this is the default anyway, being explicit for clarity)
-    USART0.CTRLC = USART_CMODE_ASYNCHRONOUS_gc | USART_PMODE_DISABLED_gc | USART_SBMODE_1BIT_gc |
-                   USART_CHSIZE_8BIT_gc;
-    USART0.BAUD = (uint16_t)((float)(F_CLK_PER * 64 / (16 * (float)9600)) + 0.5);
-    USART0.CTRLB = USART_TXEN_bm; // TX only
-}
-
-void sendDebugChar(char byte) {
-    while (!(USART0.STATUS & USART_DREIF_bm)) {
-        ;
-    }
-    USART0_TXDATAL = byte;
-}
-
 int main(void) {
     wdt_enable(0x9); // 2 second (note the constants in avr/wdt are wrong for this chip)
 
@@ -103,13 +110,15 @@ int main(void) {
     VPORTB.DIR |= POWER_PIN_NUM;
 
     // Speed output on PA4, TCA WO4 (PWM).
-    VPORTB.DIR |= PIN4_bm; // Output
+    VPORTA.DIR |= PIN4_bm; // Output
+    PORTA.PIN4CTRL |= PORT_INVEN_bm;
     // Only single-slope supported with split-mode and we're using an output pin
     // that is only supported in split mode.
     // TCA0.SINGLE.CTRLB = TCA_SINGLE_WGMODE_SINGLESLOPE_gc;
     TCA0.SPLIT.CTRLD = TCA_SPLIT_SPLITM_bm;  // Enable split mode
     TCA0.SPLIT.CTRLB = TCA_SPLIT_HCMP1EN_bm; // Enable WO4 (WO[n+3])
     TCA0.SPLIT.INTCTRL = TCA_SPLIT_LUNF_bm;  // Interrupt on low byte underflow for tick counter
+    TCA0.SPLIT.HCMP1 = 255;
 
     // High-byte runs at a bit less than 1.2khz to support full 8 bit range
     // 20e6 CPU / 64 prescaler / 256
@@ -125,7 +134,8 @@ int main(void) {
 
     sendDebugChar('b');
 
-    modbus_client_init(MB_SLAVE_ID, MB_BAUD, &last_data_, &curr_speed_);
+    uint16_t curr_speed = last_speed_;
+    modbus_client_init(MB_SLAVE_ID, MB_BAUD, &last_data_, &curr_speed);
 
     sendDebugChar('c');
 
@@ -138,12 +148,12 @@ int main(void) {
         if (rc != 0) {
             sendDebugChar(rc);
         }
+        setSpeed(curr_speed);
 
         uint16_t now = getTick();
         if (now - last_pht_read_ticks_ > PHT_READ_INTERVAL_TICKS) {
             //bme280_get_latest(&last_data_.temp, &last_data_.humidity, &last_data_.pressure);
             last_pht_read_ticks_ = now;
-            sendDebugChar('c');
         }
     }
 

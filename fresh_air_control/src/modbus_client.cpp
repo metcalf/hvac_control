@@ -1,7 +1,6 @@
 #include "modbus_client.h"
 
 #include <stdint.h>
-#include <string.h>
 
 #define SPEED_ADDRESS 0x10
 
@@ -28,29 +27,33 @@ eMBErrorCode eMBRegInputCB(UCHAR *pucRegBuffer, USHORT usAddress, USHORT usNRegs
         return MB_ENOREG;
     }
 
-    memcpy(pucRegBuffer, last_data_ptr_ + usAddress * 2, usNRegs * 2);
+    uint8_t *data_ptr = (uint8_t *)last_data_ptr_;
+    while (usNRegs > 0) {
+        _XFER_2_RD(pucRegBuffer, data_ptr);
+        usNRegs--;
+    }
 
     return MB_ENOERR;
 }
 
+// NB: This is used for reading and writing single and multiple holding
+// holding registers (functions 0x03, 0x06, 0x10)
 eMBErrorCode eMBRegHoldingCB(UCHAR *pucRegBuffer, USHORT usAddress, USHORT usNRegs,
                              eMBRegisterMode eMode) {
     usAddress--; // Match how addresses are written over the line
-    if (usAddress != SPEED_ADDRESS || usNRegs != 0) {
+    if (usAddress != SPEED_ADDRESS || usNRegs != 1) {
         return MB_ENOREG;
     }
 
     UCHAR *from, *to;
 
+    uint8_t *ptr = (uint8_t *)speed_ptr_;
     if (eMode == MB_REG_READ) {
-        from = (UCHAR *)speed_ptr_;
-        to = pucRegBuffer;
+        _XFER_2_RD(pucRegBuffer, ptr);
     } else {
-        from = pucRegBuffer;
-        to = (UCHAR *)speed_ptr_;
+        _XFER_2_WR(ptr, pucRegBuffer);
     }
 
-    memcpy(to, from, 2);
     return MB_ENOERR;
 }
 

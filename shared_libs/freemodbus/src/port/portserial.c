@@ -47,7 +47,7 @@ BOOL xMBPortSerialInit(UCHAR ucPORT, ULONG ulBaudRate, UCHAR ucDataBits, eMBPari
     assert(eParity == MB_PAR_NONE); // Don't support parity
     assert(ucPORT == 0x00);         // Don't support selecting port
 
-    PORTMUX.USARTROUTEA = PORTMUX_USART1_ALT1_gc;
+    PORTMUX.USARTROUTEA |= PORTMUX_USART1_ALT1_gc;
     VPORTC.DIR &= ~PIN1_bm;            // RxD on PC1
     VPORTC.DIR |= (PIN2_bm | PIN3_bm); // TxD on PC2, XDIR on PC3
 

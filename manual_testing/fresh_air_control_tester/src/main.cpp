@@ -101,8 +101,10 @@ esp_err_t write_speed(uint8_t speed) {
     esp_err_t err = ESP_OK;
     uint8_t type = 0; // throwaway
 
-    err = mbc_master_set_parameter(CID_FAN_CONTROL_SPEED, (char *)MB_NAME_FAN_CONTROL_SPEED, &speed,
-                                   &type);
+    uint16_t v = speed;
+
+    err = mbc_master_set_parameter(CID_FAN_CONTROL_SPEED, (char *)MB_NAME_FAN_CONTROL_SPEED,
+                                   (uint8_t *)&v, &type);
 
     if (err == ESP_OK) {
         ESP_LOGI(TAG, "Speed write successful (%d)", speed);
@@ -187,7 +189,7 @@ extern "C" void app_main(void) {
     vTaskDelay(2000 / portTICK_PERIOD_MS);
     //esp_log_level_set("*", ESP_LOG_DEBUG);
     ESP_LOGI(TAG, "start");
-    repl_start(&write_speed);
+    repl_start(&write_speed, &read_lastest_data);
 
     debug_uart_init();
     xTaskCreate(debug_uart_task, "debug_uart_task", 4096, NULL, 20, NULL);
@@ -199,7 +201,7 @@ extern "C" void app_main(void) {
     vTaskDelay(1000 / portTICK_PERIOD_MS);
 
     while (1) {
-        read_lastest_data();
+        //read_lastest_data();
         vTaskDelay(5000 / portTICK_PERIOD_MS);
     }
 }

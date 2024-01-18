@@ -107,7 +107,7 @@ PR_BEGIN_EXTERN_C
 #define MB_FUNC_WRITE_HOLDING_ENABLED           (  1 )
 
 /*! \brief If the <em>Write Multiple registers</em> function should be enabled. */
-#define MB_FUNC_WRITE_MULTIPLE_HOLDING_ENABLED  (  0 )
+#define MB_FUNC_WRITE_MULTIPLE_HOLDING_ENABLED  (  1 )
 
 /*! \brief If the <em>Read Coils</em> function should be enabled. */
 #define MB_FUNC_READ_COILS_ENABLED              (  0 )
