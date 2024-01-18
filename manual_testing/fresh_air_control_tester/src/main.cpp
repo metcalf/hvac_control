@@ -1,17 +1,18 @@
 #include <string.h>
 
-#include <esp_log.h>
-#include <mbcontroller.h>
+#include "driver/gpio.h"
+#include "esp_log.h"
+#include "mbcontroller.h"
 
 #include "repl.h"
 
 #define USB_BUF_SIZE (1024)
 
-#define MB_PORT_NUM UART_NUM_0 // Number of UART port used for Modbus connection
+#define MB_PORT_NUM UART_NUM_1 // Number of UART port used for Modbus connection
 #define MB_DEV_SPEED 9600      // The communication speed of the UART
-#define MB_UART_TXD 6
-#define MB_UART_RXD 8
-#define MB_UART_RTS 7
+#define MB_UART_TXD GPIO_NUM_6
+#define MB_UART_RXD GPIO_NUM_8
+#define MB_UART_RTS GPIO_NUM_7
 
 #define MB_NAME_FAN_CONTROL_INPUTS "fan_control_inputs"
 #define MB_NAME_FAN_CONTROL_SPEED "fan_control_speed"
@@ -21,7 +22,7 @@ static const char *TAG = "APP";
 // Enumeration of modbus device addresses accessed by master device
 enum {
     MB_DEVICE_ADDR1 =
-        0x21 // Only one slave device used for the test (add other slave addresses here)
+        0x11 // Only one slave device used for the test (add other slave addresses here)
 };
 
 // Enumeration of all supported CIDs for device (used in parameter definition table)
@@ -83,8 +84,8 @@ esp_err_t read_lastest_data() {
     if (err == ESP_OK) {
         double temp = (double)data[0] / 100.0;
         double humidity = (double)data[1] / 512.0; // 2^9 for a 9 bit shift of the decimal point
-        uint16_t pressure = data[2] + 87000;
-        uint16_t tach_rpm = data[4];
+        uint32_t pressure = data[2] + 87000;
+        uint16_t tach_rpm = data[3];
 
         ESP_LOGI(TAG, "FC data: t=%.2fC\th=%.2f%%\tp=%dPa\trpm=%d", temp, humidity, pressure,
                  tach_rpm);
@@ -154,11 +155,46 @@ static esp_err_t master_init(void) {
     return err;
 }
 
-extern "C" void app_main(void) {
-    // Initialization of device peripheral and objects
-    ESP_ERROR_CHECK(master_init());
+void debug_uart_init() {
+    uart_config_t uart_config = {
+        .baud_rate = 9600,
+        .data_bits = UART_DATA_8_BITS,
+        .parity = UART_PARITY_DISABLE,
+        .stop_bits = UART_STOP_BITS_1,
+        .flow_ctrl = UART_HW_FLOWCTRL_DISABLE,
+        .rx_flow_ctrl_thresh = 0,
+        .source_clk = UART_SCLK_APB,
+    };
+    int intr_alloc_flags = 0;
+    // Configure UART parameters
+    ESP_ERROR_CHECK(uart_driver_install(UART_NUM_2, 1024, 0, 0, NULL, intr_alloc_flags));
+    ESP_ERROR_CHECK(uart_param_config(UART_NUM_2, &uart_config));
+    ESP_ERROR_CHECK(
+        uart_set_pin(UART_NUM_2, UART_PIN_NO_CHANGE, 35, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE));
+}
 
+void debug_uart_task(void *) {
+    uint8_t byte;
+    while (1) {
+        int rx_bytes = uart_read_bytes(UART_NUM_2, &byte, 1, portMAX_DELAY);
+        if (rx_bytes == 1) {
+            ESP_LOGI(TAG, "UD: %c %02x", byte, byte);
+        }
+    }
+}
+
+extern "C" void app_main(void) {
+    vTaskDelay(2000 / portTICK_PERIOD_MS);
+    //esp_log_level_set("*", ESP_LOG_DEBUG);
+    ESP_LOGI(TAG, "start");
     repl_start(&write_speed);
+
+    debug_uart_init();
+    xTaskCreate(debug_uart_task, "debug_uart_task", 4096, NULL, 20, NULL);
+
+    //test_uart();
+
+    ESP_ERROR_CHECK(master_init());
 
     vTaskDelay(1000 / portTICK_PERIOD_MS);
 

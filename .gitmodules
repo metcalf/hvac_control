@@ -3,7 +3,8 @@
 	url = https://github.com/boschsensortec/BME280_driver.git
 [submodule "components/esp-modbus"]
 	path = components/esp-modbus
-	url = https://github.com/espressif/esp-modbus.git
+	url = https://github.com/metcalf/esp-modbus.git
+	branch = v1.0.12
 [submodule "components/lvgl"]
 	path = components/lvgl
 	url = https://github.com/lvgl/lvgl.git

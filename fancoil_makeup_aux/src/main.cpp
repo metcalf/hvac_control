@@ -50,8 +50,11 @@ int main(void) {
     // Enable pullup resistor on input PC0
     PORTC.PIN0CTRL |= PORT_PULLUPEN_bm;
 
-    uint8_t slave_id = USERROW_USERROW0;
-    uint8_t mode_bits = USERROW_USERROW1;
+    // TODO: Read from EEPROM
+    uint8_t slave_id = 0x20;
+    uint8_t mode_bits = 0xff;
+    // uint8_t slave_id = USERROW_USERROW0;
+    // uint8_t mode_bits = USERROW_USERROW1;
 
     mode_fancoil_ = mode_bits & 0x01;
     mode_iso_input_ = mode_bits & (0x01 << 1);

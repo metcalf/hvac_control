@@ -19,19 +19,23 @@ void modbus_client_init(UCHAR slave_id, ULONG baud, LastData *lastData, uint16_t
     assert(eMBErrorCode == MB_ENOERR);
 }
 
-void modbus_poll() { (void)eMBPoll(); }
+int modbus_poll() { return eMBPoll(); }
 
 eMBErrorCode eMBRegInputCB(UCHAR *pucRegBuffer, USHORT usAddress, USHORT usNRegs) {
-    if ((usAddress + usNRegs) * 2 > sizeof(LastData)) {
+    usAddress--; // Address is passed one-based but sent zero-based
+
+    if (usAddress < 0 || (usAddress + usNRegs) * 2 > sizeof(LastData)) {
         return MB_ENOREG;
     }
 
-    memcpy(pucRegBuffer, last_data_ptr_ + (usAddress * 2), usNRegs * 2);
+    memcpy(pucRegBuffer, last_data_ptr_ + usAddress * 2, usNRegs * 2);
+
     return MB_ENOERR;
 }
 
 eMBErrorCode eMBRegHoldingCB(UCHAR *pucRegBuffer, USHORT usAddress, USHORT usNRegs,
                              eMBRegisterMode eMode) {
+    usAddress--; // Match how addresses are written over the line
     if (usAddress != SPEED_ADDRESS || usNRegs != 0) {
         return MB_ENOREG;
     }

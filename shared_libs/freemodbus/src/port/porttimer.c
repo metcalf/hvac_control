@@ -41,7 +41,10 @@ BOOL xMBPortTimersInit(USHORT usTim1Timerout50us) {
     return TRUE;
 }
 
-inline void vMBPortTimersEnable() { TCB1.CTRLA |= TCB_ENABLE_bm; }
+inline void vMBPortTimersEnable() {
+    TCB1.CNT = 0;
+    TCB1.CTRLA |= TCB_ENABLE_bm;
+}
 
 inline void vMBPortTimersDisable() { TCB1.CTRLA &= ~(TCB_ENABLE_bm); }
 
@@ -50,7 +53,6 @@ inline void vMBPortTimersDisable() { TCB1.CTRLA &= ~(TCB_ENABLE_bm); }
  * the timer has expired.
  */
 ISR(TCB1_INT_vect) {
-    if (TCB0.INTFLAGS & TCB_CAPT_bm) {
-        (void)pxMBPortCBTimerExpired();
-    }
+    TCB1.INTFLAGS = TCB_CAPT_bm;
+    (void)pxMBPortCBTimerExpired();
 }

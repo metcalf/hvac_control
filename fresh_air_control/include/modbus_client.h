@@ -9,7 +9,7 @@ struct LastData {
 
 void modbus_client_init(UCHAR slave_id, ULONG baud, LastData *lastData, uint16_t *speed);
 
-void modbus_poll();
+int modbus_poll();
 
 eMBErrorCode eMBRegInputCB(UCHAR *pucRegBuffer, USHORT usAddress, USHORT usNRegs);
 
