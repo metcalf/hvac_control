@@ -19,13 +19,11 @@ TinyI2CMaster::TinyI2CMaster() {}
 
 ********************************************************************************************************************* */
 
-// 100kHz clock
-uint32_t const FREQUENCY = 100000L; // Hardware I2C clock in Hz
-uint32_t const T_RISE = 600L;       // Rise time
+#define TWI0_BAUD(F_SCL, T_RISE)                                                                   \
+    ((((((float)F_CLK_PER / (float)F_SCL)) - 10 - ((float)F_CLK_PER * T_RISE / 1000000))) / 2)
 
 void TinyI2CMaster::init() {
-    uint32_t baud =
-        ((F_CLK_PER / FREQUENCY) - (((F_CLK_PER * T_RISE) / 1000) / 1000) / 1000 - 10) / 2;
+    uint32_t baud = TWI0_BAUD(100000UL, 2UL);
     TWI0.MBAUD = (uint8_t)baud;
     TWI0.MCTRLA = TWI_ENABLE_bm; // Enable as master, no interrupts
     TWI0.MSTATUS = TWI_BUSSTATE_IDLE_gc;

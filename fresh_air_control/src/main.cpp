@@ -31,9 +31,6 @@ uint16_t getTick() {
 void setupDebugUSART() {
     PORTMUX.USARTROUTEA |= PORTMUX_USART0_ALT1_gc;
     VPORTA.DIR |= PIN1_bm; // TxD on PA1
-    // Configure async 8N1 (this is the default anyway, being explicit for clarity)
-    USART0.CTRLC = USART_CMODE_ASYNCHRONOUS_gc | USART_PMODE_DISABLED_gc | USART_SBMODE_1BIT_gc |
-                   USART_CHSIZE_8BIT_gc;
     USART0.BAUD = (uint16_t)((float)(F_CLK_PER * 64 / (16 * (float)9600)) + 0.5);
     USART0.CTRLB = USART_TXEN_bm; // TX only
 }
@@ -49,8 +46,6 @@ void setSpeed(uint8_t speed) {
     if (speed == last_speed_) {
         return;
     }
-
-    sendDebugChar(speed);
 
     // Set PWM duty cycle we invert the pin and invert
     // the duty cycle so that we can achieve 100% duty cycle
@@ -98,7 +93,7 @@ void setupTachTimer() {
 }
 
 int main(void) {
-    wdt_enable(0x9); // 2 second (note the constants in avr/wdt are wrong for this chip)
+    wdt_enable(0xa); // 2 second (note the constants in avr/wdt are wrong for this chip)
 
     CPU_CCP = CCP_IOREG_gc; /* Enable writing to protected register MCLKCTRLB */
     CLKCTRL.MCLKCTRLB = CLKCTRL_PEN_bm | CLKCTRL_PDIV_64X_gc; // Divide main clock by 64 = 312500hz
@@ -129,15 +124,13 @@ int main(void) {
     TCA0.SPLIT.CTRLA = TCA_SPLIT_ENABLE_bm; // Run at ~1.2khz (16e6 / 64 prescaler / 256 range)
 
     sendDebugChar('a');
-    //bme280_init();
+    bme280_init();
     last_pht_read_ticks_ = getTick();
 
     sendDebugChar('b');
 
     uint16_t curr_speed = last_speed_;
     modbus_client_init(MB_SLAVE_ID, MB_BAUD, &last_data_, &curr_speed);
-
-    sendDebugChar('c');
 
     sei();
 
@@ -152,8 +145,9 @@ int main(void) {
 
         uint16_t now = getTick();
         if (now - last_pht_read_ticks_ > PHT_READ_INTERVAL_TICKS) {
-            //bme280_get_latest(&last_data_.temp, &last_data_.humidity, &last_data_.pressure);
+            bme280_get_latest(&last_data_.temp, &last_data_.humidity, &last_data_.pressure);
             last_pht_read_ticks_ = now;
+            sendDebugChar('d');
         }
     }
 

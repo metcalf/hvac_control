@@ -12,7 +12,7 @@
 #define MIN_PRESSURE_PA 87000
 
 uint16_t bme_period_ms_;
-static uint8_t bme_dev_addr_ = BME280_I2C_ADDR_PRIM;
+static uint8_t bme_dev_addr_ = BME280_I2C_ADDR_SEC; // TODO: Switch back to primary address
 struct bme280_dev bme_dev_;
 
 void bme280_init() {
@@ -71,12 +71,14 @@ int8_t bme280_get_latest(int16_t *temp, uint16_t *hum, uint16_t *pres) {
 BME280_INTF_RET_TYPE bme280_i2c_read(uint8_t reg_addr, uint8_t *reg_data, uint32_t length,
                                      void *intf_ptr) {
 
-    if (!TinyI2C.start(*(uint8_t *)intf_ptr, length)) {
+    if (!TinyI2C.start(*(uint8_t *)intf_ptr, 0)) {
         return BME280_E_COMM_FAIL;
     }
+
     if (!TinyI2C.write(reg_addr)) {
         return BME280_E_COMM_FAIL;
     }
+
     if (!TinyI2C.restart(*(uint8_t *)intf_ptr, length)) {
         return BME280_E_COMM_FAIL;
     }

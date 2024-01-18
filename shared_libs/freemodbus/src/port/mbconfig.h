@@ -82,7 +82,7 @@ PR_BEGIN_EXTERN_C
  * the sum of all enabled functions in this file and custom function
  * handlers. If set to small adding more functions will fail.
  */
-#define MB_FUNC_HANDLERS_MAX                    ( 4 )
+#define MB_FUNC_HANDLERS_MAX                    ( 3 )
 
 /*! \brief Number of bytes which should be allocated for the <em>Report Slave ID
  *    </em>command.
@@ -104,7 +104,8 @@ PR_BEGIN_EXTERN_C
 #define MB_FUNC_READ_HOLDING_ENABLED            (  1 )
 
 /*! \brief If the <em>Write Single Register</em> function should be enabled. */
-#define MB_FUNC_WRITE_HOLDING_ENABLED           (  1 )
+// NB: esp-modbus always uses "write multiple" so we don't need this
+#define MB_FUNC_WRITE_HOLDING_ENABLED           (  0 )
 
 /*! \brief If the <em>Write Multiple registers</em> function should be enabled. */
 #define MB_FUNC_WRITE_MULTIPLE_HOLDING_ENABLED  (  1 )
