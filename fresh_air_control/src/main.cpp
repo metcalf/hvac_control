@@ -80,7 +80,7 @@ void setupTachTimer() {
 }
 
 int main(void) {
-    wdt_enable(0xa); // 2 second (note the constants in avr/wdt are wrong for this chip)
+    wdt_enable(0x8); // 1 second (note the constants in avr/wdt are wrong for this chip)
 
     CPU_CCP = CCP_IOREG_gc; /* Enable writing to protected register MCLKCTRLB */
     CLKCTRL.MCLKCTRLB = CLKCTRL_PEN_bm | CLKCTRL_PDIV_64X_gc; // Divide main clock by 64 = 312500hz

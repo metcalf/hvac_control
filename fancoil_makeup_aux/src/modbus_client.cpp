@@ -3,10 +3,10 @@
 #include <stdint.h>
 #include <stdlib.h>
 
-static uint8_t *iso_input_state_;
+static uint16_t *iso_input_state_;
 static set_fancoil_func set_fancoil_;
 
-void modbus_client_init(UCHAR slave_id, ULONG baud, uint8_t *iso_input_state,
+void modbus_client_init(UCHAR slave_id, ULONG baud, uint16_t *iso_input_state,
                         set_fancoil_func set_fancoil) {
     iso_input_state_ = iso_input_state;
     set_fancoil_ = set_fancoil;
@@ -20,8 +20,10 @@ void modbus_client_init(UCHAR slave_id, ULONG baud, uint8_t *iso_input_state,
 void modbus_poll() { (void)eMBPoll(); }
 
 eMBErrorCode eMBRegInputCB(UCHAR *pucRegBuffer, USHORT usAddress, USHORT usNRegs) {
-    if (usAddress == 0x01 && usNRegs == 1 && iso_input_state_ != NULL) {
-        *pucRegBuffer = *iso_input_state_;
+    usAddress--; // Match how addresses are written over the line
+    if (usAddress == 0x00 && usNRegs == 1 && iso_input_state_ != NULL) {
+        uint8_t *ptr = (uint8_t *)iso_input_state_; // Copy ptr since _XFER_RD_2 modifies it
+        _XFER_2_RD(pucRegBuffer, ptr);
         return MB_ENOERR;
     }
 
@@ -30,6 +32,7 @@ eMBErrorCode eMBRegInputCB(UCHAR *pucRegBuffer, USHORT usAddress, USHORT usNRegs
 
 eMBErrorCode eMBRegHoldingCB(UCHAR *pucRegBuffer, USHORT usAddress, USHORT usNRegs,
                              eMBRegisterMode eMode) {
+    usAddress--; // Match how addresses are written over the line
 
     if (usAddress == 0x10 && usNRegs == 1 && set_fancoil_ != NULL) {
         if (eMode != MB_REG_WRITE) {
@@ -37,8 +40,11 @@ eMBErrorCode eMBRegHoldingCB(UCHAR *pucRegBuffer, USHORT usAddress, USHORT usNRe
             return MB_EINVAL;
         }
 
-        bool cool = (*pucRegBuffer) & 0x01;
-        uint8_t speed = ((*pucRegBuffer) >> 1) & (0x01 | 0x02); // 2nd and 3rd bits
+        uint16_t data;
+        _XFER_2_WR((uint8_t *)&data, pucRegBuffer);
+
+        bool cool = data & 0x01;
+        uint8_t speed = (data >> 1) & 0x03; // 2nd and 3rd bits
 
         if (set_fancoil_(cool, speed) == 0) {
             return MB_ENOERR;

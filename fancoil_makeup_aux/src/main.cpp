@@ -17,7 +17,7 @@ bool mode_fancoil_, mode_iso_input_;
 
 volatile uint16_t tick_;
 uint16_t iso_input_last_on_;
-uint8_t iso_input_state_;
+uint16_t iso_input_state_;
 
 uint16_t getTick() {
     ATOMIC_BLOCK(ATOMIC_FORCEON) { return tick_; }
