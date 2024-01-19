@@ -7,6 +7,7 @@
 
 #include "bme280_client.h"
 #include "modbus_client.h"
+#include "usart_debug.h"
 
 #define POWER_PIN_NUM PIN2_bm
 #define TACH_CLK F_CLK_PER / 2UL
@@ -26,20 +27,6 @@ uint16_t getTick() {
     uint16_t tick;
     ATOMIC_BLOCK(ATOMIC_FORCEON) { tick = tick_; }
     return tick;
-}
-
-void setupDebugUSART() {
-    PORTMUX.USARTROUTEA |= PORTMUX_USART0_ALT1_gc;
-    VPORTA.DIR |= PIN1_bm; // TxD on PA1
-    USART0.BAUD = (uint16_t)((float)(F_CLK_PER * 64 / (16 * (float)9600)) + 0.5);
-    USART0.CTRLB = USART_TXEN_bm; // TX only
-}
-
-void sendDebugChar(char byte) {
-    while (!(USART0.STATUS & USART_DREIF_bm)) {
-        ;
-    }
-    USART0_TXDATAL = byte;
 }
 
 void setSpeed(uint8_t speed) {
@@ -98,7 +85,7 @@ int main(void) {
     CPU_CCP = CCP_IOREG_gc; /* Enable writing to protected register MCLKCTRLB */
     CLKCTRL.MCLKCTRLB = CLKCTRL_PEN_bm | CLKCTRL_PDIV_64X_gc; // Divide main clock by 64 = 312500hz
 
-    setupDebugUSART();
+    USART_DEBUG_INIT();
     setupTachTimer();
 
     // PB2 output for power toggle
@@ -123,11 +110,8 @@ int main(void) {
 
     TCA0.SPLIT.CTRLA = TCA_SPLIT_ENABLE_bm; // Run at ~1.2khz (16e6 / 64 prescaler / 256 range)
 
-    sendDebugChar('a');
     bme280_init();
     last_pht_read_ticks_ = getTick();
-
-    sendDebugChar('b');
 
     uint16_t curr_speed = last_speed_;
     modbus_client_init(MB_SLAVE_ID, MB_BAUD, &last_data_, &curr_speed);
@@ -137,17 +121,13 @@ int main(void) {
     while (1) {
         wdt_reset();
         last_data_.tach_rpm = getLastTachRPM();
-        int rc = modbus_poll();
-        if (rc != 0) {
-            sendDebugChar(rc);
-        }
+        modbus_poll();
         setSpeed(curr_speed);
 
         uint16_t now = getTick();
         if (now - last_pht_read_ticks_ > PHT_READ_INTERVAL_TICKS) {
             bme280_get_latest(&last_data_.temp, &last_data_.humidity, &last_data_.pressure);
             last_pht_read_ticks_ = now;
-            sendDebugChar('d');
         }
     }
 

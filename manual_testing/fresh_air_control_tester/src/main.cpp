@@ -187,21 +187,12 @@ void debug_uart_task(void *) {
 
 extern "C" void app_main(void) {
     vTaskDelay(2000 / portTICK_PERIOD_MS);
-    //esp_log_level_set("*", ESP_LOG_DEBUG);
+
     ESP_LOGI(TAG, "start");
     repl_start(&write_speed, &read_lastest_data);
 
     debug_uart_init();
     xTaskCreate(debug_uart_task, "debug_uart_task", 4096, NULL, 20, NULL);
 
-    //test_uart();
-
     ESP_ERROR_CHECK(master_init());
-
-    vTaskDelay(1000 / portTICK_PERIOD_MS);
-
-    while (1) {
-        //read_lastest_data();
-        vTaskDelay(5000 / portTICK_PERIOD_MS);
-    }
 }

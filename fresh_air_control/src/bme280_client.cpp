@@ -44,25 +44,27 @@ void bme280_init() {
 };
 
 int8_t bme280_get_latest(int16_t *temp, uint16_t *hum, uint16_t *pres) {
-    struct bme280_data data;
+    struct bme280_data data {};
     int8_t rslt = bme280_get_sensor_data(BME280_ALL, &data, &bme_dev_);
     if (rslt != 0) {
         return rslt;
     }
 
-    *temp = (uint16_t)data.temperature; // 0.01C
+    *temp = (int16_t)data.temperature; // 0.01C
     // Convert from Q22.10 to Q23.9 to fit in uint_16 (truncating to Q7.9)
     // The humidity range is 0-100% so we only need 7 bits left of the decimal
     *hum = (uint16_t)(data.humidity >> 1);
-    // Convert from Q24.8 Pa to (Pa - 87000) to fit into atmospheric range
+    // Convert from Pa to (Pa - 87000) to fit into atmospheric range
     // Pa pressure range = 87,000 - 108,500 = 21,500
-    data.pressure >>= 8;
-    if (data.pressure > UINT16_MAX) {
-        *pres = UINT16_MAX;
-    } else if (data.pressure < MIN_PRESSURE_PA) {
+    if (data.pressure < MIN_PRESSURE_PA) {
         *pres = 0;
     } else {
-        *pres = (uint16_t)(data.pressure - MIN_PRESSURE_PA);
+        data.pressure -= MIN_PRESSURE_PA;
+        if (data.pressure > UINT16_MAX) {
+            *pres = UINT16_MAX;
+        } else {
+            *pres = data.pressure;
+        }
     }
 
     return 0;

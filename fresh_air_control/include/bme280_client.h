@@ -1,6 +1,5 @@
 #pragma once
 
-#define BME280_32BIT_ENABLE
 #include <bme280.h>
 
 void bme280_init();
