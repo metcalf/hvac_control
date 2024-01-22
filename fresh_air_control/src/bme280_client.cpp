@@ -12,7 +12,7 @@
 #define MIN_PRESSURE_PA 87000
 
 uint16_t bme_period_ms_;
-static uint8_t bme_dev_addr_ = BME280_I2C_ADDR_SEC; // TODO: Switch back to primary address
+static uint8_t bme_dev_addr_ = BME280_I2C_ADDR_PRIM;
 struct bme280_dev bme_dev_;
 
 void bme280_init() {
