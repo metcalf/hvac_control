@@ -30,6 +30,10 @@
     {
       "name": "zone_io_tester",
       "path": "manual_testing/zone_io_tester"
+    },
+    {
+      "name": "controller",
+      "path": "controller"
     }
   ],
   "settings": {
