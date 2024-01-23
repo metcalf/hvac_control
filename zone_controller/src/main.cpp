@@ -6,6 +6,7 @@
 #include "ESPModbusClient.h"
 #include "ESPOutIO.h"
 #include "OutCtrl.h"
+#include "wifi.h"
 #include "zone_io_client.h"
 
 #define ZONE_IO_TASK_PRIORITY 10
@@ -36,6 +37,9 @@ void output_task(void *) {
 }
 
 extern "C" void app_main() {
+    wifi_init();
+    wifi_connect();
+
     zone_io_init();
 
     ESPModbusClient *mb_client = new ESPModbusClient();
@@ -46,8 +50,8 @@ extern "C" void app_main() {
     outCtrl = new OutCtrl(outIO, mb_client, xTaskGetTickCount);
 
     // TODO:
-    // * Wifi for NTP, logging, polling Ecobee vacation API
-    // * UI (consider dedicated core, PSRAM)
+    // * Wifi for NTP, logging, polling Ecobee vacation API (or maybe home assistant)
+    // * UI (use PSRAM?)
 
     xTaskCreate(zone_io_task, "zone_io_task", ZONE_IO_TASK_STACK_SIZE, NULL, ZONE_IO_TASK_PRIORITY,
                 NULL);

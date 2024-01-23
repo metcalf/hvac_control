@@ -18,6 +18,7 @@ static const char *TAG = "MBC";
 esp_err_t ESPModbusClient::init() {
     int i = 0;
     for (auto const item : cx_registers_) {
+        // TODO: Do we need to subtract one to get the wire
         uint16_t id = static_cast<uint16_t>(item.first);
         deviceParameters_[i] = {
             id,

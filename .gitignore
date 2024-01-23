@@ -1,6 +1,7 @@
 # These contain user-specific paths
 /.pio/
 /.vscode/
+wifi_credentials.h
 
 # Prerequisites
 *.d

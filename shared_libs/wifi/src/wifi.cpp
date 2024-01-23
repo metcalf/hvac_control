@@ -2,7 +2,6 @@
 
 #include <cstring>
 
-#include "esp_http_client.h"
 #include "esp_log.h"
 #include "esp_sntp.h"
 #include "esp_wifi.h"
@@ -11,22 +10,16 @@
 #include "freertos/task.h"
 #include "time.h"
 
-#include "zones.h"
+#include "wifi_credentials.h"
 
 #define MAX_RETRIES 5
 #define WIFI_ACTIVE_BIT BIT0
 #define WIFI_CONNECTED_BIT BIT1
 #define WIFI_FAIL_BIT BIT2
-#define POSIX_TZ_STR "PST8PDT,M3.2.0/2:00:00,M11.1.0/2:00:00"
 
 const static char *TAG = "ntm";
 
-static wifi_config_t s_wifi_config = {
-    .sta =
-        {
-            .pmf_cfg = {.capable = true, .required = false},
-        },
-};
+static wifi_config_t s_wifi_config;
 
 static int s_retry_num = 0;
 
@@ -43,13 +36,8 @@ void sntp_sync_time(struct timeval *tv) {
     if (old.tv_sec < 16e8) { // Before ~2020
         ESP_LOGI(TAG, "time initialized");
     } else {
-        ESP_LOGI(TAG, "time updated, offset: %lld", (long)old.tv_sec - tv->tv_sec);
+        ESP_LOGI(TAG, "time updated, offset: %ld", (long)old.tv_sec - tv->tv_sec);
     }
-}
-
-void wifi_set_posix_tz(const char *posix_str) {
-    setenv("TZ", "posix_str", 1);
-    tzset();
 }
 
 void event_handler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data) {
@@ -95,15 +83,14 @@ void event_handler(void *arg, esp_event_base_t event_base, int32_t event_id, voi
     }
 }
 
-void wifi_connect(const char *network_name, const char *network_pswd) {
-    memcpy(s_wifi_config.sta.ssid, network_name, sizeof(s_wifi_config.sta.ssid));
-    memcpy(s_wifi_config.sta.password, network_pswd, sizeof(s_wifi_config.sta.password));
+void wifi_connect() {
+    memcpy(s_wifi_config.sta.ssid, wifi_ssid, sizeof(s_wifi_config.sta.ssid));
+    memcpy(s_wifi_config.sta.password, wifi_pswd, sizeof(s_wifi_config.sta.password));
 
     xEventGroupSetBits(s_wifi_event_group, WIFI_ACTIVE_BIT);
 
-    // Zero-length password
-    s_wifi_config.sta.threshold.authmode =
-        (network_pswd[0] == 0) ? WIFI_AUTH_OPEN : WIFI_AUTH_WPA2_PSK;
+    s_wifi_config.sta.threshold.authmode = WIFI_AUTH_WPA2_PSK;
+    s_wifi_config.sta.pmf_cfg = {.capable = true, .required = false};
 
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
     ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &s_wifi_config));
@@ -137,17 +124,8 @@ void wifi_disconnect() {
     xEventGroupClearBits(s_wifi_event_group, WIFI_ACTIVE_BIT);
 }
 
-bool wifi_has_error() {
-    return xEventGroupGetBits(s_wifi_event_group) & (WIFI_FAIL_BIT | TZ_FAIL_BIT);
-}
+bool wifi_has_error() { return xEventGroupGetBits(s_wifi_event_group) & WIFI_FAIL_BIT; }
 
 bool wifi_is_connected() { return xEventGroupGetBits(s_wifi_event_group) & WIFI_CONNECTED_BIT; }
 
 bool wifi_is_active() { return xEventGroupGetBits(s_wifi_event_group) & WIFI_ACTIVE_BIT; }
-
-bool wifi_get_local_time(struct tm *info) {
-    time_t now;
-    time(&now);
-    localtime_r(&now, info);
-    return info->tm_year > (2016 - 1900);
-}
