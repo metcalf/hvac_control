@@ -70,7 +70,7 @@ BME280_INTF_RET_TYPE bme280_i2c_read(uint8_t reg_addr, uint8_t *reg_data, uint32
 
 BME280_INTF_RET_TYPE bme280_i2c_write(uint8_t reg_addr, const uint8_t *reg_data, uint32_t length,
                                       void *intf_ptr) {
-    esp_err_t err = i2c_manager_write(I2C_NUM_0, *(uint8_t *)intf_ptr, 0x42, reg_data, length);
+    esp_err_t err = i2c_manager_write(I2C_NUM_0, *(uint8_t *)intf_ptr, reg_addr, reg_data, length);
     if (err != ESP_OK) {
         return BME280_E_COMM_FAIL;
     }

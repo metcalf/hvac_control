@@ -6,6 +6,7 @@
 #include "lvgl/lvgl.h"
 
 #include "bme280_client.h"
+#include "scd4x_i2c.h"
 #include "wifi.h"
 
 static const char *TAG = "APP";
