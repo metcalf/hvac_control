@@ -48,7 +48,9 @@
       "string_view": "cpp",
       "initializer_list": "cpp",
       "utility": "cpp",
-      "interrupt.h": "c"
+      "interrupt.h": "c",
+      "lvgl_helpers.h": "c",
+      "stdbool.h": "c"
     }
   }
 }
