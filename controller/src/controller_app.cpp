@@ -6,7 +6,8 @@
 #include "lvgl/lvgl.h"
 
 #include "bme280_client.h"
-#include "scd4x_i2c.h"
+#include "co2_client.h"
+
 #include "wifi.h"
 
 static const char *TAG = "APP";
@@ -18,6 +19,8 @@ extern "C" void controller_app() {
         while (1)
             ;
     }
+
+    co2_init();
 
     wifi_init();
     wifi_connect();
