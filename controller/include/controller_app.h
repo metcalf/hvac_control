@@ -5,7 +5,7 @@
 extern "C" {
 #endif
 
-void controller_app();
+void controllerApp();
 
 #ifdef __cplusplus
 } /* extern "C" */

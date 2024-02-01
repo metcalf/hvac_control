@@ -9,5 +9,6 @@ void app_main() {
     lvgl_i2c_locking(i2c_manager_locking());
     lv_init();
     lvgl_driver_init();
-    controller_app();
+
+    controllerApp();
 }

@@ -1,8 +1,8 @@
 {
   "name": "BME280",
   "version": "0.0.0",
+  "headers": ["bme280.h"],
   "build": {
-    "includeDir": "src",
-    "headers": "bme280.h"
+    "includeDir": "src"
   }
 }

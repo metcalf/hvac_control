@@ -30,7 +30,7 @@ int8_t bme280_init() {
         .osr_p = BME280_OVERSAMPLING_1X,
         .osr_t = BME280_OVERSAMPLING_1X,
         .osr_h = BME280_OVERSAMPLING_1X,
-        .filter = BME280_FILTER_COEFF_2,
+        .filter = BME280_FILTER_COEFF_16, // Exposed location, apply more filtering
         .standby_time = BME280_STANDBY_TIME_1000_MS,
     };
     rslt = bme280_set_sensor_settings(BME280_SEL_ALL_SETTINGS, &settings, &bme_dev_);
@@ -60,7 +60,7 @@ int8_t bme280_get_latest(double *temp, double *hum, uint32_t *pres) {
 BME280_INTF_RET_TYPE bme280_i2c_read(uint8_t reg_addr, uint8_t *reg_data, uint32_t length,
                                      void *intf_ptr) {
 
-    esp_err_t err = i2c_manager_read(I2C_NUM_0, *(uint8_t *)intf_ptr, 0x42, reg_data, length);
+    esp_err_t err = i2c_manager_read(I2C_NUM_0, *(uint8_t *)intf_ptr, reg_addr, reg_data, length);
     if (err != ESP_OK) {
         return BME280_E_COMM_FAIL;
     }

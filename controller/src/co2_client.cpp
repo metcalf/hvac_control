@@ -28,4 +28,4 @@ int8_t co2_read(uint16_t *co2) {
     return scd4x_read_measurement(co2, &t, &h);
 }
 
-int8_t co2_set_pressure(uint32_t pressure_pa);
+int8_t co2_set_pressure(uint16_t pressure_hpa) { return scd4x_set_ambient_pressure(pressure_hpa); }
