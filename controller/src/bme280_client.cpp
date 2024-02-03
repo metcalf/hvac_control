@@ -1,7 +1,6 @@
 #include "bme280_client.h"
 
-// Need this define to support variable delay
-#define __DELAY_BACKWARD_COMPATIBLE__
+#include "esp_timer.h"
 
 #include "i2c_manager.h"
 #include <assert.h>

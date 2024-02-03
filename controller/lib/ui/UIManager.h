@@ -71,7 +71,7 @@ class UIManager {
 
     UIManager(Config config) : config_(config) {}
 
-    void tick() { lv_tick_inc(portTICK_RATE_MS); }
+    void tick(uint32_t ms) { lv_tick_inc(ms); }
     void handleTasks() { lv_timer_handler(); }
 
     void loaded();

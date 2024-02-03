@@ -56,15 +56,15 @@ extern "C" void run_controller_app() { app_.start(); }
 void sensorTask(void *sensors) {
     while (1) {
         if (((Sensors *)sensors)->poll()) {
-            vTaskDelay(SENSOR_UPDATE_INTERVAL_SECS * 1000 / portTICK_RATE_MS);
+            vTaskDelay(SENSOR_UPDATE_INTERVAL_SECS * 1000 / portTICK_PERIOD_MS);
         } else {
-            vTaskDelay(SENSOR_RETRY_INTERVAL_SECS * 1000 / portTICK_RATE_MS);
+            vTaskDelay(SENSOR_RETRY_INTERVAL_SECS * 1000 / portTICK_PERIOD_MS);
         }
     }
 }
 
 UIManager *tickUIManager_;
-void uiTickHook() { tickUIManager_->tick(); }
+void uiTickHook() { tickUIManager_->tick(portTICK_PERIOD_MS); }
 
 void uiTask(void *uiManager) {
     tickUIManager_ = ((UIManager *)uiManager);
@@ -296,8 +296,8 @@ void ControllerApp::runTask() {
         // TODO: Consider taking another turn through the loop until ui events are cleared
         // to avoid blocking processing? Need to be careful since some UI events need processing
         // by other parts of this loop. Probably should move all modbus interaction into another thread
-        if (xQueueReceive(uiQueue, &uiEvent, (APP_LOOP_INTERVAL_SECS * 1000) / portTICK_RATE_MS) ==
-            pdTRUE) {
+        if (xQueueReceive(uiQueue, &uiEvent,
+                          (APP_LOOP_INTERVAL_SECS * 1000) / portTICK_PERIOD_MS) == pdTRUE) {
             handleUIEvent(uiEvent, now);
         }
 

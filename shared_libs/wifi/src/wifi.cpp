@@ -26,17 +26,17 @@ static int s_retry_num = 0;
 /* FreeRTOS event group to signal when we are connected*/
 static EventGroupHandle_t s_wifi_event_group;
 
-void sntp_sync_time(struct timeval *tv) {
+void esp_sntp_sync_time(struct timeval *tv) {
     struct timeval old;
     gettimeofday(&old, NULL);
 
     settimeofday(tv, NULL);
-    sntp_set_sync_status(SNTP_SYNC_STATUS_COMPLETED);
+    esp_sntp_set_sync_status(SNTP_SYNC_STATUS_COMPLETED);
 
     if (old.tv_sec < 16e8) { // Before ~2020
         ESP_LOGI(TAG, "time initialized");
     } else {
-        ESP_LOGI(TAG, "time updated, offset: %ld", (long)old.tv_sec - tv->tv_sec);
+        ESP_LOGI(TAG, "time updated, offset: %lld", old.tv_sec - tv->tv_sec);
     }
 }
 
@@ -72,10 +72,10 @@ void event_handler(void *arg, esp_event_base_t event_base, int32_t event_id, voi
         s_retry_num = 0;
 
         // Restart sntp every time we reconnect to reset the polling timeout
-        if (sntp_enabled()) {
-            sntp_stop();
+        if (esp_sntp_enabled()) {
+            esp_sntp_stop();
         }
-        sntp_init();
+        esp_sntp_init();
     } else if (event_base == IP_EVENT && event_id == IP_EVENT_STA_LOST_IP) {
         xEventGroupClearBits(s_wifi_event_group, WIFI_CONNECTED_BIT);
         ESP_LOGW(TAG, "lost IP");
@@ -115,8 +115,8 @@ void wifi_init() {
     ESP_ERROR_CHECK(esp_event_handler_instance_register(IP_EVENT, ESP_EVENT_ANY_ID, &event_handler,
                                                         NULL, NULL));
 
-    sntp_setoperatingmode(SNTP_OPMODE_POLL);
-    sntp_setservername(0, "pool.ntp.org");
+    esp_sntp_setoperatingmode(SNTP_OPMODE_POLL);
+    esp_sntp_setservername(0, "pool.ntp.org");
 }
 
 void wifi_disconnect() {

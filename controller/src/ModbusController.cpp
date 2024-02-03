@@ -5,7 +5,7 @@
 void ModbusController::task() {
     while (1) {
         EventBits_t bits = xEventGroupWaitBits(requests_, 0xff, pdTRUE, pdFALSE,
-                                               POLL_INTERVAL_SECS * 1000 / portTICK_RATE_MS);
+                                               POLL_INTERVAL_SECS * 1000 / portTICK_PERIOD_MS);
 
         struct timeval tm;
         time_t now = 0;
