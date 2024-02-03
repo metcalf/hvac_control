@@ -164,7 +164,7 @@ esp_err_t ModbusClient::getFreshAirState(FreshAirState *state) {
 
 esp_err_t ModbusClient::setFreshAirSpeed(uint8_t speed) {
     uint16_t v = speed;
-    return setParam(CID::FreshAirSpeed, &v);
+    return setParam(CID::FreshAirSpeed, (uint8_t *)&v);
 }
 
 esp_err_t ModbusClient::getMakeupDemand(bool *demand) {

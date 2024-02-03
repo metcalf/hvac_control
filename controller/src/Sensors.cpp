@@ -54,5 +54,10 @@ bool Sensors::poll() {
         return false;
     }
 
+    struct timeval tm;
+    if (!gettimeofday(&tm, NULL)) {
+        lastData_.updateTime = tm.tv_sec;
+    }
+
     return true;
 }

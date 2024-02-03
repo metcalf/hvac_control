@@ -12,6 +12,7 @@ class ModbusClient {
         uint16_t fanRpm;
     };
 
+    // TODO: Maybe move these to another place
     enum class FancoilSpeed { Off, Low, Med, High };
     enum class FancoilID { Prim, Sec };
 

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <stdint.h>
+#include <sys/time.h>
 
 class Sensors {
   public:
@@ -8,6 +9,7 @@ class Sensors {
         double temp, humidity;
         uint32_t pressurePa;
         uint16_t co2;
+        time_t updateTime;
     };
 
     uint8_t init();

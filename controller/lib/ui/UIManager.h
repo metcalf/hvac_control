@@ -11,6 +11,8 @@ class UIManager {
   public:
     enum class HVACState { Off, Heat, FanCool, ACCool };
     enum class ACOverride { Normal, Force, Stop };
+    enum class ControllerType { Only, Primary, Secondary };
+    enum class HVACType { None, Fancoil, Valve };
 
     struct Schedule {
         double heatSetC, coolSetC;
@@ -20,11 +22,16 @@ class UIManager {
     struct Config {
         Schedule day, night;
         uint16_t co2Target;
-        bool systemOn;
+        double maxHeatC, minCoolC;
+        bool systemOn, hasMakeupDemand;
+        ControllerType controllerType;
+        // TODO: Make sure we disable UI buttons as needed based on these types (e.g. no AC)
+        HVACType heatType, coolType;
     };
 
     struct FanOverride {
         bool on;
+        uint8_t speed;
         uint16_t timeMins;
     };
 
@@ -38,7 +45,9 @@ class UIManager {
     };
 
     enum class EventType {
-        ConfigUpdate,
+        SetSchedule,
+        SetCO2Target,
+        SetSystemPower,
         FanOverride,
         TempOverride,
         ACOverride,
@@ -46,7 +55,9 @@ class UIManager {
     };
 
     union EventPayload {
-        Config config;
+        Schedule schedules[2];
+        uint16_t co2Target;
+        bool systemPower;
         FanOverride fanOverride;
         TempOverride tempOverride;
         ACOverride acOverride;
@@ -60,8 +71,10 @@ class UIManager {
 
     UIManager(Config config) : config_(config) {}
 
-    void loaded();
     void tick() { lv_tick_inc(portTICK_RATE_MS); }
+    void handleTasks() { lv_timer_handler(); }
+
+    void loaded();
     void setHumidity(double h);
     void setCurrentFanSpeed(uint8_t speed);
     void setOutTempC(double tc);
@@ -69,6 +82,7 @@ class UIManager {
     void setInCO2(uint16_t ppm);
     void setHVACState(HVACState state);
     void setCurrentSetpoints(double heatC, double coolC);
+    void clearACOverride();
 
     void setMessage(MessageID messageID, bool allowCancel, const char *msg);
     void clearMessage(MessageID messageID);

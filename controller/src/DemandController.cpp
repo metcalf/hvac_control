@@ -1,6 +1,7 @@
 #include "DemandController.h"
 
 #include <algorithm>
+#include <cmath>
 
 #include "esp_log.h"
 
@@ -14,88 +15,71 @@ using FancoilSpeed = ModbusClient::FancoilSpeed;
 
 static const char *TAG = "DC";
 
-// constexpr DemandController::LevelSetpointHandler::Cutoff
-//     DemandController::indoor_temp_cooling_cutoffs_[];
-// constexpr DemandController::LevelSetpointHandler::Cutoff
-//     DemandController::outdoor_temp_delta_cooling_cutoffs_[];
-// constexpr DemandController::LevelSetpointHandler::Cutoff DemandController::co2_venting_cutoffs_[];
-// constexpr DemandController::LevelSetpointHandler::Cutoff
-//     DemandController::indoor_temp_vent_limit_cutoffs_[];
-// constexpr DemandController::LevelSetpointHandler::Cutoff
-//     DemandController::outdoor_temp_vent_limit_cutoffs_[];
-// constexpr DemandController::LevelSetpointHandler::Cutoff
-//     DemandController::indoor_rh_vent_limit_cutoffs_[];
-// constexpr DemandController::LevelSetpointHandler::Cutoff
-//     DemandController::outdoor_rh_vent_limit_cutoffs_[];
+constexpr DemandController::FancoilSetpointHandler::Cutoff DemandController::hvac_temp_cutoffs_[];
 
-// HANDLER_INIT(indoor_temp_cooling_), HANDLER_INIT(outdoor_temp_delta_cooling_),
-//       HANDLER_INIT(co2_venting_), HANDLER_INIT(indoor_temp_vent_limit_),
-//       HANDLER_INIT(outdoor_temp_vent_limit_), HANDLER_INIT(indoor_rh_vent_limit_),
-//       HANDLER_INIT(outdoor_rh_vent_limit_)
-
-DemandController::DemandController() : HANDLER_INIT(hvac_temp_) {
-    outdoor_temp_vent_limit_ = createLinearRangeHandler(outdoor_temp_vent_limit_range_);
-    co2_venting_ = createLinearRangeHandler(co2_venting_range_);
-    outdoor_temp_delta_cooling_ = createLinearRangeHandler(outdoor_temp_delta_cooling_range_);
-    indoor_temp_cooling_ = createLinearRangeHandler(indoor_temp_cooling_range_);
-}
-
-DemandController::~DemandController() {
-    for (; !allocatedHandlers_.empty(); allocatedHandlers_.pop_front()) {
-        delete allocatedHandlers_.front();
-    }
-
-    for (; !allocatedCutoffs_.empty(); allocatedCutoffs_.pop_front()) {
-        delete allocatedCutoffs_.front();
-    }
-}
-
-DemandController::PctSpeedSetpointHandler *
-DemandController::createLinearRangeHandler(LinearRange range) {
-    double step = (range.max.value - range.min.value) / (range.max.speed - range.min.speed);
-    uint8_t dir = range.max.speed > range.min.speed ? 1 : -1;
-    int numSteps = abs(range.max.speed - range.min.speed) + 1;
-
-    SpeedCutoff *cutoffs = new SpeedCutoff[numSteps];
-    allocatedCutoffs_.push_front(cutoffs);
-
-    for (uint8_t i = 0; i < numSteps; i++) {
-        cutoffs[i] = SpeedCutoff{(uint8_t)(range.min.speed + i * dir), range.min.value + i * step};
-    }
-
-    PctSpeedSetpointHandler *handler = new PctSpeedSetpointHandler(cutoffs, numSteps);
-    allocatedHandlers_.push_front(handler);
-
-    return handler;
-}
+DemandController::DemandController() : HANDLER_INIT(hvac_temp_) {}
 
 DemandRequest DemandController::update(const Sensors::Data &sensor_data, const Setpoints &setpoints,
                                        const double outdoorTempC) {
+    FanSpeed maxFanCooling, maxFanVenting;
+    if (std::isnan(outdoorTempC)) {
+        // Without a valid outdoor temperature, disable fan cooling but allow
+        // any amount of ventilation.
+        maxFanCooling = 0;
+        maxFanVenting = UINT8_MAX;
+    } else {
+        maxFanCooling = outdoor_temp_delta_cooling_range_.getSpeed(sensor_data.temp - outdoorTempC);
+        maxFanVenting = computeVentLimit(setpoints, sensor_data.temp, outdoorTempC);
+    }
 
     return DemandRequest{
-        .targetVent = co2_venting_->update(setpoints.co2, sensor_data.co2),
-        .targetFanCooling = indoor_temp_cooling_->update(setpoints.coolTemp, sensor_data.temp),
-        .maxFanCooling = outdoor_temp_delta_cooling_->update(sensor_data.temp, outdoorTempC),
-        .maxFanVenting = computeVentLimit(setpoints, sensor_data.temp, outdoorTempC),
+        .targetVent = co2_venting_range_.getSpeed(setpoints.co2 - sensor_data.co2),
+        .targetFanCooling =
+            indoor_temp_cooling_range_.getSpeed(setpoints.coolTemp - sensor_data.temp),
+        .maxFanCooling = maxFanCooling,
+        .maxFanVenting = maxFanVenting,
         .fancoil = computeFancoil(setpoints, sensor_data.temp),
     };
 }
 
+FanSpeed DemandController::speedForRequests(const DemandRequest *requests, size_t n) {
+    FanSpeed targetVent = 0, maxVent = UINT8_MAX, targetCool = 0;
+
+    for (int i = 0; i < n; i++) {
+        targetVent = std::max(targetVent, requests[i].targetVent);
+        maxVent = std::min(maxVent, requests[i].maxFanVenting);
+        targetCool =
+            std::max(targetCool, std::min(requests[i].targetFanCooling, requests[i].maxFanCooling));
+    }
+
+    return std::min(maxVent, std::max(targetVent, targetCool));
+}
+
+bool DemandController::isFanCoolingTempLimited(const DemandRequest *requests, size_t n) {
+    for (int i = 0; i < n; i++) {
+        if (requests[i].maxFanCooling < UINT8_MAX) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
 FanSpeed DemandController::computeVentLimit(const Setpoints &setpoints, const double indoor,
                                             const double outdoor) {
-    computeVentLimit(setpoints, indoor, outdoor, outdoor_temp_vent_limit_);
+    return computeVentLimit(setpoints, indoor, outdoor, outdoor_temp_vent_limit_range_);
 }
 
 FanSpeed DemandController::computeVentLimit(const Setpoints &setpoints, const double indoor,
                                             const double outdoor,
-                                            PctSpeedSetpointHandler *outdoor_limit) {
+                                            const LinearRange outdoor_limit_range) {
     if (outdoor > indoor) {
         // Limit venting if it's too hot outside relative to cool setpoint
-        return outdoor_limit->update(0, outdoor - setpoints.coolTemp);
+        return outdoor_limit_range.getSpeed(outdoor - setpoints.coolTemp);
     }
     {
         // Limit venting if it's too cool outside relative to heat setpoint
-        return outdoor_limit->update(0, setpoints.heatTemp - outdoor);
+        return outdoor_limit_range.getSpeed(setpoints.heatTemp - outdoor);
     }
 }
 

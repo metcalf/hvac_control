@@ -3,6 +3,6 @@
   "version": "0.0.0",
   "headers": ["UIManager.h"],
   "build": {
-    "includeDir": "src"
+    "includeDir": "."
   }
 }
