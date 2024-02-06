@@ -1,7 +1,6 @@
 #pragma once
 
-// TODO: Possible should move config definition elsewhere
-#include "UIManager.h"
+#include "ControllerDomain.h"
 
-UIManager::Config app_config_load();
-void app_config_save(UIManager::Config &config);
+ControllerDomain::Config app_config_load();
+void app_config_save(ControllerDomain::Config &config);

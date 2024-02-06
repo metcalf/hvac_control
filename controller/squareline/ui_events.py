@@ -42,3 +42,7 @@ def set_target_co2(event_struct):
 def set_schedule(event_struct):
     return
 
+
+def set_allow_ac(event_struct):
+    return
+

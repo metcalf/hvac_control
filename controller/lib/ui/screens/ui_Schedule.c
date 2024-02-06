@@ -53,7 +53,7 @@ lv_obj_set_style_border_side(lv_tabview_get_tab_btns(ui_TabView1), LV_BORDER_SID
 
 ui_DAY = lv_tabview_add_tab(ui_TabView1, "DAY");
 lv_obj_set_flex_flow(ui_DAY,LV_FLEX_FLOW_ROW);
-lv_obj_set_flex_align(ui_DAY, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
+lv_obj_set_flex_align(ui_DAY, LV_FLEX_ALIGN_SPACE_AROUND, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
 lv_obj_set_style_pad_left(ui_DAY, 10, LV_PART_MAIN| LV_STATE_DEFAULT);
 lv_obj_set_style_pad_right(ui_DAY, 10, LV_PART_MAIN| LV_STATE_DEFAULT);
 lv_obj_set_style_pad_top(ui_DAY, 0, LV_PART_MAIN| LV_STATE_DEFAULT);
@@ -190,7 +190,7 @@ lv_obj_set_style_text_font(ui_Label17, &lv_font_montserrat_18, LV_PART_MAIN| LV_
 
 ui_NIGHT = lv_tabview_add_tab(ui_TabView1, "NIGHT");
 lv_obj_set_flex_flow(ui_NIGHT,LV_FLEX_FLOW_ROW);
-lv_obj_set_flex_align(ui_NIGHT, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
+lv_obj_set_flex_align(ui_NIGHT, LV_FLEX_ALIGN_SPACE_AROUND, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
 lv_obj_set_style_pad_left(ui_NIGHT, 10, LV_PART_MAIN| LV_STATE_DEFAULT);
 lv_obj_set_style_pad_right(ui_NIGHT, 10, LV_PART_MAIN| LV_STATE_DEFAULT);
 lv_obj_set_style_pad_top(ui_NIGHT, 0, LV_PART_MAIN| LV_STATE_DEFAULT);

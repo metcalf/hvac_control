@@ -1,21 +1,28 @@
 #pragma once
 
+#include <chrono>
 #include <stdint.h>
 #include <sys/time.h>
 
+#include "freertos/FreeRTOS.h"
+#include "freertos/semphr.h"
+
+#include "ControllerDomain.h"
+
 class Sensors {
   public:
-    struct Data {
-        double temp, humidity;
-        uint32_t pressurePa;
-        uint16_t co2;
-        time_t updateTime;
-    };
+    using SensorData = ControllerDomain::SensorData;
+
+    Sensors() { mutex_ = xSemaphoreCreateMutex(); }
+    ~Sensors() { vSemaphoreDelete(mutex_); }
 
     uint8_t init();
     bool poll();
-    Data getLatest() { return lastData_; }
+    SensorData getLatest();
 
   private:
-    Data lastData_;
+    SensorData lastData_;
+    SemaphoreHandle_t mutex_;
+
+    SensorData pollInternal();
 };

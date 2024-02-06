@@ -12,6 +12,8 @@
 
 #include "wifi.h"
 
+#define SCHEDULE_TIME_STR_ARGS(s) (s.startHr - 1) % 12 + 1, s.startMin, s.startHr < 12 ? 'a' : 'p'
+
 #define UI_TASK_PRIO ESP_TASKD_EVENT_PRIO
 #define SENSOR_TASK_PRIO ESP_TASK_MAIN_PRIO
 #define MODBUS_TASK_PRIO SENSOR_TASK_PRIO + 1
@@ -25,30 +27,34 @@
 #define SENSOR_UPDATE_INTERVAL_SECS 30
 #define SENSOR_RETRY_INTERVAL_SECS 1
 #define APP_LOOP_INTERVAL_SECS 5
+#define INIT_ERR_RESTART_DELAY_TICKS 15 * 1000 / portTICK_PERIOD_MS
 
 #define HEAT_VLV_GPIO GPIO_NUM_3
 #define COOL_VLV_GPIO GPIO_NUM_9
+
+#define PRECOOL_MINS 60 * 5
+#define PRECOOL_DEG_PER_MIN REL_F_TO_C(1.0) / 60.0
 
 #define POSIX_TZ_STR "PST8PDT,M3.2.0/2:00:00,M11.1.0/2:00:00"
 
 // Interval between running the fan to get an updated outdoor temp when we're
 // waiting for the temp to drop to allow fan cooling
-#define OUTDOOR_TEMP_UPDATE_INTERVAL_SECS 15 * 60
+#define OUTDOOR_TEMP_UPDATE_INTERVAL std::chrono::minutes(15)
 // Maximum age of outdoor temp to display in the UI before treating it as stale
-#define OUTDOOR_TEMP_MAX_AGE_SECS 20 * 60
+#define OUTDOOR_TEMP_MAX_AGE std::chrono::minutes(20)
 // Minimum time fan needs to run before we trust the outdoor temp reading
-#define OUTDOOR_TEMP_MIN_FAN_TIME_SECS 60
+#define OUTDOOR_TEMP_MIN_FAN_TIME std::chrono::seconds(60)
 // Ignore makeup demand requests older than this
-#define MAKEUP_MAX_AGE_SECS 60 * 5
+#define MAKEUP_MAX_AGE std::chrono::minutes(5)
 
 #define MAKEUP_FAN_SPEED (FanSpeed)80
 #define MIN_FAN_SPEED_VALUE (FanSpeed)10
 #define MIN_FAN_RUNNING_RPM 1000
 
-static const char *TAG = "APP";
+using FanSpeed = ControllerDomain::FanSpeed;
+using Setpoints = ControllerDomain::Setpoints;
 
-using DemandRequest = DemandController::DemandRequest;
-using FanSpeed = DemandController::FanSpeed;
+static const char *TAG = "APP";
 
 ControllerApp app_;
 extern "C" void run_controller_app() { app_.start(); }
@@ -80,61 +86,120 @@ void mainTask(void *app) { ((ControllerApp *)app)->runTask(); }
 
 void modbusTask(void *mb) { ((ModbusController *)mb)->task(); }
 
+const char *fancoilSpeedToS(ControllerDomain::FancoilSpeed speed) {
+    switch (speed) {
+    case ControllerDomain::FancoilSpeed::Off:
+        return "OFF";
+    case ControllerDomain::FancoilSpeed::Low:
+        return "LOW";
+    case ControllerDomain::FancoilSpeed::Med:
+        return "MED";
+    case ControllerDomain::FancoilSpeed::High:
+        return "HIGH";
+    default:
+        __builtin_unreachable();
+    }
+}
+
+void ControllerApp::bootErr(const char *msg) {
+    uiManager_->bootErr(msg);
+    ESP_LOGE(TAG, "%s", msg);
+    vTaskDelay(INIT_ERR_RESTART_DELAY_TICKS);
+    esp_restart();
+}
+
 void ControllerApp::start() {
+    char bootErrMsg[UI_MAX_MSG_LEN];
     config_ = app_config_load();
     uiManager_ = new UIManager(config_);
+    UIManager::setEventsInst(uiManager_);
     modbusController_ = new ModbusController(config_.hasMakeupDemand);
-    valveCtrl_ = new ValveCtrl(config_.heatType == UIManager::HVACType::Valve,
-                               config_.coolType == UIManager::HVACType::Valve);
-    nControllers_ = config_.controllerType == UIManager::ControllerType::Primary ? 2 : 1;
+    valveCtrl_ = new ValveCtrl(config_.heatType == Config::HVACType::Valve,
+                               config_.coolType == Config::HVACType::Valve);
+    nControllers_ = config_.controllerType == Config::ControllerType::Primary ? 2 : 1;
 
+    xTaskCreate(uiTask, "uiTask", UI_TASK_STACK_SIZE, uiManager_, UI_TASK_PRIO, NULL);
+
+    setenv("TZ", POSIX_TZ_STR, 1);
+    tzset();
+
+    // TODO: Setup OTA updates
     wifi_init();
     wifi_connect();
 
-    // TODO: Report these errors in the UI and restart after some amount of time
     uint8_t sensor_err = sensors_.init();
     if (sensor_err != 0) {
-        while (1)
-            ;
+        snprintf(bootErrMsg, sizeof(bootErrMsg), "Sensor init error: %d", sensor_err);
+        bootErr(bootErrMsg);
     }
 
     esp_err_t err = modbusController_->init();
     if (err != ESP_OK) {
-        while (1)
-            ;
+        snprintf(bootErrMsg, sizeof(bootErrMsg), "Modbus init error: %d", err);
+        bootErr(bootErrMsg);
     }
 
     xTaskCreate(sensorTask, "sensorTask", SENSOR_TASK_STACK_SIZE, &sensors_, SENSOR_TASK_PRIO,
                 NULL);
     xTaskCreate(modbusTask, "modbusTask", MODBUS_TASK_STACK_SIZE, &modbusController_,
                 MODBUS_TASK_PRIO, NULL);
-
-    xTaskCreate(uiTask, "uiTask", UI_TASK_STACK_SIZE, uiManager_, UI_TASK_PRIO, NULL);
     xTaskCreate(mainTask, "mainTask", MAIN_TASK_STACK_SIZE, this, MAIN_TASK_PRIO, NULL);
 }
 
-void ControllerApp::updateACMode(DemandRequest *requests, time_t now) {
-    if (acModeUntil_ != 0 && acModeUntil_ < now) {
+void ControllerApp::updateACMode(DemandRequest *requests,
+                                 std::chrono::system_clock::time_point now) {
+    if (!config_.systemOn) {
         acMode_ = ACMode::Standby;
-        acModeUntil_ = 0;
-        uiManager_->clearACOverride();
+        clearMessage(MsgID::ACMode);
     }
 
-    if (acMode_ == ACMode::Standby) {
+    switch (acMode_) {
+    case ACMode::Off:
+        break;
+    case ACMode::Standby:
         // If any of the fancoils are demanding HIGH A/C, turn the A/C on until the next start-of-day
         for (int i = 0; i < nControllers_; i++) {
-            DemandController::FancoilRequest fc = requests[i].fancoil;
-            if (fc.cool && fc.speed == ModbusClient::FancoilSpeed::High) {
+            DemandRequest::FancoilRequest fc = requests[i].fancoil;
+            if (fc.cool && fc.speed == FancoilSpeed::High) {
                 acMode_ = ACMode::On;
-                acModeUntil_ = 0; // TODO: Make this the start of the daytime schedule
                 break;
             }
         }
+        break;
+    case ACMode::On:
+        // If any fancoils are still demanding cooling or the fan can't satisfy
+        bool shouldKeepACOn = false;
+        for (int i = 0; i < nControllers_; i++) {
+            DemandRequest::FancoilRequest fc = requests[i].fancoil;
+            if (fc.cool && fc.speed != FancoilSpeed::Off) {
+                shouldKeepACOn = true; // Fancoil is still demanding cooling
+                break;
+            }
+
+            if (requests[i].targetFanCooling > requests[i].maxFanCooling) {
+                shouldKeepACOn = true; // Fan cannot satisfy cooling demand
+                break;
+            }
+        }
+
+        // If fancoils aren't being used for cooling and the fan can satisfy cooling
+        // demands then
+        if (!shouldKeepACOn) {
+            clearMessage(MsgID::ACMode);
+            acMode_ = ACMode::Standby;
+        }
+        break;
     }
 }
 
-FanSpeed ControllerApp::computeFanSpeed(DemandRequest *requests, time_t now) {
+FanSpeed ControllerApp::computeFanSpeed(DemandRequest *requests,
+                                        std::chrono::system_clock::time_point now) {
     FanSpeed fanSpeed;
+
+    if (!config_.systemOn) {
+        clearMessage(MsgID::FanOverride);
+        return 0;
+    }
 
     if (fanOverrideUntil_ > now) {
         fanSpeed = fanOverrideSpeed_;
@@ -155,63 +220,69 @@ FanSpeed ControllerApp::computeFanSpeed(DemandRequest *requests, time_t now) {
 
         if (fanSpeed < MIN_FAN_SPEED_VALUE &&
             DemandController::isFanCoolingTempLimited(requests, nControllers_) &&
-            (now - lastOutdoorTempUpdate_) > OUTDOOR_TEMP_UPDATE_INTERVAL_SECS) {
+            (now - lastOutdoorTempUpdate_) > OUTDOOR_TEMP_UPDATE_INTERVAL) {
             // If we're waiting for the outdoor temperature to drop for cooling and
             // we haven't updated the outdoor temperature recently, run the fan until
             // we get an update.
             fanSpeed = MIN_FAN_SPEED_VALUE;
         }
 
-        if (fanOverrideUntil_ != 0) {
-            // TODO: Clear fan override message
-            fanOverrideUntil_ = 0;
+        if (fanOverrideUntil_ > std::chrono::system_clock::time_point()) {
+            clearMessage(MsgID::FanOverride);
+            fanOverrideUntil_ = {};
         }
     }
 
-    time_t mdTime;
+    std::chrono::system_clock::time_point mdTime;
     bool makeupDemand;
     esp_err_t err = modbusController_->getMakeupDemand(&makeupDemand, &mdTime);
-    if (err != ESP_OK) {
-        // TODO: Log error to UI
-        ESP_LOGE(TAG, "Error getting makeup demand: %d", err);
-    } else if (makeupDemand && now - mdTime < MAKEUP_MAX_AGE_SECS) {
-        fanSpeed = std::max(fanSpeed, MAKEUP_FAN_SPEED);
+    if (err == ESP_OK) {
+        clearMessage(MsgID::GetMakeupDemandErr);
+
+        if (makeupDemand && now - mdTime < MAKEUP_MAX_AGE) {
+            fanSpeed = std::max(fanSpeed, MAKEUP_FAN_SPEED);
+        }
+    } else {
+        char errMsg[UI_MAX_MSG_LEN];
+        snprintf(errMsg, sizeof(errMsg), "Error getting makeup demand: %d", err);
+        setMessage(MsgID::GetMakeupDemandErr, false, errMsg);
+        ESP_LOGE(TAG, "%s", errMsg);
     }
 
     return fanSpeed;
 }
 
 void ControllerApp::setFanSpeed(FanSpeed speed) {
-    // TODO: Use this in the UI instead
-    // uint8_t scaledSpeed;
-
-    // if (speed > 100) {
-    //     ESP_LOGE(TAG, "Unexpected FanSpeed > 100: %d", speed);
-    //     speed = 100;
-    // }
-
-    // if (speed > 0) {
-    //     scaledSpeed = MIN_FAN_SPEED_VALUE + speed * ((UINT8_MAX - MIN_FAN_SPEED_VALUE) / 100.0);
-    // } else {
-    //     scaledSpeed = 0;
-    // }
-
     if (speed > 0 && speed < MIN_FAN_SPEED_VALUE) {
         ESP_LOGE(TAG, "Unexpected fan speeed 0<%d<%d: ", MIN_FAN_SPEED_VALUE, speed);
         speed = 0;
     }
 
+    uiManager_->setCurrentFanSpeed(speed);
     modbusController_->setFreshAirSpeed(speed);
     fanIsOn_ = speed > 0;
 }
 
-void ControllerApp::handleUIEvent(UIManager::Event &uiEvent, time_t now) {
+bool ControllerApp::pollUIEvent(bool wait) {
+    UIManager::Event uiEvent;
+    QueueHandle_t uiQueue = uiManager_->getEventQueue();
+    TickType_t waitTicks = wait ? APP_LOOP_INTERVAL_SECS * 1000 / portTICK_PERIOD_MS : 0;
+
+    if (xQueueReceive(uiQueue, &uiEvent, waitTicks) != pdTRUE) {
+        return false;
+    }
+
     switch (uiEvent.type) {
     case UIManager::EventType::SetSchedule:
-        config_.day = uiEvent.payload.schedules[0];
-        config_.night = uiEvent.payload.schedules[1];
+        for (int i = 0; i < sizeof(uiEvent.payload.schedules); i++) {
+            config_.schedules[i] = uiEvent.payload.schedules[i];
+        }
         app_config_save(config_);
-        // TODO: Respond to new schedule?
+
+        // Clear the temp override when we set a new schedule to avoid having
+        // to think about how these interact.
+        tempOverrideUntilScheduleIdx_ = -1;
+        clearMessage(MsgID::TempOverride);
         break;
     case UIManager::EventType::SetCO2Target:
         config_.co2Target = uiEvent.payload.co2Target;
@@ -219,51 +290,114 @@ void ControllerApp::handleUIEvent(UIManager::Event &uiEvent, time_t now) {
         break;
     case UIManager::EventType::SetSystemPower:
         config_.systemOn = uiEvent.payload.systemPower;
-        // TODO: Add a cancellable message to turn system on?
-        break;
-    case UIManager::EventType::FanOverride:
-        if (uiEvent.payload.fanOverride.on) {
-            fanOverrideSpeed_ = uiEvent.payload.fanOverride.speed;
-            fanOverrideUntil_ = 0; // TODO: Until next day-start
+        app_config_save(config_);
+        if (config_.systemOn) {
+            clearMessage(MsgID::SystemOff);
         } else {
-            // Don't set to zero, computeFanSpeed will handle that
-            fanOverrideUntil_ = now - 1;
+            setMessage(MsgID::SystemOff, true, "System turned off");
+
+            tempOverrideUntilScheduleIdx_ = -1;
+            clearMessage(MsgID::TempOverride);
         }
         break;
-    case UIManager::EventType::TempOverride:
-        // TODO: figure out along with setpoints
+    case UIManager::EventType::FanOverride:
+        fanOverrideSpeed_ = uiEvent.payload.fanOverride.speed;
+        fanOverrideUntil_ = std::chrono::system_clock::now() +
+                            std::chrono::minutes{uiEvent.payload.fanOverride.timeMins};
+        // TODO: Implement "until" in this message
+        setMessageF(MsgID::FanOverride, true, "Fan set to %u%%",
+                    (uint)(fanOverrideSpeed_ / 255.0 * 100));
         break;
+    case UIManager::EventType::TempOverride: {
+        setTempOverride(uiEvent.payload.tempOverride);
+        break;
+    }
     case UIManager::EventType::ACOverride:
         switch (uiEvent.payload.acOverride) {
         case UIManager::ACOverride::Normal:
             // Don't set to zero, updateACMode will handle that and clearing the message
-            acModeUntil_ = now - 1;
+            acMode_ = ACMode::Standby;
+            clearMessage(MsgID::ACMode);
             break;
         case UIManager::ACOverride::Force:
             acMode_ = ACMode::On;
-            acModeUntil_ = 0; // TODO: Until next day start
+            setMessage(MsgID::ACMode, true, "Forcing A/C on");
             break;
         case UIManager::ACOverride::Stop:
             acMode_ = ACMode::Off;
-            acModeUntil_ = 0; // TODO: Until next day start
+            setMessage(MsgID::ACMode, true, "A/C disabled");
             break;
         }
         break;
     case UIManager::EventType::MsgCancel:
-        // TODO: figure out along with messaging system
+        handleCancelMessage((MsgID)uiEvent.payload.msgID);
         break;
     }
+
+    return true;
 }
+
+void ControllerApp::handleCancelMessage(MsgID id) {
+    switch (id) {
+    case MsgID::SystemOff:
+        config_.systemOn = true;
+        uiManager_->setSystemPower(true);
+        app_config_save(config_);
+        break;
+    case MsgID::FanOverride:
+        // Don't set to zero, computeFanSpeed will handle that
+        clearMessage(MsgID::FanOverride);
+        fanOverrideUntil_ = {};
+        break;
+    case MsgID::TempOverride:
+        tempOverrideUntilScheduleIdx_ = -1;
+        break;
+    case MsgID::ACMode:
+        acMode_ = ACMode::Standby;
+        break;
+    case MsgID::Precooling: {
+        // We stop precooling by setting a temperature override
+        Config::Schedule schedule = config_.schedules[getScheduleIdx(0)];
+        setTempOverride(UIManager::TempOverride{
+            .heatC = schedule.heatC,
+            .coolC = schedule.coolC,
+        });
+        break;
+    }
+    default:
+        ESP_LOGE(TAG, "Unexpected message cancellation for: %d", static_cast<int>(id));
+    }
+}
+
 void ControllerApp::setHVAC(DemandRequest *requests) {
     for (int i = 0; i < nControllers_; i++) {
+        DemandRequest request = requests[i];
 
-        ModbusClient::FancoilSpeed speed = ModbusClient::FancoilSpeed::Off;
-        bool cool = requests[i].fancoil.cool;
-        if (!cool || acMode_ == ACMode::On) {
-            speed = requests[i].fancoil.speed;
+        FancoilSpeed speed = FancoilSpeed::Off;
+        bool cool = request.fancoil.cool;
+        if (config_.systemOn && (!cool || acMode_ == ACMode::On)) {
+            speed = request.fancoil.speed;
         }
 
-        UIManager::HVACType hvacType;
+        HVACState hvacState;
+        if (speed != FancoilSpeed::Off) {
+            if (cool) {
+                hvacState = HVACState::ACCool;
+            } else {
+                hvacState = HVACState::Heat;
+            }
+        } else if (request.targetFanCooling > 0) {
+            hvacState = HVACState::FanCool;
+        } else {
+            hvacState = HVACState::Off;
+        }
+        if (i == 0) {
+            uiManager_->setHVACState(hvacState);
+        } else {
+            modbusController_->reportHVACState(hvacState);
+        }
+
+        Config::HVACType hvacType;
         if (cool) {
             hvacType = config_.coolType;
         } else {
@@ -271,68 +405,204 @@ void ControllerApp::setHVAC(DemandRequest *requests) {
         }
 
         switch (hvacType) {
-        case UIManager::HVACType::None:
+        case Config::HVACType::None:
             break;
-        case UIManager::HVACType::Fancoil:
-            modbusController_->setFancoil((ModbusClient::FancoilID)i, speed, cool);
+        case Config::HVACType::Fancoil:
+            modbusController_->setFancoil((FancoilID)i, speed, cool);
             break;
-        case UIManager::HVACType::Valve:
-            valveCtrl_->setMode(cool, speed != ModbusClient::FancoilSpeed::Off);
+        case Config::HVACType::Valve:
+            if (i == 0) {
+                valveCtrl_->setMode(cool, speed != FancoilSpeed::Off);
+            } else {
+                ESP_LOGE(TAG, "Not implemented: valves on secondary controller");
+            }
             break;
         }
     }
 }
 
-void ControllerApp::runTask() {
-    UIManager::Event uiEvent;
-    QueueHandle_t uiQueue = uiManager_->getEventQueue();
+void ControllerApp::checkModbusErrors() {
+    esp_err_t err = modbusController_->lastFreshAirSpeedErr();
+    if (err == ESP_OK) {
+        clearMessage(MsgID::SetFreshAirSpeedErr);
+    } else {
+        setMessageF(MsgID::SetFreshAirSpeedErr, false, "Error setting fan speed: %d", err);
+    }
 
-    while (1) {
-        time_t now = 0; // TODO: Get local time, or use UTC?
-        esp_err_t err;
+    err = modbusController_->lastSetFancoilErr();
+    if (err == ESP_OK) {
+        clearMessage(MsgID::SetFancoilErr);
+    } else {
+        setMessageF(MsgID::SetFancoilErr, false, "Error controlling fancoil: %d", err);
+    }
+}
 
-        // TODO: CO2 calibration
+uint16_t nowMinOfDay() {
+    struct tm nowLocalTm;
+    time_t nowUTC;
+    time(&nowUTC);
+    localtime_r(&nowUTC, &nowLocalTm);
 
-        // TODO: Consider taking another turn through the loop until ui events are cleared
-        // to avoid blocking processing? Need to be careful since some UI events need processing
-        // by other parts of this loop. Probably should move all modbus interaction into another thread
-        if (xQueueReceive(uiQueue, &uiEvent,
-                          (APP_LOOP_INTERVAL_SECS * 1000) / portTICK_PERIOD_MS) == pdTRUE) {
-            handleUIEvent(uiEvent, now);
+    return nowLocalTm.tm_hour * 60 + nowLocalTm.tm_min;
+}
+
+int ControllerApp::getScheduleIdx(int offset) {
+    int i;
+    for (i = 0; i < NUM_SCHEDULE_TIMES; i++) {
+        Config::Schedule schedule = config_.schedules[i];
+        if (nowMinOfDay() < schedule.startMinOfDay()) {
+            break;
         }
+    }
 
-        // TODO: Manage scheduling setpoints
+    // We search for the first schedule *after* the current time and then look to the
+    // previous schedule.
+    return (i - 1 + offset) % NUM_SCHEDULE_TIMES;
+}
 
-        time_t fasTime;
-        ModbusClient::FreshAirState freshAirState;
-        err = modbusController_->getFreshAirState(&freshAirState, &fasTime);
-        if (err == ESP_OK) {
-            if (freshAirState.fanRpm > MIN_FAN_RUNNING_RPM) {
-                if (fanLastStarted_ == 0) {
-                    fanLastStarted_ = fasTime;
-                } else if (now - fanLastStarted_ > OUTDOOR_TEMP_MIN_FAN_TIME_SECS) {
-                    outdoorTempC_ = freshAirState.temp;
-                    uiManager_->setOutTempC(outdoorTempC_);
-                    lastOutdoorTempUpdate_ = fasTime;
-                }
-            } else {
-                fanLastStarted_ = 0;
+Setpoints ControllerApp::getCurrentSetpoints() {
+    int idx = getScheduleIdx(0);
+
+    if (idx == tempOverrideUntilScheduleIdx_) {
+        tempOverrideUntilScheduleIdx_ = -1;
+        clearMessage(MsgID::TempOverride);
+    } else if (tempOverrideUntilScheduleIdx_ != 1) {
+        return Setpoints{
+            .heatTemp = tempOverride_.heatC,
+            .coolTemp = tempOverride_.coolC,
+            .co2 = (double)config_.co2Target,
+        };
+    }
+
+    // We search for the first schedule *after* the current time and then look to the
+    // previous schedule.
+    Config::Schedule schedule = config_.schedules[idx];
+    Config::Schedule nextSchedule = config_.schedules[getScheduleIdx(1)];
+
+    Setpoints setpoints{
+        .heatTemp = schedule.heatC,
+        .coolTemp = schedule.coolC,
+        .co2 = (double)config_.co2Target,
+    };
+
+    // If the next scheduled time is at a lower temperature, we adjust the setpoint
+    // to start cooling now.
+    if (config_.systemOn && setpoints.coolTemp > nextSchedule.coolC) {
+        int minsUntilNext = (nextSchedule.startMinOfDay() - nowMinOfDay()) % (60 * 24);
+        if (minsUntilNext <= PRECOOL_MINS) {
+            double precoolC = nextSchedule.coolC + minsUntilNext * PRECOOL_DEG_PER_MIN;
+            if (precoolC < setpoints.coolTemp) {
+                setpoints.coolTemp = precoolC;
+                setMessageF(MsgID::Precooling, true, "Cooling to %d by %02d:%02d%c",
+                            ABS_C_TO_F(setpoints.coolTemp), SCHEDULE_TIME_STR_ARGS(nextSchedule));
+
+                return setpoints;
+            }
+        }
+    }
+
+    clearMessage(MsgID::Precooling);
+
+    return setpoints;
+}
+
+void ControllerApp::setTempOverride(UIManager::TempOverride to) {
+    tempOverride_ = to;
+    tempOverrideUntilScheduleIdx_ = getScheduleIdx(1);
+    Config::Schedule schedule = config_.schedules[tempOverrideUntilScheduleIdx_];
+
+    setMessageF(MsgID::TempOverride, true, "Hold %d/%d until %02d:%02d%c",
+                ABS_C_TO_F(tempOverride_.heatC), ABS_C_TO_F(tempOverride_.coolC),
+                SCHEDULE_TIME_STR_ARGS(schedule));
+}
+
+void ControllerApp::handleFreshAirState(std::chrono::system_clock::time_point now) {
+    std::chrono::system_clock::time_point fasTime;
+    FreshAirState freshAirState;
+    esp_err_t err = modbusController_->getFreshAirState(&freshAirState, &fasTime);
+    if (err == ESP_OK) {
+        if (freshAirState.fanRpm > MIN_FAN_RUNNING_RPM) {
+            if (fanLastStarted_ == std::chrono::system_clock::time_point()) {
+                fanLastStarted_ = fasTime;
+            } else if (now - fanLastStarted_ > OUTDOOR_TEMP_MIN_FAN_TIME) {
+                outdoorTempC_ = freshAirState.temp;
+                modbusController_->reportOutdoorTemp(outdoorTempC_);
+                uiManager_->setOutTempC(outdoorTempC_);
+                lastOutdoorTempUpdate_ = fasTime;
             }
         } else {
-            // TODO: Handle error
+            fanLastStarted_ = {};
+        }
+        clearMessage(MsgID::GetFreshAirStateErr);
+    } else {
+        char errMsg[UI_MAX_MSG_LEN];
+        snprintf(errMsg, sizeof(errMsg), "Error getting fresh air state: %d", err);
+        setMessage(MsgID::GetFreshAirStateErr, false, errMsg);
+        ESP_LOGE(TAG, "%s", errMsg);
+    }
+
+    if (now - lastOutdoorTempUpdate_ > OUTDOOR_TEMP_MAX_AGE) {
+        outdoorTempC_ = std::nan("");
+        modbusController_->reportOutdoorTemp(outdoorTempC_);
+        uiManager_->setOutTempC(outdoorTempC_);
+    }
+}
+
+void ControllerApp::setMessageF(MsgID msgID, bool allowCancel, const char *fmt, ...) {
+    char msg[UI_MAX_MSG_LEN];
+
+    va_list args;
+    va_start(args, fmt);
+    vsnprintf(msg, sizeof(msg), fmt, args);
+    va_end(args);
+}
+void ControllerApp::setMessage(MsgID msgID, bool allowCancel, const char *msg) {
+    uiManager_->setMessage(static_cast<uint8_t>(msgID), allowCancel, msg);
+}
+void ControllerApp::clearMessage(MsgID msgID) {
+    uiManager_->clearMessage(static_cast<uint8_t>(msgID));
+}
+
+void ControllerApp::runTask() {
+    bool bootDone = false;
+    while (1) {
+        // TODO: CO2 calibration
+        std::chrono::system_clock::time_point now = std::chrono::system_clock::now();
+
+        handleFreshAirState(now);
+
+        DemandRequest requests[nControllers_];
+
+        Setpoints localSetpoints = getCurrentSetpoints();
+        uiManager_->setCurrentSetpoints(localSetpoints.heatTemp, localSetpoints.coolTemp);
+
+        SensorData sensorData = sensors_.getLatest();
+        if (strlen(sensorData.errMsg) == 0) {
+            requests[0] = demandController_.update(sensorData, localSetpoints, outdoorTempC_);
+            clearMessage(MsgID::SensorErr);
+
+            uiManager_->setHumidity(sensorData.humidity);
+            uiManager_->setInTempC(sensorData.temp);
+            uiManager_->setInCO2(sensorData.co2);
+        } else {
+            setMessage(MsgID::SensorErr, false, sensorData.errMsg);
         }
 
-        if (now - lastOutdoorTempUpdate_ > OUTDOOR_TEMP_MAX_AGE_SECS) {
-            outdoorTempC_ = std::nan("");
-            uiManager_->setOutTempC(outdoorTempC_);
+        if (nControllers_ > 1) {
+            SensorData secondarySensorData;
+            Setpoints secondarySetpoints;
+            esp_err_t err = modbusController_->getSecondaryControllerState(&secondarySensorData,
+                                                                           &secondarySetpoints);
+
+            if (err == ESP_OK) {
+                clearMessage(MsgID::SecondaryControllerErr);
+            } else {
+                setMessageF(MsgID::SecondaryControllerErr, false, "Sec ctrl err: %d", err);
+            }
+
+            requests[1] =
+                demandController_.update(secondarySensorData, secondarySetpoints, outdoorTempC_);
         }
-
-        Sensors::Data sensor_data = sensors_.getLatest();
-        DemandController::Setpoints setpoints; // TODO
-
-        DemandController::DemandRequest requests[nControllers_];
-
-        requests[0] = demandController_.update(sensor_data, setpoints, outdoorTempC_);
 
         FanSpeed speed = computeFanSpeed(requests, now);
         setFanSpeed(speed);
@@ -340,6 +610,18 @@ void ControllerApp::runTask() {
         updateACMode(requests, now);
         setHVAC(requests);
 
-        // TODO: Interface with secondary controller
+        checkModbusErrors();
+
+        if (!bootDone) {
+            uiManager_->bootDone();
+            bootDone = true;
+        }
+
+        if (pollUIEvent(true)) {
+            // If we found something in the queue, clear the queue before proceeeding with
+            // the control logic.
+            while (pollUIEvent(false))
+                ;
+        }
     }
 }

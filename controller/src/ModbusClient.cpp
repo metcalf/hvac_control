@@ -11,6 +11,12 @@
 #define MB_UART_RXD GPIO_NUM_8
 #define MB_UART_RTS GPIO_NUM_18
 
+using FanSpeed = ControllerDomain::FanSpeed;
+using FancoilSpeed = ControllerDomain::FancoilSpeed;
+using FancoilID = ControllerDomain::FancoilID;
+using FreshAirState = ControllerDomain::FreshAirState;
+using SensorData = ControllerDomain::SensorData;
+
 static const char *TAG = "MBC";
 
 enum class CID {
@@ -110,7 +116,8 @@ esp_err_t ModbusClient::init() {
     initParams();
 
     // Initialize and start Modbus controller
-    mb_communication_info_t comm = {.mode = MB_MODE_RTU};
+    mb_communication_info_t comm;
+    comm.mode = MB_MODE_RTU;
     comm.port = MB_PORT_NUM;
     comm.baudrate = MB_DEV_SPEED;
     comm.parity = MB_PARITY_NONE;
@@ -162,7 +169,7 @@ esp_err_t ModbusClient::getFreshAirState(FreshAirState *state) {
     return err;
 }
 
-esp_err_t ModbusClient::setFreshAirSpeed(uint8_t speed) {
+esp_err_t ModbusClient::setFreshAirSpeed(FanSpeed speed) {
     uint16_t v = speed;
     return setParam(CID::FreshAirSpeed, (uint8_t *)&v);
 }
@@ -193,4 +200,17 @@ esp_err_t ModbusClient::setFancoil(FancoilID id, FancoilSpeed speed, bool cool) 
     }
 
     return setParam(cid, (uint8_t *)&v);
+}
+
+esp_err_t ModbusClient::getSecondaryControllerState(ControllerDomain::SensorData *sensorData,
+                                                    ControllerDomain::Setpoints *setpoints) {
+    // TODO: (secondary controller) Implement this
+    return ESP_ERR_NOT_SUPPORTED;
+}
+
+esp_err_t ModbusClient::setSecondaryControllerData(ControllerDomain::FanSpeed fanSpeed,
+                                                   ControllerDomain::HVACState hvacState,
+                                                   double outTempC, bool systemOn) {
+    // TODO: (secondary controller) Implement this
+    return ESP_ERR_NOT_SUPPORTED;
 }

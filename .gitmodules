@@ -18,3 +18,6 @@
 [submodule "shared_libs/scd40"]
 	path = shared_libs/scd40
 	url = git@github.com:metcalf/embedded-i2c-scd4x.git
+[submodule "controller/lib/date"]
+	path = controller/lib/date
+	url = https://github.com/HowardHinnant/date

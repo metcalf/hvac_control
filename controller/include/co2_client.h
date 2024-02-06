@@ -2,8 +2,6 @@
 
 #include <stdint.h>
 
-// TODO: Figure out recalibration
-
 int8_t co2_init();
 
 int8_t co2_read(uint16_t *co2);

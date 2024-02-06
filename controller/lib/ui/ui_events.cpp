@@ -6,20 +6,20 @@
 #include "UIManager.h"
 #include "ui.h"
 
-UIManager *ui_;
+void set_fan_override(lv_event_t *e) { UIManager::eventsInst()->eFanOverride(); }
 
-void set_fan_override(lv_event_t *e) { ui_->eFanOverride(); }
+void set_thermostat_override(lv_event_t *e) { UIManager::eventsInst()->eThermotatOverride(); }
 
-void set_thermostat_override(lv_event_t *e) { ui_->eThermotatOverride(); }
+void set_use_ac(lv_event_t *e) { UIManager::eventsInst()->eUseAC(); }
 
-void set_use_ac(lv_event_t *e) { ui_->eUseAC(); }
+void set_stop_ac(lv_event_t *e) { UIManager::eventsInst()->eStopAC(); }
 
-void set_stop_ac(lv_event_t *e) { ui_->eStopAC(); }
+void set_allow_ac(lv_event_t *e) { UIManager::eventsInst()->eAllowAC(); }
 
-void set_system_off(lv_event_t *e) { ui_->eSystemOff(); }
+void set_system_off(lv_event_t *e) { UIManager::eventsInst()->eSystemOff(); }
 
-void set_system_on(lv_event_t *e) { ui_->eSystemOn(); }
+void set_system_on(lv_event_t *e) { UIManager::eventsInst()->eSystemOn(); }
 
-void set_target_co2(lv_event_t *e) { ui_->eTargetCO2(); }
+void set_target_co2(lv_event_t *e) { UIManager::eventsInst()->eTargetCO2(); }
 
-void set_schedule(lv_event_t *e) { ui_->eSchedule(); }
+void set_schedule(lv_event_t *e) { UIManager::eventsInst()->eSchedule(); }

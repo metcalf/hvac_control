@@ -47,7 +47,7 @@ lv_obj_set_align( ui_Override_speed_container, LV_ALIGN_CENTER );
 lv_obj_clear_flag( ui_Override_speed_container, LV_OBJ_FLAG_SCROLLABLE );    /// Flags
 
 ui_Fan_override_speed = lv_roller_create(ui_Override_speed_container);
-lv_roller_set_options( ui_Fan_override_speed, "OFF\n10%\n20%\n30%\n40%\n50%\n60%\n70%\n80%\n90%\nMAX", LV_ROLLER_MODE_NORMAL );
+lv_roller_set_options( ui_Fan_override_speed, "OFF\n10%\n20%\n30%\n40%\n50%\n60%\n70%\n80%\n90%\n100%", LV_ROLLER_MODE_NORMAL );
 lv_obj_set_height( ui_Fan_override_speed, 100);
 lv_obj_set_width( ui_Fan_override_speed, LV_SIZE_CONTENT);  /// 60
 lv_obj_set_align( ui_Fan_override_speed, LV_ALIGN_TOP_MID );

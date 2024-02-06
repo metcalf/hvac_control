@@ -5,40 +5,42 @@
 
 #define NVS_CONFIG_VERSION 0
 #define STORAGE_NAMESPACE "config"
-#define F_TO_C(t) (t * 5.0 / 9.0)
 
 const static char *TAG = "cfg";
 
 bool version_written = false;
 
-UIManager::Config default_config() {
-    return UIManager::Config{
-        .day =
+using Config = ControllerDomain::Config;
+
+Config default_config() {
+    return Config{
+        .schedules =
             {
-                .heatSetC = F_TO_C(68),
-                .coolSetC = F_TO_C(72),
-                .startHr = 7,
-                .startMin = 0,
-            },
-        .night =
-            {
-                .heatSetC = F_TO_C(66),
-                .coolSetC = F_TO_C(70),
-                .startHr = 21,
-                .startMin = 0,
+                {
+                    .heatC = ABS_F_TO_C(68),
+                    .coolC = ABS_F_TO_C(72),
+                    .startHr = 7,
+                    .startMin = 0,
+                },
+                {
+                    .heatC = ABS_F_TO_C(66),
+                    .coolC = ABS_F_TO_C(70),
+                    .startHr = 21,
+                    .startMin = 0,
+                },
             },
         .co2Target = 1000,
-        .maxHeatC = F_TO_C(74),
-        .minCoolC = F_TO_C(66),
+        .maxHeatC = ABS_F_TO_C(74),
+        .minCoolC = ABS_F_TO_C(66),
         .systemOn = true,
         .hasMakeupDemand = false,
-        .controllerType = UIManager::ControllerType::Only,
-        .heatType = UIManager::HVACType::Fancoil,
-        .coolType = UIManager::HVACType::Fancoil,
+        .controllerType = Config::ControllerType::Only,
+        .heatType = Config::HVACType::Fancoil,
+        .coolType = Config::HVACType::Fancoil,
     };
 }
 
-UIManager::Config app_config_load() {
+Config app_config_load() {
     nvs_handle_t handle;
 
     ESP_ERROR_CHECK(nvs_open(STORAGE_NAMESPACE, NVS_READWRITE, &handle));
@@ -55,17 +57,17 @@ UIManager::Config app_config_load() {
         return default_config();
     }
 
-    UIManager::Config config;
-    size_t size = sizeof(UIManager::Config);
+    Config config;
+    size_t size = sizeof(Config);
     nvs_get_blob(handle, "config", &config, &size);
-    if (size != sizeof(UIManager::Config)) {
-        ESP_LOGE(TAG, "Invalid config length read: %u != %u", sizeof(UIManager::Config), size);
+    if (size != sizeof(Config)) {
+        ESP_LOGE(TAG, "Invalid config length read: %u != %u", sizeof(Config), size);
         return default_config();
     }
 
     return config;
 }
-void app_config_save(UIManager::Config &config) {
+void app_config_save(Config &config) {
     nvs_handle_t handle;
     ESP_ERROR_CHECK(nvs_open(STORAGE_NAMESPACE, NVS_READWRITE, &handle));
 
@@ -74,7 +76,7 @@ void app_config_save(UIManager::Config &config) {
         version_written = true;
     }
 
-    ESP_ERROR_CHECK(nvs_set_blob(handle, "config", &config, sizeof(UIManager::Config)));
+    ESP_ERROR_CHECK(nvs_set_blob(handle, "config", &config, sizeof(Config)));
 
     ESP_ERROR_CHECK(nvs_commit(handle));
     nvs_close(handle);

@@ -16,6 +16,14 @@ extern "C" {
 #include "components/ui_comp.h"
 #include "components/ui_comp_hook.h"
 #include "ui_events.h"
+void Load_Animation( lv_obj_t *TargetObject, int delay);
+// SCREEN: ui_Boot
+void ui_Boot_screen_init(void);
+extern lv_obj_t *ui_Boot;
+extern lv_obj_t *ui_boot_message;
+extern lv_obj_t *ui_boot_error_heading;
+extern lv_obj_t *ui_Container6;
+extern lv_obj_t *ui_boot_error_text;
 // SCREEN: ui_Home
 void ui_Home_screen_init(void);
 extern lv_obj_t *ui_Home;
@@ -95,6 +103,9 @@ extern lv_obj_t *ui_Label9;
 void ui_event_stop_ac_button( lv_event_t * e);
 extern lv_obj_t *ui_stop_ac_button;
 extern lv_obj_t *ui_Label12;
+void ui_event_allow_ac_button( lv_event_t * e);
+extern lv_obj_t *ui_allow_ac_button;
+extern lv_obj_t *ui_Label22;
 extern lv_obj_t *ui_Container10;
 void ui_event_off_button( lv_event_t * e);
 extern lv_obj_t *ui_off_button;

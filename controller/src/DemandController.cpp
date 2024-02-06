@@ -5,13 +5,14 @@
 
 #include "esp_log.h"
 
+#include "ControllerDomain.h"
+
 #define HANDLER_ARGS(a) a, (sizeof(a) / sizeof(*(a)))
 #define HANDLER_INIT(h) h(HANDLER_ARGS(h##cutoffs_))
 
-using DemandRequest = DemandController::DemandRequest;
-using FanSpeed = DemandController::FanSpeed;
-using FancoilRequest = DemandController::FancoilRequest;
-using FancoilSpeed = ModbusClient::FancoilSpeed;
+using DemandRequest = ControllerDomain::DemandRequest;
+using FanSpeed = ControllerDomain::FanSpeed;
+using FancoilSpeed = ControllerDomain::FancoilSpeed;
 
 static const char *TAG = "DC";
 
@@ -19,7 +20,7 @@ constexpr DemandController::FancoilSetpointHandler::Cutoff DemandController::hva
 
 DemandController::DemandController() : HANDLER_INIT(hvac_temp_) {}
 
-DemandRequest DemandController::update(const Sensors::Data &sensor_data, const Setpoints &setpoints,
+DemandRequest DemandController::update(const SensorData &sensor_data, const Setpoints &setpoints,
                                        const double outdoorTempC) {
     FanSpeed maxFanCooling, maxFanVenting;
     if (std::isnan(outdoorTempC)) {
@@ -83,16 +84,18 @@ FanSpeed DemandController::computeVentLimit(const Setpoints &setpoints, const do
     }
 }
 
-FancoilRequest DemandController::computeFancoil(const Setpoints &setpoints, const double indoor) {
+DemandRequest::FancoilRequest DemandController::computeFancoil(const Setpoints &setpoints,
+                                                               const double indoor) {
     return computeFancoil(setpoints, indoor, hvac_temp_);
 }
-FancoilRequest DemandController::computeFancoil(const Setpoints &setpoints, const double indoor,
-                                                FancoilSetpointHandler hvac_temp) {
+DemandRequest::FancoilRequest DemandController::computeFancoil(const Setpoints &setpoints,
+                                                               const double indoor,
+                                                               FancoilSetpointHandler hvac_temp) {
 
     double heat_delta = abs(setpoints.heatTemp - indoor);
     double cool_delta = abs(setpoints.coolTemp - indoor);
 
-    FancoilRequest request;
+    DemandRequest::FancoilRequest request;
 
     // If the indoor temp is closer to the cooling setpoint than the heating setpoint then
     // we're cooling. We may want to cool slightly below setpoint so it's fine that this will
@@ -109,20 +112,4 @@ FancoilRequest DemandController::computeFancoil(const Setpoints &setpoints, cons
     request.speed = hvac_temp_.update(0, delta);
 
     return request;
-}
-
-const char *DemandController::fancoilSpeedToS(ModbusClient::FancoilSpeed speed) {
-    switch (speed) {
-    case ModbusClient::FancoilSpeed::Off:
-        return "OFF";
-    case ModbusClient::FancoilSpeed::Low:
-        return "LOW";
-    case ModbusClient::FancoilSpeed::Med:
-        return "MED";
-    case ModbusClient::FancoilSpeed::High:
-        return "HIGH";
-    default:
-        ESP_LOGE(TAG, "impossible fancoilSpeed");
-        return "ERR";
-    }
 }

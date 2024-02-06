@@ -156,7 +156,7 @@ ui_use_ac_button = lv_btn_create(ui_Container12);
 lv_obj_set_width( ui_use_ac_button, 120);
 lv_obj_set_height( ui_use_ac_button, 40);
 lv_obj_set_align( ui_use_ac_button, LV_ALIGN_CENTER );
-lv_obj_add_flag( ui_use_ac_button, LV_OBJ_FLAG_SCROLL_ON_FOCUS );   /// Flags
+lv_obj_add_flag( ui_use_ac_button, LV_OBJ_FLAG_HIDDEN | LV_OBJ_FLAG_SCROLL_ON_FOCUS );   /// Flags
 lv_obj_clear_flag( ui_use_ac_button, LV_OBJ_FLAG_SCROLLABLE );    /// Flags
 lv_obj_set_style_bg_color(ui_use_ac_button, lv_color_hex(0x44474C), LV_PART_MAIN | LV_STATE_DEFAULT );
 lv_obj_set_style_bg_opa(ui_use_ac_button, 255, LV_PART_MAIN| LV_STATE_DEFAULT);
@@ -187,8 +187,27 @@ ui_Label12 = lv_label_create(ui_stop_ac_button);
 lv_obj_set_width( ui_Label12, LV_SIZE_CONTENT);  /// 1
 lv_obj_set_height( ui_Label12, LV_SIZE_CONTENT);   /// 1
 lv_obj_set_align( ui_Label12, LV_ALIGN_CENTER );
-lv_label_set_text(ui_Label12,"STOP A/C");
+lv_label_set_text(ui_Label12,"A/C OFF");
 lv_obj_set_style_text_font(ui_Label12, &lv_font_montserrat_18, LV_PART_MAIN| LV_STATE_DEFAULT);
+
+ui_allow_ac_button = lv_btn_create(ui_Container12);
+lv_obj_set_width( ui_allow_ac_button, 120);
+lv_obj_set_height( ui_allow_ac_button, 40);
+lv_obj_set_align( ui_allow_ac_button, LV_ALIGN_CENTER );
+lv_obj_add_flag( ui_allow_ac_button, LV_OBJ_FLAG_HIDDEN | LV_OBJ_FLAG_SCROLL_ON_FOCUS );   /// Flags
+lv_obj_clear_flag( ui_allow_ac_button, LV_OBJ_FLAG_SCROLLABLE );    /// Flags
+lv_obj_set_style_bg_color(ui_allow_ac_button, lv_color_hex(0x44474C), LV_PART_MAIN | LV_STATE_DEFAULT );
+lv_obj_set_style_bg_opa(ui_allow_ac_button, 255, LV_PART_MAIN| LV_STATE_DEFAULT);
+lv_obj_set_style_border_color(ui_allow_ac_button, lv_color_hex(0x808080), LV_PART_MAIN | LV_STATE_DEFAULT );
+lv_obj_set_style_border_opa(ui_allow_ac_button, 255, LV_PART_MAIN| LV_STATE_DEFAULT);
+lv_obj_set_style_border_width(ui_allow_ac_button, 1, LV_PART_MAIN| LV_STATE_DEFAULT);
+
+ui_Label22 = lv_label_create(ui_allow_ac_button);
+lv_obj_set_width( ui_Label22, LV_SIZE_CONTENT);  /// 1
+lv_obj_set_height( ui_Label22, LV_SIZE_CONTENT);   /// 1
+lv_obj_set_align( ui_Label22, LV_ALIGN_CENTER );
+lv_label_set_text(ui_Label22,"ALLOW A/C");
+lv_obj_set_style_text_font(ui_Label22, &lv_font_montserrat_18, LV_PART_MAIN| LV_STATE_DEFAULT);
 
 ui_Container10 = lv_obj_create(ui_Schedule_buttons);
 lv_obj_remove_style_all(ui_Container10);
@@ -213,7 +232,7 @@ ui_Label7 = lv_label_create(ui_off_button);
 lv_obj_set_width( ui_Label7, LV_SIZE_CONTENT);  /// 1
 lv_obj_set_height( ui_Label7, LV_SIZE_CONTENT);   /// 1
 lv_obj_set_align( ui_Label7, LV_ALIGN_CENTER );
-lv_label_set_text(ui_Label7,"OFF");
+lv_label_set_text(ui_Label7,"SYSTEM OFF");
 lv_obj_set_style_text_font(ui_Label7, &lv_font_montserrat_18, LV_PART_MAIN| LV_STATE_DEFAULT);
 
 ui_on_button = lv_btn_create(ui_Container10);
@@ -240,6 +259,7 @@ lv_obj_add_event_cb(ui_comp_get_child(ui_Thermostat_setting_header, UI_COMP_SETT
 lv_obj_add_event_cb(ui_schedule_button, ui_event_schedule_button, LV_EVENT_ALL, NULL);
 lv_obj_add_event_cb(ui_use_ac_button, ui_event_use_ac_button, LV_EVENT_ALL, NULL);
 lv_obj_add_event_cb(ui_stop_ac_button, ui_event_stop_ac_button, LV_EVENT_ALL, NULL);
+lv_obj_add_event_cb(ui_allow_ac_button, ui_event_allow_ac_button, LV_EVENT_ALL, NULL);
 lv_obj_add_event_cb(ui_off_button, ui_event_off_button, LV_EVENT_ALL, NULL);
 lv_obj_add_event_cb(ui_on_button, ui_event_on_button, LV_EVENT_ALL, NULL);
 
