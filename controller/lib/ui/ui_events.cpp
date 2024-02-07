@@ -23,3 +23,7 @@ void set_system_on(lv_event_t *e) { UIManager::eventsInst()->eSystemOn(); }
 void set_target_co2(lv_event_t *e) { UIManager::eventsInst()->eTargetCO2(); }
 
 void set_schedule(lv_event_t *e) { UIManager::eventsInst()->eSchedule(); }
+
+void on_home_load_start(lv_event_t *e) { UIManager::eventsInst()->eHomeLoadStart(); }
+
+void on_home_unload_start(lv_event_t *e) { UIManager::eventsInst()->eHomeUnloadStart(); }

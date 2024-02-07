@@ -21,6 +21,7 @@ lv_obj_t *ui_boot_error_text;
 
 // SCREEN: ui_Home
 void ui_Home_screen_init(void);
+void ui_event_Home( lv_event_t * e);
 lv_obj_t *ui_Home;
 lv_obj_t *ui_Header;
 lv_obj_t *ui_Humidity;
@@ -34,9 +35,12 @@ lv_obj_t *ui_out_temp;
 lv_obj_t *ui_out_symbol;
 lv_obj_t *ui_Out_temp_value;
 lv_obj_t *ui_Footer;
-lv_obj_t *ui_Message;
+lv_obj_t *ui_message_container;
+lv_obj_t *ui_message_close;
+lv_obj_t *ui_message_text;
 lv_obj_t *ui_Indoor_Temp;
-lv_obj_t *ui_Container3;
+void ui_event_indoor_temps_container( lv_event_t * e);
+lv_obj_t *ui_indoor_temps_container;
 lv_obj_t *ui_Indoor_temp_value;
 lv_obj_t *ui_Temp_setpoint_container;
 lv_obj_t *ui_Setpoint_row;
@@ -49,7 +53,8 @@ lv_obj_t *ui_Cool_setpoint;
 lv_obj_t *ui_Temp_header;
 lv_obj_t *ui_Indoor_co2;
 lv_obj_t *ui_co2_header;
-lv_obj_t *ui_Container4;
+void ui_event_co2_container( lv_event_t * e);
+lv_obj_t *ui_co2_container;
 lv_obj_t *ui_co2_value;
 lv_obj_t *ui_co2_setpoint_container;
 lv_obj_t *ui_co2_symbol;
@@ -59,10 +64,10 @@ lv_obj_t *ui_co2_target_value;
 // SCREEN: ui_Fan_speed_override
 void ui_Fan_speed_override_screen_init(void);
 lv_obj_t *ui_Fan_speed_override;
-lv_obj_t *ui_Setting_header;
-void ui_event_Setting_header_Setting_back_button_Setting_back_label( lv_event_t * e);
-void ui_event_Setting_header_Setting_accept_button_Setting_accept_label( lv_event_t * e);
-lv_obj_t *ui_Container7;
+lv_obj_t *ui_fan_setting_header;
+void ui_event_fan_setting_header_Setting_back_button_Setting_back_label( lv_event_t * e);
+void ui_event_fan_setting_header_Setting_accept_button_Setting_accept_label( lv_event_t * e);
+lv_obj_t *ui_fan_override_container;
 lv_obj_t *ui_Override_speed_container;
 lv_obj_t *ui_Fan_override_speed;
 lv_obj_t *ui_Label5;
@@ -75,6 +80,8 @@ lv_obj_t *ui_Label6;
 lv_obj_t *ui_Override_mins_container;
 lv_obj_t *ui_Fan_override_mins;
 lv_obj_t *ui_Label2;
+lv_obj_t *ui_fan_override_secondary_container;
+lv_obj_t *ui_Label21;
 
 
 // SCREEN: ui_Thermostat
@@ -95,7 +102,7 @@ lv_obj_t *ui_Schedule_buttons;
 void ui_event_schedule_button( lv_event_t * e);
 lv_obj_t *ui_schedule_button;
 lv_obj_t *ui_Label8;
-lv_obj_t *ui_Container12;
+lv_obj_t *ui_ac_button_container;
 void ui_event_use_ac_button( lv_event_t * e);
 lv_obj_t *ui_use_ac_button;
 lv_obj_t *ui_Label9;
@@ -105,7 +112,7 @@ lv_obj_t *ui_Label12;
 void ui_event_allow_ac_button( lv_event_t * e);
 lv_obj_t *ui_allow_ac_button;
 lv_obj_t *ui_Label22;
-lv_obj_t *ui_Container10;
+lv_obj_t *ui_power_button_container;
 void ui_event_off_button( lv_event_t * e);
 lv_obj_t *ui_off_button;
 lv_obj_t *ui_Label7;
@@ -201,19 +208,40 @@ lv_anim_start(&PropertyAnimation_0);
 }
 
 ///////////////////// FUNCTIONS ////////////////////
+void ui_event_Home( lv_event_t * e) {
+    lv_event_code_t event_code = lv_event_get_code(e);lv_obj_t * target = lv_event_get_target(e);
+if ( event_code == LV_EVENT_SCREEN_LOAD_START) {
+      on_home_load_start( e );
+}
+if ( event_code == LV_EVENT_SCREEN_UNLOAD_START) {
+      on_home_unload_start( e );
+}
+}
 void ui_event_Fan( lv_event_t * e) {
     lv_event_code_t event_code = lv_event_get_code(e);lv_obj_t * target = lv_event_get_target(e);
 if ( event_code == LV_EVENT_CLICKED) {
       _ui_screen_change( &ui_Fan_speed_override, LV_SCR_LOAD_ANIM_FADE_ON, 500, 0, &ui_Fan_speed_override_screen_init);
 }
 }
-void ui_event_Setting_header_Setting_back_button_Setting_back_label( lv_event_t * e) {
+void ui_event_indoor_temps_container( lv_event_t * e) {
+    lv_event_code_t event_code = lv_event_get_code(e);lv_obj_t * target = lv_event_get_target(e);
+if ( event_code == LV_EVENT_CLICKED) {
+      _ui_screen_change( &ui_Thermostat, LV_SCR_LOAD_ANIM_FADE_ON, 500, 0, &ui_Thermostat_screen_init);
+}
+}
+void ui_event_co2_container( lv_event_t * e) {
+    lv_event_code_t event_code = lv_event_get_code(e);lv_obj_t * target = lv_event_get_target(e);
+if ( event_code == LV_EVENT_CLICKED) {
+      _ui_screen_change( &ui_CO2, LV_SCR_LOAD_ANIM_FADE_ON, 500, 0, &ui_CO2_screen_init);
+}
+}
+void ui_event_fan_setting_header_Setting_back_button_Setting_back_label( lv_event_t * e) {
     lv_event_code_t event_code = lv_event_get_code(e);lv_obj_t * target = lv_event_get_target(e);
 if ( event_code == LV_EVENT_CLICKED) {
       _ui_screen_change( &ui_Home, LV_SCR_LOAD_ANIM_FADE_ON, 500, 0, &ui_Home_screen_init);
 }
 }
-void ui_event_Setting_header_Setting_accept_button_Setting_accept_label( lv_event_t * e) {
+void ui_event_fan_setting_header_Setting_accept_button_Setting_accept_label( lv_event_t * e) {
     lv_event_code_t event_code = lv_event_get_code(e);lv_obj_t * target = lv_event_get_target(e);
 if ( event_code == LV_EVENT_CLICKED) {
       _ui_screen_change( &ui_Home, LV_SCR_LOAD_ANIM_FADE_ON, 500, 0, &ui_Home_screen_init);

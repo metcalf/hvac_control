@@ -5,6 +5,17 @@
 using HVACState = ControllerDomain::HVACState;
 using Config = ControllerDomain::Config;
 
+#define MSG_SCROLL_MS 5 * 1000
+
+void messageTimerCb(lv_timer_t *timer) { ((UIManager *)timer->user_data)->onMessageTimer(); }
+
+void pauseTimer(lv_event_t *e) { lv_timer_pause((lv_timer_t *)e->user_data); }
+
+void resetAndResumeTimer(lv_event_t *e) {
+    lv_timer_reset((lv_timer_t *)e->user_data);
+    lv_timer_resume((lv_timer_t *)e->user_data);
+}
+
 void UIManager::bootDone() {
     _ui_screen_change(&ui_Home, LV_SCR_LOAD_ANIM_FADE_ON, 500, 0, &ui_Home_screen_init);
 }
@@ -32,6 +43,16 @@ double UIManager::getHeatRollerValue(lv_obj_t *roller) {
 }
 double UIManager::getCoolRollerValue(lv_obj_t *roller) {
     return ABS_F_TO_C(minCoolF_ + lv_roller_get_selected(roller));
+}
+
+UIManager::MessageContainer *UIManager::focusedMessage() {
+    for (int i = 0; i < nMsgIds_; i++) {
+        if (messages_[i]->isFocused()) {
+            return messages_[i];
+        }
+    }
+
+    return nullptr;
 }
 
 void UIManager::eFanOverride() {
@@ -118,7 +139,34 @@ void UIManager::eSchedule() {
     xQueueSend(eventQueue_, &evt, portMAX_DELAY);
 }
 
-UIManager::UIManager(ControllerDomain::Config config) {
+void UIManager::eHomeLoadStart() {
+    lv_timer_reset(msgTimer_);
+    lv_timer_resume(msgTimer_);
+}
+
+void UIManager::eHomeUnloadStart() { lv_timer_pause(msgTimer_); }
+
+void UIManager::onMessageTimer() {
+    // TODO: It'd be nicer to make this a circular scroll
+
+    lv_coord_t currY = lv_obj_get_scroll_y(ui_Footer);
+
+    int nVisible = 0;
+    for (int i = 0; i < nMsgIds_; i++) {
+        if (messages_[i]->isVisible()) {
+            nVisible++;
+        }
+    }
+
+    lv_coord_t newY = currY + msgHeight_;
+    if (newY > (nVisible - 1) * msgHeight_) {
+        newY = 0;
+    }
+
+    lv_obj_scroll_to_y(ui_Footer, newY, LV_ANIM_ON);
+}
+
+UIManager::UIManager(ControllerDomain::Config config, size_t nMsgIds) {
     minCoolF_ = ABS_C_TO_F(config.minCoolC) + 0.5;
 
     // Populate schedule values
@@ -140,7 +188,32 @@ UIManager::UIManager(ControllerDomain::Config config) {
         lv_obj_add_flag(ui_Night_cool_container, LV_OBJ_FLAG_HIDDEN);
     }
 
-    // TODO: FUTURE hide buttons/controls on secondary controller
+    if (config.controllerType == Config::ControllerType::Secondary) {
+        lv_obj_add_flag(ui_ac_button_container, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_add_flag(ui_power_button_container, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_add_flag(ui_fan_override_container, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_add_flag(
+            ui_comp_get_child(ui_fan_setting_header,
+                              UI_COMP_SETTING_HEADER_SETTING_ACCEPT_BUTTON_SETTING_ACCEPT_LABEL),
+            LV_OBJ_FLAG_HIDDEN);
+        lv_obj_clear_flag(ui_fan_override_secondary_container, LV_OBJ_FLAG_HIDDEN);
+    }
+
+    // Delete the message container we created with Squareline for design purposes
+    lv_obj_del(ui_message_container);
+
+    nMsgIds_ = nMsgIds;
+    messages_ = new MessageContainer *[nMsgIds];
+
+    for (int i = 0; i < nMsgIds; i++) {
+        messages_[i] = new MessageContainer(ui_Footer);
+    }
+
+    msgHeight_ = messages_[0]->getHeight();
+    msgTimer_ = lv_timer_create(messageTimerCb, MSG_SCROLL_MS, this);
+
+    lv_obj_add_event_cb(ui_Footer, pauseTimer, LV_EVENT_SCROLL_BEGIN, msgTimer_);
+    lv_obj_add_event_cb(ui_Footer, resetAndResumeTimer, LV_EVENT_SCROLL_END, msgTimer_);
 }
 
 void UIManager::setHumidity(double h) {
@@ -205,21 +278,110 @@ void UIManager::setSystemPower(bool on) {
     lv_obj_clear_flag(on ? ui_off_button : ui_on_button, LV_OBJ_FLAG_HIDDEN);
 }
 
-// TODO: some way to set messages like the following
-// Maybe scroll through them?
-// https://forum.lvgl.io/t/how-to-scroll-items-circularly/9504
-// Need some way to automatically clear messages too
-// (X) Fan @ 66% for 4:23
-// (X) Temp override until XX:XXXM
-// ERR: ...
-// Precooling for evening (fan / A/C + fan)
-// Waiting for outdoor temp to drop to cool
-// Replace filter
-// Ventilating
-// Fetching time
-// Wifi connection failed
-// (X) Forcing A/C cooling until XX:XXXM
-// (X) A/C disabled until XX:XXXM
-void UIManager::setMessage(uint8_t msgID, bool allowCancel, const char *msg) {}
+void UIManager::setMessage(uint8_t msgID, bool allowCancel, const char *msg) {
+    MessageContainer *msgContainer = messages_[msgID];
 
-void UIManager::clearMessage(uint8_t msgID) {}
+    msgContainer->setText(msg);
+    msgContainer->setCancelable(allowCancel);
+
+    MessageContainer *focused = focusedMessage();
+    if (focused == nullptr) {
+        // Either there was no message or we're in the middle of scrolling
+        // so just add to the end.
+        msgContainer->setIndex(-1);
+    } else if (msgContainer != focused) {
+        msgContainer->setIndex(focused->getIndex() + 1);
+    }
+
+    msgContainer->setVisibility(true);
+}
+
+void UIManager::clearMessage(uint8_t msgID) { messages_[msgID]->setVisibility(false); }
+
+UIManager::MessageContainer::MessageContainer(lv_obj_t *parent) {
+    lv_obj_t *ui_message_container, *ui_message_close, *ui_message_text;
+    lv_obj_t *ui_Footer = parent; // Gross but allows for copy-paste
+
+    // BEGIN copy-paste from ui_Home.c
+    ui_message_container = lv_obj_create(ui_Footer);
+    lv_obj_remove_style_all(ui_message_container);
+    lv_obj_set_width(ui_message_container, lv_pct(100));
+    lv_obj_set_height(ui_message_container, lv_pct(100));
+    lv_obj_set_align(ui_message_container, LV_ALIGN_CENTER);
+    lv_obj_set_flex_flow(ui_message_container, LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_align(ui_message_container, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER,
+                          LV_FLEX_ALIGN_CENTER);
+    lv_obj_clear_flag(ui_message_container, LV_OBJ_FLAG_SCROLLABLE); /// Flags
+
+    ui_message_close = lv_label_create(ui_message_container);
+    lv_obj_set_width(ui_message_close, LV_SIZE_CONTENT);  /// 1
+    lv_obj_set_height(ui_message_close, LV_SIZE_CONTENT); /// 1
+    lv_obj_set_align(ui_message_close, LV_ALIGN_CENTER);
+    lv_label_set_text(ui_message_close, "");
+    lv_obj_set_style_text_font(ui_message_close, &ui_font_MaterialSymbols24,
+                               LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_pad_left(ui_message_close, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_pad_right(ui_message_close, 3, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_pad_top(ui_message_close, 1, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_pad_bottom(ui_message_close, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
+
+    ui_message_text = lv_label_create(ui_message_container);
+    lv_obj_set_width(ui_message_text, LV_SIZE_CONTENT);  /// 1
+    lv_obj_set_height(ui_message_text, LV_SIZE_CONTENT); /// 100
+    lv_obj_set_align(ui_message_text, LV_ALIGN_CENTER);
+    lv_label_set_text(ui_message_text, "MESSAGE");
+    // END copy-paste from ui_Home.c
+
+    // NB: This is a bit awkard but allows directly copy-pasting from the Squareline generated code
+    container_ = ui_message_container;
+    cancel_ = ui_message_close;
+    text_ = ui_message_text;
+    parent_ = parent;
+
+    setVisibility(false);
+}
+
+void UIManager::MessageContainer::setVisibility(bool visible) {
+    if (visible_ == visible) {
+        return;
+    }
+
+    if (visible) {
+        lv_obj_clear_flag(container_, LV_OBJ_FLAG_HIDDEN);
+    } else {
+        lv_obj_add_flag(container_, LV_OBJ_FLAG_HIDDEN);
+    }
+
+    visible_ = visible;
+}
+
+void UIManager::MessageContainer::setCancelable(bool cancelable) {
+    if (cancelable_ == cancelable) {
+        return;
+    }
+
+    if (cancelable) {
+        lv_obj_clear_flag(cancel_, LV_OBJ_FLAG_HIDDEN);
+    } else {
+        lv_obj_add_flag(cancel_, LV_OBJ_FLAG_HIDDEN);
+    }
+
+    cancelable_ = cancelable;
+}
+
+void UIManager::MessageContainer::setText(const char *str) {
+    if (strncmp(str, lv_label_get_text(text_), UI_MAX_MSG_LEN) == 0) {
+        // Strings are the same, don't cause an invalidation
+        return;
+    }
+
+    lv_label_set_text(text_, str);
+}
+
+bool UIManager::MessageContainer::isFocused() {
+    if (!visible_) {
+        return false;
+    }
+
+    return lv_obj_get_scroll_y(parent_) == lv_obj_get_y(container_);
+}

@@ -46,3 +46,11 @@ def set_schedule(event_struct):
 def set_allow_ac(event_struct):
     return
 
+
+def on_home_load_start(event_struct):
+    return
+
+
+def on_home_unload_start(event_struct):
+    return
+

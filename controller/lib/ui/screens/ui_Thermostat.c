@@ -33,10 +33,10 @@ lv_obj_remove_style_all(ui_Container1);
 lv_obj_set_width( ui_Container1, 300);
 lv_obj_set_height( ui_Container1, 190);
 lv_obj_set_x( ui_Container1, 0 );
-lv_obj_set_y( ui_Container1, -7 );
+lv_obj_set_y( ui_Container1, -6 );
 lv_obj_set_align( ui_Container1, LV_ALIGN_CENTER );
 lv_obj_set_flex_flow(ui_Container1,LV_FLEX_FLOW_ROW);
-lv_obj_set_flex_align(ui_Container1, LV_FLEX_ALIGN_SPACE_AROUND, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER);
+lv_obj_set_flex_align(ui_Container1, LV_FLEX_ALIGN_SPACE_AROUND, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
 lv_obj_clear_flag( ui_Container1, LV_OBJ_FLAG_SCROLLABLE );    /// Flags
 
 ui_Override_heat_container = lv_obj_create(ui_Container1);
@@ -119,11 +119,11 @@ lv_obj_set_style_border_side(ui_Divider1, LV_BORDER_SIDE_LEFT, LV_PART_MAIN| LV_
 
 ui_Schedule_buttons = lv_obj_create(ui_Container1);
 lv_obj_remove_style_all(ui_Schedule_buttons);
-lv_obj_set_height( ui_Schedule_buttons, 155);
+lv_obj_set_height( ui_Schedule_buttons, 165);
 lv_obj_set_width( ui_Schedule_buttons, LV_SIZE_CONTENT);  /// 1
 lv_obj_set_align( ui_Schedule_buttons, LV_ALIGN_CENTER );
 lv_obj_set_flex_flow(ui_Schedule_buttons,LV_FLEX_FLOW_COLUMN);
-lv_obj_set_flex_align(ui_Schedule_buttons, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
+lv_obj_set_flex_align(ui_Schedule_buttons, LV_FLEX_ALIGN_SPACE_AROUND, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
 lv_obj_clear_flag( ui_Schedule_buttons, LV_OBJ_FLAG_SCROLLABLE );    /// Flags
 
 ui_schedule_button = lv_btn_create(ui_Schedule_buttons);
@@ -145,14 +145,14 @@ lv_obj_set_align( ui_Label8, LV_ALIGN_CENTER );
 lv_label_set_text(ui_Label8,"SCHEDULE");
 lv_obj_set_style_text_font(ui_Label8, &lv_font_montserrat_18, LV_PART_MAIN| LV_STATE_DEFAULT);
 
-ui_Container12 = lv_obj_create(ui_Schedule_buttons);
-lv_obj_remove_style_all(ui_Container12);
-lv_obj_set_width( ui_Container12, LV_SIZE_CONTENT);  /// 100
-lv_obj_set_height( ui_Container12, LV_SIZE_CONTENT);   /// 50
-lv_obj_set_align( ui_Container12, LV_ALIGN_CENTER );
-lv_obj_clear_flag( ui_Container12, LV_OBJ_FLAG_SCROLLABLE );    /// Flags
+ui_ac_button_container = lv_obj_create(ui_Schedule_buttons);
+lv_obj_remove_style_all(ui_ac_button_container);
+lv_obj_set_width( ui_ac_button_container, LV_SIZE_CONTENT);  /// 100
+lv_obj_set_height( ui_ac_button_container, LV_SIZE_CONTENT);   /// 50
+lv_obj_set_align( ui_ac_button_container, LV_ALIGN_CENTER );
+lv_obj_clear_flag( ui_ac_button_container, LV_OBJ_FLAG_SCROLLABLE );    /// Flags
 
-ui_use_ac_button = lv_btn_create(ui_Container12);
+ui_use_ac_button = lv_btn_create(ui_ac_button_container);
 lv_obj_set_width( ui_use_ac_button, 120);
 lv_obj_set_height( ui_use_ac_button, 40);
 lv_obj_set_align( ui_use_ac_button, LV_ALIGN_CENTER );
@@ -171,7 +171,7 @@ lv_obj_set_align( ui_Label9, LV_ALIGN_CENTER );
 lv_label_set_text(ui_Label9,"USE A/C");
 lv_obj_set_style_text_font(ui_Label9, &lv_font_montserrat_18, LV_PART_MAIN| LV_STATE_DEFAULT);
 
-ui_stop_ac_button = lv_btn_create(ui_Container12);
+ui_stop_ac_button = lv_btn_create(ui_ac_button_container);
 lv_obj_set_width( ui_stop_ac_button, 120);
 lv_obj_set_height( ui_stop_ac_button, 40);
 lv_obj_set_align( ui_stop_ac_button, LV_ALIGN_CENTER );
@@ -190,7 +190,7 @@ lv_obj_set_align( ui_Label12, LV_ALIGN_CENTER );
 lv_label_set_text(ui_Label12,"A/C OFF");
 lv_obj_set_style_text_font(ui_Label12, &lv_font_montserrat_18, LV_PART_MAIN| LV_STATE_DEFAULT);
 
-ui_allow_ac_button = lv_btn_create(ui_Container12);
+ui_allow_ac_button = lv_btn_create(ui_ac_button_container);
 lv_obj_set_width( ui_allow_ac_button, 120);
 lv_obj_set_height( ui_allow_ac_button, 40);
 lv_obj_set_align( ui_allow_ac_button, LV_ALIGN_CENTER );
@@ -209,14 +209,14 @@ lv_obj_set_align( ui_Label22, LV_ALIGN_CENTER );
 lv_label_set_text(ui_Label22,"ALLOW A/C");
 lv_obj_set_style_text_font(ui_Label22, &lv_font_montserrat_18, LV_PART_MAIN| LV_STATE_DEFAULT);
 
-ui_Container10 = lv_obj_create(ui_Schedule_buttons);
-lv_obj_remove_style_all(ui_Container10);
-lv_obj_set_width( ui_Container10, LV_SIZE_CONTENT);  /// 100
-lv_obj_set_height( ui_Container10, LV_SIZE_CONTENT);   /// 50
-lv_obj_set_align( ui_Container10, LV_ALIGN_BOTTOM_MID );
-lv_obj_clear_flag( ui_Container10, LV_OBJ_FLAG_SCROLLABLE );    /// Flags
+ui_power_button_container = lv_obj_create(ui_Schedule_buttons);
+lv_obj_remove_style_all(ui_power_button_container);
+lv_obj_set_width( ui_power_button_container, LV_SIZE_CONTENT);  /// 100
+lv_obj_set_height( ui_power_button_container, LV_SIZE_CONTENT);   /// 50
+lv_obj_set_align( ui_power_button_container, LV_ALIGN_BOTTOM_MID );
+lv_obj_clear_flag( ui_power_button_container, LV_OBJ_FLAG_SCROLLABLE );    /// Flags
 
-ui_off_button = lv_btn_create(ui_Container10);
+ui_off_button = lv_btn_create(ui_power_button_container);
 lv_obj_set_width( ui_off_button, 120);
 lv_obj_set_height( ui_off_button, 40);
 lv_obj_set_align( ui_off_button, LV_ALIGN_CENTER );
@@ -235,7 +235,7 @@ lv_obj_set_align( ui_Label7, LV_ALIGN_CENTER );
 lv_label_set_text(ui_Label7,"SYSTEM OFF");
 lv_obj_set_style_text_font(ui_Label7, &lv_font_montserrat_18, LV_PART_MAIN| LV_STATE_DEFAULT);
 
-ui_on_button = lv_btn_create(ui_Container10);
+ui_on_button = lv_btn_create(ui_power_button_container);
 lv_obj_set_width( ui_on_button, 120);
 lv_obj_set_height( ui_on_button, 40);
 lv_obj_set_align( ui_on_button, LV_ALIGN_CENTER );

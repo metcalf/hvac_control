@@ -111,7 +111,7 @@ void ControllerApp::bootErr(const char *msg) {
 void ControllerApp::start() {
     char bootErrMsg[UI_MAX_MSG_LEN];
     config_ = app_config_load();
-    uiManager_ = new UIManager(config_);
+    uiManager_ = new UIManager(config_, static_cast<size_t>(MsgID::_Last));
     UIManager::setEventsInst(uiManager_);
     modbusController_ = new ModbusController(config_.hasMakeupDemand);
     valveCtrl_ = new ValveCtrl(config_.heatType == Config::HVACType::Valve,

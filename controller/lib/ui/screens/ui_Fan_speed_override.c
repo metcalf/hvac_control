@@ -18,28 +18,28 @@ lv_obj_set_style_pad_bottom(ui_Fan_speed_override, 0, LV_PART_MAIN| LV_STATE_DEF
 lv_obj_set_style_pad_row(ui_Fan_speed_override, 20, LV_PART_MAIN| LV_STATE_DEFAULT);
 lv_obj_set_style_pad_column(ui_Fan_speed_override, 0, LV_PART_MAIN| LV_STATE_DEFAULT);
 
-ui_Setting_header = ui_Setting_header_create(ui_Fan_speed_override);
-lv_obj_set_x( ui_Setting_header, 0 );
-lv_obj_set_y( ui_Setting_header, 0 );
+ui_fan_setting_header = ui_Setting_header_create(ui_Fan_speed_override);
+lv_obj_set_x( ui_fan_setting_header, 0 );
+lv_obj_set_y( ui_fan_setting_header, 0 );
 
-lv_label_set_text(ui_comp_get_child(ui_Setting_header, UI_COMP_SETTING_HEADER_SETTING_TITLE),"FAN OVERRIDE");
-
-
+lv_label_set_text(ui_comp_get_child(ui_fan_setting_header, UI_COMP_SETTING_HEADER_SETTING_TITLE),"FAN OVERRIDE");
 
 
 
-ui_Container7 = lv_obj_create(ui_Fan_speed_override);
-lv_obj_remove_style_all(ui_Container7);
-lv_obj_set_width( ui_Container7, 300);
-lv_obj_set_height( ui_Container7, 174);
-lv_obj_set_x( ui_Container7, 0 );
-lv_obj_set_y( ui_Container7, 10 );
-lv_obj_set_align( ui_Container7, LV_ALIGN_CENTER );
-lv_obj_set_flex_flow(ui_Container7,LV_FLEX_FLOW_ROW);
-lv_obj_set_flex_align(ui_Container7, LV_FLEX_ALIGN_SPACE_AROUND, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER);
-lv_obj_clear_flag( ui_Container7, LV_OBJ_FLAG_SCROLLABLE );    /// Flags
 
-ui_Override_speed_container = lv_obj_create(ui_Container7);
+
+ui_fan_override_container = lv_obj_create(ui_Fan_speed_override);
+lv_obj_remove_style_all(ui_fan_override_container);
+lv_obj_set_width( ui_fan_override_container, 300);
+lv_obj_set_height( ui_fan_override_container, 174);
+lv_obj_set_x( ui_fan_override_container, 0 );
+lv_obj_set_y( ui_fan_override_container, 10 );
+lv_obj_set_align( ui_fan_override_container, LV_ALIGN_CENTER );
+lv_obj_set_flex_flow(ui_fan_override_container,LV_FLEX_FLOW_ROW);
+lv_obj_set_flex_align(ui_fan_override_container, LV_FLEX_ALIGN_SPACE_AROUND, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER);
+lv_obj_clear_flag( ui_fan_override_container, LV_OBJ_FLAG_SCROLLABLE );    /// Flags
+
+ui_Override_speed_container = lv_obj_create(ui_fan_override_container);
 lv_obj_remove_style_all(ui_Override_speed_container);
 lv_obj_set_height( ui_Override_speed_container, 143);
 lv_obj_set_width( ui_Override_speed_container, LV_SIZE_CONTENT);  /// 1
@@ -65,7 +65,7 @@ lv_obj_set_style_text_color(ui_Label5, lv_color_hex(0x808080), LV_PART_MAIN | LV
 lv_obj_set_style_text_opa(ui_Label5, 255, LV_PART_MAIN| LV_STATE_DEFAULT);
 lv_obj_set_style_text_font(ui_Label5, &lv_font_montserrat_18, LV_PART_MAIN| LV_STATE_DEFAULT);
 
-ui_Divider = lv_obj_create(ui_Container7);
+ui_Divider = lv_obj_create(ui_fan_override_container);
 lv_obj_set_width( ui_Divider, 1);
 lv_obj_set_height( ui_Divider, 100);
 lv_obj_set_x( ui_Divider, 0 );
@@ -79,7 +79,7 @@ lv_obj_set_style_border_opa(ui_Divider, 255, LV_PART_MAIN| LV_STATE_DEFAULT);
 lv_obj_set_style_border_width(ui_Divider, 1, LV_PART_MAIN| LV_STATE_DEFAULT);
 lv_obj_set_style_border_side(ui_Divider, LV_BORDER_SIDE_LEFT, LV_PART_MAIN| LV_STATE_DEFAULT);
 
-ui_Override_time_container = lv_obj_create(ui_Container7);
+ui_Override_time_container = lv_obj_create(ui_fan_override_container);
 lv_obj_remove_style_all(ui_Override_time_container);
 lv_obj_set_width( ui_Override_time_container, 135);
 lv_obj_set_height( ui_Override_time_container, 143);
@@ -147,7 +147,23 @@ lv_obj_set_style_text_color(ui_Label2, lv_color_hex(0x808080), LV_PART_MAIN | LV
 lv_obj_set_style_text_opa(ui_Label2, 255, LV_PART_MAIN| LV_STATE_DEFAULT);
 lv_obj_set_style_text_font(ui_Label2, &lv_font_montserrat_18, LV_PART_MAIN| LV_STATE_DEFAULT);
 
-lv_obj_add_event_cb(ui_comp_get_child(ui_Setting_header, UI_COMP_SETTING_HEADER_SETTING_BACK_BUTTON_SETTING_BACK_LABEL), ui_event_Setting_header_Setting_back_button_Setting_back_label, LV_EVENT_ALL, NULL);
-lv_obj_add_event_cb(ui_comp_get_child(ui_Setting_header, UI_COMP_SETTING_HEADER_SETTING_ACCEPT_BUTTON_SETTING_ACCEPT_LABEL), ui_event_Setting_header_Setting_accept_button_Setting_accept_label, LV_EVENT_ALL, NULL);
+ui_fan_override_secondary_container = lv_obj_create(ui_Fan_speed_override);
+lv_obj_remove_style_all(ui_fan_override_secondary_container);
+lv_obj_set_height( ui_fan_override_secondary_container, 160);
+lv_obj_set_width( ui_fan_override_secondary_container, lv_pct(100));
+lv_obj_set_align( ui_fan_override_secondary_container, LV_ALIGN_CENTER );
+lv_obj_add_flag( ui_fan_override_secondary_container, LV_OBJ_FLAG_HIDDEN );   /// Flags
+lv_obj_clear_flag( ui_fan_override_secondary_container, LV_OBJ_FLAG_SCROLLABLE );    /// Flags
+
+ui_Label21 = lv_label_create(ui_fan_override_secondary_container);
+lv_obj_set_width( ui_Label21, LV_SIZE_CONTENT);  /// 1
+lv_obj_set_height( ui_Label21, LV_SIZE_CONTENT);   /// 1
+lv_obj_set_align( ui_Label21, LV_ALIGN_CENTER );
+lv_label_set_text(ui_Label21,"PLEASE USE PRIMARY \nCONTROLLER TO SET \nFAN OVERRIDES");
+lv_obj_set_style_text_align(ui_Label21, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN| LV_STATE_DEFAULT);
+lv_obj_set_style_text_font(ui_Label21, &lv_font_montserrat_18, LV_PART_MAIN| LV_STATE_DEFAULT);
+
+lv_obj_add_event_cb(ui_comp_get_child(ui_fan_setting_header, UI_COMP_SETTING_HEADER_SETTING_BACK_BUTTON_SETTING_BACK_LABEL), ui_event_fan_setting_header_Setting_back_button_Setting_back_label, LV_EVENT_ALL, NULL);
+lv_obj_add_event_cb(ui_comp_get_child(ui_fan_setting_header, UI_COMP_SETTING_HEADER_SETTING_ACCEPT_BUTTON_SETTING_ACCEPT_LABEL), ui_event_fan_setting_header_Setting_accept_button_Setting_accept_label, LV_EVENT_ALL, NULL);
 
 }

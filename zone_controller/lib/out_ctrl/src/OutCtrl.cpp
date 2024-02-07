@@ -3,7 +3,7 @@
 #if defined(ESP_PLATFORM)
 #include "esp_log.h"
 #else
-#define NATIVE_LOG(tag, format, ...) printf(tag, format, ##__VA_ARGS__)
+#define NATIVE_LOG(tag, format, ...) printf(format, ##__VA_ARGS__)
 #define ESP_LOGE(tag, format, ...) NATIVE_LOG(tag, format, ##__VA_ARGS__)
 #define ESP_LOGW(tag, format, ...) NATIVE_LOG(tag, format, ##__VA_ARGS__)
 #define ESP_LOGI(tag, format, ...) NATIVE_LOG(tag, format, ##__VA_ARGS__)

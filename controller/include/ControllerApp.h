@@ -47,6 +47,7 @@ class ControllerApp {
         GetMakeupDemandErr,
         SetFancoilErr,
         SecondaryControllerErr,
+        _Last,
     };
 
     void updateACMode(DemandRequest *requests, std::chrono::system_clock::time_point now);

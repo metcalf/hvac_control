@@ -10,6 +10,8 @@
 extern "C" {
 #endif
 
+void on_home_load_start(lv_event_t * e);
+void on_home_unload_start(lv_event_t * e);
 void set_fan_override(lv_event_t * e);
 void set_thermostat_override(lv_event_t * e);
 void set_use_ac(lv_event_t * e);
