@@ -1,5 +1,6 @@
 #pragma once
 
+#include "AbstractDemandController.h"
 #include "ControllerDomain.h"
 #include "SetpointHandler.h"
 
@@ -7,16 +8,13 @@
 // setpoint by this value to reduce energy consumption.
 #define FANCOIL_COOL_OFFSET REL_F_TO_C(2.0)
 
-class DemandController {
+class DemandController : public AbstractDemandController {
   public:
     DemandController();
 
     ControllerDomain::DemandRequest update(const ControllerDomain::SensorData &sensor_data,
                                            const ControllerDomain::Setpoints &setpoints,
-                                           const double outdoorTempC);
-    static ControllerDomain::FanSpeed
-    speedForRequests(const ControllerDomain::DemandRequest *requests, size_t n);
-    static bool isFanCoolingTempLimited(const ControllerDomain::DemandRequest *requests, size_t n);
+                                           const double outdoorTempC) override;
 
   protected:
     using FancoilSpeed = ControllerDomain::FancoilSpeed;

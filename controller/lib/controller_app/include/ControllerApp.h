@@ -1,27 +1,31 @@
-#ifndef CTRL_APP_H
-#define CTRL_APP_H
+#pragma once
 
-#ifdef __cplusplus
-
+#include "AbstractDemandController.h"
+#include "AbstractModbusController.h"
+#include "AbstractSensors.h"
+#include "AbstractUIManager.h"
+#include "AbstractValveCtrl.h"
 #include "ControllerDomain.h"
-#include "DemandController.h"
-#include "ModbusController.h"
-#include "Sensors.h"
-#include "ValveCtrl.h"
-
-#include "UIManager.h"
 
 class ControllerApp {
   public:
-    ~ControllerApp() {
-        delete uiManager_;
-        delete modbusController_;
-        delete valveCtrl_;
+    typedef void (*cfgUpdateCb_t)(ControllerDomain::Config &config);
+    typedef bool (*uiEvtRcv_t)(AbstractUIManager::Event *evt, uint waitMs);
+
+    ControllerApp(ControllerDomain::Config config, AbstractUIManager *uiManager,
+                  AbstractModbusController *modbusController, AbstractSensors *sensors,
+                  AbstractDemandController *demandController, AbstractValveCtrl *valveCtrl,
+                  cfgUpdateCb_t cfgUpdateCb, uiEvtRcv_t uiEvtRcv)
+        : config_(config), uiManager_(uiManager), modbusController_(modbusController),
+          sensors_(sensors), demandController_(demandController), valveCtrl_(valveCtrl),
+          cfgUpdateCb_(cfgUpdateCb), uiEvtRcv_(uiEvtRcv) {
+        nControllers_ = config.controllerType == Config::ControllerType::Primary ? 2 : 1;
     }
 
-    void start();
-
     void runTask();
+    void bootErr(const char *msg);
+
+    static size_t nMsgIds() { return static_cast<size_t>(ControllerApp::MsgID::_Last); }
 
   private:
     using FancoilSpeed = ControllerDomain::FancoilSpeed;
@@ -59,22 +63,23 @@ class ControllerApp {
     void setMessageF(MsgID msgID, bool allowCancel, const char *fmt, ...);
     void setMessage(MsgID msgID, bool allowCancel, const char *msg);
     void clearMessage(MsgID msgID);
-    void bootErr(const char *msg);
     void checkModbusErrors();
     void handleFreshAirState(std::chrono::system_clock::time_point now);
     int getScheduleIdx(int offset);
     Setpoints getCurrentSetpoints();
-    void setTempOverride(UIManager::TempOverride override);
+    void setTempOverride(AbstractUIManager::TempOverride override);
 
     Config config_;
-    UIManager *uiManager_;
-    ModbusController *modbusController_;
-    Sensors sensors_;
-    DemandController demandController_;
-    ValveCtrl *valveCtrl_;
+    AbstractUIManager *uiManager_;
+    AbstractModbusController *modbusController_;
+    AbstractSensors *sensors_;
+    AbstractDemandController *demandController_;
+    AbstractValveCtrl *valveCtrl_;
     uint8_t nControllers_;
+    cfgUpdateCb_t cfgUpdateCb_;
+    uiEvtRcv_t uiEvtRcv_;
 
-    UIManager::TempOverride tempOverride_;
+    AbstractUIManager::TempOverride tempOverride_;
     int tempOverrideUntilScheduleIdx_;
 
     ACMode acMode_;
@@ -86,14 +91,3 @@ class ControllerApp {
     FanSpeed fanOverrideSpeed_;
     std::chrono::system_clock::time_point fanOverrideUntil_, fanLastStarted_;
 };
-
-extern "C" {
-#endif
-
-void run_controller_app();
-
-#ifdef __cplusplus
-} /* extern "C" */
-#endif
-
-#endif

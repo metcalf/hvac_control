@@ -2,54 +2,14 @@
 
 #include <stdint.h>
 
-#include "freertos/FreeRTOS.h"
-#include "freertos/queue.h"
-
+#include "AbstractUIManager.h"
 #include "ControllerDomain.h"
 #include "ui.h"
 #include "ui_events.h"
 
-#define UI_MAX_MSG_LEN 18 * 2
-
-class UIManager {
+class UIManager : public AbstractUIManager {
   public:
-    enum class ACOverride { Normal, Force, Stop };
-
-    struct FanOverride {
-        uint8_t speed;
-        uint16_t timeMins;
-    };
-
-    struct TempOverride {
-        double heatC, coolC;
-    };
-
-    enum class EventType {
-        SetSchedule,
-        SetCO2Target,
-        SetSystemPower,
-        FanOverride,
-        TempOverride,
-        ACOverride,
-        MsgCancel,
-    };
-
-    union EventPayload {
-        ControllerDomain::Config::Schedule schedules[2];
-        uint16_t co2Target;
-        bool systemPower;
-        FanOverride fanOverride;
-        TempOverride tempOverride;
-        ACOverride acOverride;
-        uint8_t msgID;
-    };
-
-    struct Event {
-        EventType type;
-        EventPayload payload;
-    };
-
-    UIManager(ControllerDomain::Config config, size_t nMsgIds);
+    UIManager(ControllerDomain::Config config, size_t nMsgIds, eventCb_t eventCb);
     ~UIManager() {
         lv_timer_del(msgTimer_);
         for (int i = 0; i < nMsgIds_; i++) {
@@ -61,22 +21,22 @@ class UIManager {
     void tick(uint32_t ms) { lv_tick_inc(ms); }
     void handleTasks() { lv_timer_handler(); }
 
-    void setHumidity(double h);
-    void setCurrentFanSpeed(uint8_t speed);
-    void setOutTempC(double tc);
-    void setInTempC(double tc);
-    void setInCO2(uint16_t ppm);
-    void setHVACState(ControllerDomain::HVACState state);
-    void setCurrentSetpoints(double heatC, double coolC);
-    void setSystemPower(bool on);
+    void setHumidity(double h) override;
+    void setCurrentFanSpeed(uint8_t speed) override;
+    void setOutTempC(double tc) override;
+    void setInTempC(double tc) override;
+    void setInCO2(uint16_t ppm) override;
+    void setHVACState(ControllerDomain::HVACState state) override;
+    void setCurrentSetpoints(double heatC, double coolC) override;
+    void setSystemPower(bool on) override;
 
-    void setMessage(uint8_t msgID, bool allowCancel, const char *msg);
-    void clearMessage(uint8_t msgID);
+    void setMessage(uint8_t msgID, bool allowCancel, const char *msg) override;
+    void clearMessage(uint8_t msgID) override;
 
-    void bootDone();
-    void bootErr(const char *msg);
+    void bootDone() override;
+    void bootErr(const char *msg) override;
 
-    QueueHandle_t getEventQueue() { return eventQueue_; }
+    void onMessageTimer() override;
 
     // Event hooks called by ui_events.cpp
     void eFanOverride();
@@ -90,8 +50,6 @@ class UIManager {
     void eSchedule();
     void eHomeLoadStart();
     void eHomeUnloadStart();
-
-    void onMessageTimer();
 
     static void setEventsInst(UIManager *inst) { eventsInst_ = inst; }
     static UIManager *eventsInst() { return eventsInst_; }
@@ -124,11 +82,11 @@ class UIManager {
     MessageContainer *focusedMessage();
 
     inline static UIManager *eventsInst_;
-    QueueHandle_t eventQueue_;
 
     MessageContainer **messages_;
     size_t nMsgIds_;
     uint8_t minCoolF_;
     lv_timer_t *msgTimer_;
     lv_coord_t msgHeight_;
+    eventCb_t eventCb_;
 };

@@ -43,29 +43,6 @@ DemandRequest DemandController::update(const SensorData &sensor_data, const Setp
     };
 }
 
-FanSpeed DemandController::speedForRequests(const DemandRequest *requests, size_t n) {
-    FanSpeed targetVent = 0, maxVent = UINT8_MAX, targetCool = 0;
-
-    for (int i = 0; i < n; i++) {
-        targetVent = std::max(targetVent, requests[i].targetVent);
-        maxVent = std::min(maxVent, requests[i].maxFanVenting);
-        targetCool =
-            std::max(targetCool, std::min(requests[i].targetFanCooling, requests[i].maxFanCooling));
-    }
-
-    return std::min(maxVent, std::max(targetVent, targetCool));
-}
-
-bool DemandController::isFanCoolingTempLimited(const DemandRequest *requests, size_t n) {
-    for (int i = 0; i < n; i++) {
-        if (requests[i].maxFanCooling < UINT8_MAX) {
-            return true;
-        }
-    }
-
-    return false;
-}
-
 FanSpeed DemandController::computeVentLimit(const Setpoints &setpoints, const double indoor,
                                             const double outdoor) {
     return computeVentLimit(setpoints, indoor, outdoor, outdoor_temp_vent_limit_range_);

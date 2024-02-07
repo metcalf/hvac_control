@@ -2,10 +2,12 @@
 
 #include "driver/gpio.h"
 
+#include "AbstractValveCtrl.h"
+
 #define HEAT_VLV_GPIO GPIO_NUM_3
 #define COOL_VLV_GPIO GPIO_NUM_9
 
-class ValveCtrl {
+class ValveCtrl : public AbstractValveCtrl {
   public:
     ValveCtrl(bool hasHeat, bool hasCool) : hasHeat_(hasHeat), hasCool_(hasCool) {}
 
@@ -22,7 +24,7 @@ class ValveCtrl {
         ESP_ERROR_CHECK(gpio_config(&io_conf));
     }
 
-    void setMode(bool cool, bool on) {
+    void setMode(bool cool, bool on) override {
         // Always turn off the valve we're not setting (e.g. turn off the heat valve if
         // `cool` is true).
         // NB: IOs are inverted

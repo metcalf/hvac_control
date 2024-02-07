@@ -1,18 +1,18 @@
 #pragma once
 
 #include <chrono>
-#include <sys/time.h>
 
 #include "freertos/FreeRTOS.h"
 #include "freertos/event_groups.h"
 #include "freertos/semphr.h"
 
+#include "AbstractModbusController.h"
 #include "ControllerDomain.h"
 #include "ModbusClient.h"
 
 #define MB_CONTROLLER_QUEUE_SIZE 10
 
-class ModbusController {
+class ModbusController : public AbstractModbusController {
   public:
     ModbusController(bool hasMakeupDemand) : hasMakeupDemand_(hasMakeupDemand) {
         requests_ = xEventGroupCreate();
@@ -25,24 +25,24 @@ class ModbusController {
     }
 
     esp_err_t init() { return client_.init(); }
-
-    esp_err_t getFreshAirState(ControllerDomain::FreshAirState *state,
-                               std::chrono::system_clock::time_point *time);
-    esp_err_t getMakeupDemand(bool *demand, std::chrono::system_clock::time_point *time);
-    esp_err_t getSecondaryControllerState(ControllerDomain::SensorData *sensorData,
-                                          ControllerDomain::Setpoints *setpoints);
-
-    esp_err_t lastFreshAirSpeedErr();
-    esp_err_t lastSetFancoilErr();
-
-    void setFreshAirSpeed(ControllerDomain::FanSpeed speed);
-    void setFancoil(ControllerDomain::FancoilID id, ControllerDomain::FancoilSpeed speed,
-                    bool cool);
     void task();
 
-    void reportHVACState(ControllerDomain::HVACState hvacState);
-    void reportSystemPower(bool systemOn);
-    void reportOutdoorTemp(double outTempC);
+    esp_err_t getFreshAirState(ControllerDomain::FreshAirState *state,
+                               std::chrono::system_clock::time_point *time) override;
+    esp_err_t getMakeupDemand(bool *demand, std::chrono::system_clock::time_point *time) override;
+    esp_err_t getSecondaryControllerState(ControllerDomain::SensorData *sensorData,
+                                          ControllerDomain::Setpoints *setpoints) override;
+
+    esp_err_t lastFreshAirSpeedErr() override;
+    esp_err_t lastSetFancoilErr() override;
+
+    void setFreshAirSpeed(ControllerDomain::FanSpeed speed) override;
+    void setFancoil(ControllerDomain::FancoilID id, ControllerDomain::FancoilSpeed speed,
+                    bool cool) override;
+
+    void reportHVACState(ControllerDomain::HVACState hvacState) override;
+    void reportSystemPower(bool systemOn) override;
+    void reportOutdoorTemp(double outTempC) override;
 
   private:
     using FanSpeed = ControllerDomain::FanSpeed;

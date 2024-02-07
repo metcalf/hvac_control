@@ -7,9 +7,10 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
 
+#include "AbstractSensors.h"
 #include "ControllerDomain.h"
 
-class Sensors {
+class Sensors : public AbstractSensors {
   public:
     using SensorData = ControllerDomain::SensorData;
 
@@ -18,7 +19,7 @@ class Sensors {
 
     uint8_t init();
     bool poll();
-    SensorData getLatest();
+    SensorData getLatest() override;
 
   private:
     SensorData lastData_;

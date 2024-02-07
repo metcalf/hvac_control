@@ -30,12 +30,12 @@ void UIManager::bootErr(const char *msg) {
 
 void UIManager::sendACOverrideEvent(ACOverride override) {
     Event evt{EventType::ACOverride, EventPayload{.acOverride = override}};
-    xQueueSend(eventQueue_, &evt, portMAX_DELAY);
+    eventCb_(evt);
 }
 
 void UIManager::sendPowerEvent(bool on) {
     Event evt{EventType::SetSystemPower, EventPayload{.systemPower = on}};
-    xQueueSend(eventQueue_, &evt, portMAX_DELAY);
+    eventCb_(evt);
 }
 
 double UIManager::getHeatRollerValue(lv_obj_t *roller) {
@@ -66,7 +66,7 @@ void UIManager::eFanOverride() {
                          .timeMins = (uint16_t)(lv_roller_get_selected(ui_Fan_override_hrs) * 60 +
                                                 lv_roller_get_selected(ui_Fan_override_mins)),
                      }}};
-    xQueueSend(eventQueue_, &evt, portMAX_DELAY);
+    eventCb_(evt);
 }
 
 void UIManager::eThermotatOverride() {
@@ -75,7 +75,7 @@ void UIManager::eThermotatOverride() {
                                .heatC = getHeatRollerValue(ui_Heat_override_setpoint),
                                .coolC = getCoolRollerValue(ui_Cool_override_setpoint),
                            }}};
-    xQueueSend(eventQueue_, &evt, portMAX_DELAY);
+    eventCb_(evt);
 }
 
 void UIManager::eUseAC() {
@@ -115,7 +115,7 @@ void UIManager::eSystemOn() {
 void UIManager::eTargetCO2() {
     uint16_t target = 800 + lv_roller_get_selected(ui_co2_target) * 50;
     Event evt{EventType::SetCO2Target, EventPayload{.co2Target = target}};
-    xQueueSend(eventQueue_, &evt, portMAX_DELAY);
+    eventCb_(evt);
 
     lv_label_set_text_fmt(ui_co2_target_value, "%u", target);
 }
@@ -136,7 +136,7 @@ void UIManager::eSchedule() {
                                    .startMin = (uint8_t)lv_roller_get_selected(ui_Night_min),
                                },
                            }}};
-    xQueueSend(eventQueue_, &evt, portMAX_DELAY);
+    eventCb_(evt);
 }
 
 void UIManager::eHomeLoadStart() {
@@ -166,7 +166,8 @@ void UIManager::onMessageTimer() {
     lv_obj_scroll_to_y(ui_Footer, newY, LV_ANIM_ON);
 }
 
-UIManager::UIManager(ControllerDomain::Config config, size_t nMsgIds) {
+UIManager::UIManager(ControllerDomain::Config config, size_t nMsgIds, eventCb_t eventCb)
+    : eventCb_(eventCb) {
     minCoolF_ = ABS_C_TO_F(config.minCoolC) + 0.5;
 
     // Populate schedule values

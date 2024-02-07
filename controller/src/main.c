@@ -1,5 +1,5 @@
 
-#include "ControllerApp.h"
+#include "controller_main.h"
 #include "i2c_manager.h"
 #include "lvgl_helpers.h"
 
@@ -10,5 +10,5 @@ void app_main() {
     lv_init();
     lvgl_driver_init();
 
-    run_controller_app();
+    controller_main();
 }
