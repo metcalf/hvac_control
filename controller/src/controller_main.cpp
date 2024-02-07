@@ -8,6 +8,7 @@
 
 #include "ControllerApp.h"
 #include "DemandController.h"
+#include "ESPLogger.h"
 #include "ModbusController.h"
 #include "Sensors.h"
 #include "UIManager.h"
@@ -39,6 +40,7 @@ ValveCtrl *valveCtrl_;
 Sensors sensors_;
 DemandController demandController_;
 QueueHandle_t uiEvtQueue_;
+ESPLogger logger_;
 
 void sensorTask(void *sensors) {
     while (1) {
@@ -86,8 +88,8 @@ extern "C" void controller_main() {
     valveCtrl_ = new ValveCtrl(config.heatType == Config::HVACType::Valve,
                                config.coolType == Config::HVACType::Valve);
 
-    app_ = new ControllerApp(config, uiManager_, modbusController_, &sensors_, &demandController_,
-                             valveCtrl_, app_config_save, uiEvtRcv);
+    app_ = new ControllerApp(config, &logger_, uiManager_, modbusController_, &sensors_,
+                             &demandController_, valveCtrl_, app_config_save, uiEvtRcv);
 
     xTaskCreate(uiTask, "uiTask", UI_TASK_STACK_SIZE, uiManager_, UI_TASK_PRIO, NULL);
 

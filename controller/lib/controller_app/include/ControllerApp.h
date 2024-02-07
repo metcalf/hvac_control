@@ -1,6 +1,7 @@
 #pragma once
 
 #include "AbstractDemandController.h"
+#include "AbstractLogger.h"
 #include "AbstractModbusController.h"
 #include "AbstractSensors.h"
 #include "AbstractUIManager.h"
@@ -12,11 +13,11 @@ class ControllerApp {
     typedef void (*cfgUpdateCb_t)(ControllerDomain::Config &config);
     typedef bool (*uiEvtRcv_t)(AbstractUIManager::Event *evt, uint waitMs);
 
-    ControllerApp(ControllerDomain::Config config, AbstractUIManager *uiManager,
-                  AbstractModbusController *modbusController, AbstractSensors *sensors,
-                  AbstractDemandController *demandController, AbstractValveCtrl *valveCtrl,
-                  cfgUpdateCb_t cfgUpdateCb, uiEvtRcv_t uiEvtRcv)
-        : config_(config), uiManager_(uiManager), modbusController_(modbusController),
+    ControllerApp(ControllerDomain::Config config, AbstractLogger *log,
+                  AbstractUIManager *uiManager, AbstractModbusController *modbusController,
+                  AbstractSensors *sensors, AbstractDemandController *demandController,
+                  AbstractValveCtrl *valveCtrl, cfgUpdateCb_t cfgUpdateCb, uiEvtRcv_t uiEvtRcv)
+        : config_(config), log_(log), uiManager_(uiManager), modbusController_(modbusController),
           sensors_(sensors), demandController_(demandController), valveCtrl_(valveCtrl),
           cfgUpdateCb_(cfgUpdateCb), uiEvtRcv_(uiEvtRcv) {
         nControllers_ = config.controllerType == Config::ControllerType::Primary ? 2 : 1;
@@ -70,6 +71,7 @@ class ControllerApp {
     void setTempOverride(AbstractUIManager::TempOverride override);
 
     Config config_;
+    AbstractLogger *log_;
     AbstractUIManager *uiManager_;
     AbstractModbusController *modbusController_;
     AbstractSensors *sensors_;

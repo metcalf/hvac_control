@@ -5,8 +5,6 @@
 
 #include <cstring>
 
-#include "esp_log.h"
-
 #define SCHEDULE_TIME_STR_ARGS(s) (s.startHr - 1) % 12 + 1, s.startMin, s.startHr < 12 ? 'a' : 'p'
 
 #define APP_LOOP_INTERVAL_SECS 5
@@ -54,7 +52,7 @@ const char *fancoilSpeedToS(ControllerDomain::FancoilSpeed speed) {
 
 void ControllerApp::bootErr(const char *msg) {
     uiManager_->bootErr(msg);
-    ESP_LOGE(TAG, "%s", msg);
+    log_->err("%s", msg);
     vTaskDelay(INIT_ERR_RESTART_DELAY_TICKS);
     esp_restart();
 }
@@ -159,7 +157,7 @@ FanSpeed ControllerApp::computeFanSpeed(DemandRequest *requests,
         char errMsg[UI_MAX_MSG_LEN];
         snprintf(errMsg, sizeof(errMsg), "Error getting makeup demand: %d", err);
         setMessage(MsgID::GetMakeupDemandErr, false, errMsg);
-        ESP_LOGE(TAG, "%s", errMsg);
+        log_->err("%s", errMsg);
     }
 
     return fanSpeed;
@@ -167,7 +165,7 @@ FanSpeed ControllerApp::computeFanSpeed(DemandRequest *requests,
 
 void ControllerApp::setFanSpeed(FanSpeed speed) {
     if (speed > 0 && speed < MIN_FAN_SPEED_VALUE) {
-        ESP_LOGE(TAG, "Unexpected fan speeed 0<%d<%d: ", MIN_FAN_SPEED_VALUE, speed);
+        log_->err("Unexpected fan speeed 0<%d<%d: ", MIN_FAN_SPEED_VALUE, speed);
         speed = 0;
     }
 
@@ -277,7 +275,7 @@ void ControllerApp::handleCancelMessage(MsgID id) {
         break;
     }
     default:
-        ESP_LOGE(TAG, "Unexpected message cancellation for: %d", static_cast<int>(id));
+        log_->err("Unexpected message cancellation for: %d", static_cast<int>(id));
     }
 }
 
@@ -326,7 +324,7 @@ void ControllerApp::setHVAC(DemandRequest *requests) {
             if (i == 0) {
                 valveCtrl_->setMode(cool, speed != FancoilSpeed::Off);
             } else {
-                ESP_LOGE(TAG, "Not implemented: valves on secondary controller");
+                log_->err("Not implemented: valves on secondary controller");
             }
             break;
         }
@@ -450,7 +448,7 @@ void ControllerApp::handleFreshAirState(std::chrono::system_clock::time_point no
         char errMsg[UI_MAX_MSG_LEN];
         snprintf(errMsg, sizeof(errMsg), "Error getting fresh air state: %d", err);
         setMessage(MsgID::GetFreshAirStateErr, false, errMsg);
-        ESP_LOGE(TAG, "%s", errMsg);
+        log_->err("%s", errMsg);
     }
 
     if (now - lastOutdoorTempUpdate_ > OUTDOOR_TEMP_MAX_AGE) {
