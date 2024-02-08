@@ -28,12 +28,13 @@ struct SensorData {
     double temp, humidity;
     uint32_t pressurePa;
     uint16_t co2;
-    std::chrono::system_clock::time_point updateTime;
+    std::chrono::steady_clock::time_point updateTime;
     char errMsg[32];
 };
 
 struct Setpoints {
-    double heatTemp, coolTemp, co2;
+    double heatTemp, coolTemp;
+    uint16_t co2;
 };
 struct DemandRequest {
     struct FancoilRequest {
@@ -63,4 +64,8 @@ struct Config {
 
     HVACType heatType, coolType;
 };
+
+const char *fancoilSpeedToS(FancoilSpeed speed);
+const char *hvacStateToS(HVACState state);
+
 } // namespace ControllerDomain

@@ -10,6 +10,11 @@
 #include "MockValveCtrl.h"
 #include "TestLogger.h"
 
+using ::testing::_;
+using ::testing::AtMost;
+using ::testing::ExpectationSet;
+using ::testing::IsNan;
+
 void configUpdateCb(ControllerDomain::Config &config) {}
 
 class ControllerAppTest : public testing::Test {
@@ -40,17 +45,26 @@ class ControllerAppTest : public testing::Test {
 };
 
 TEST_F(ControllerAppTest, Boots) {
-    EXPECT_CALL(uiManager_, bootDone());
+    ExpectationSet uiInits;
+
+    sensors_.setLatest({.temp = 1.0, .humidity = 2.0, .co2 = 456});
+
+    // AtMost is somewhat arbitrary, just making sure it's not crazy high
+    EXPECT_CALL(uiManager_, clearMessage(_)).Times(AtMost(10));
+
+    uiInits += EXPECT_CALL(uiManager_, setHumidity(2.0));
+    uiInits += EXPECT_CALL(
+        uiManager_,
+        setCurrentFanSpeed(0)); // TODO: Maybe should init to nan or provide a way to set nan/err?
+    uiInits += EXPECT_CALL(uiManager_, setOutTempC(IsNan()));
+    uiInits += EXPECT_CALL(uiManager_, setInTempC(1.0));
+    uiInits += EXPECT_CALL(uiManager_, setInCO2(456));
+    uiInits += EXPECT_CALL(uiManager_, setHVACState(ControllerDomain::HVACState::Off));
+    uiInits += EXPECT_CALL(uiManager_, setCurrentSetpoints(0.0, 0.0)); // TODO
+
+    EXPECT_CALL(uiManager_, bootDone()).After(uiInits);
 
     app_->task(true);
-    // InputState input_state;
-    // input_state.fc[0].v = true;
-
-    // outCtrl_->update(true, input_state);
-
-    // EXPECT_EQ(mbClient_.mustGetParam(CxRegister::SwitchOnOff), 1);
-    // EXPECT_EQ(static_cast<CxOpMode>(mbClient_.mustGetParam(CxRegister::ACMode)), CxOpMode::HeatDHW);
-    // EXPECT_TRUE(outIO_.getFcPump());
 }
 
 // TODO: Write lots more tests!!
@@ -62,9 +76,7 @@ extern "C" void app_main() {
     // default value is test_speed=115200
     Serial.begin(115200);
 
-    ::testing::InitGoogleTest();
-    // if you plan to use GMock, replace the line above with
-    // ::testing::InitGoogleMock();
+    ::testing::InitGoogleMock();
 
     // Run tests
     if (RUN_ALL_TESTS())
@@ -76,9 +88,7 @@ extern "C" void app_main() {
 
 #else
 int main(int argc, char **argv) {
-    ::testing::InitGoogleTest(&argc, argv);
-    // if you plan to use GMock, replace the line above with
-    // ::testing::InitGoogleMock(&argc, argv);
+    ::testing::InitGoogleMock(&argc, argv);
 
     if (RUN_ALL_TESTS())
         ;

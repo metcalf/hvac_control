@@ -16,9 +16,9 @@ class AbstractModbusController {
     virtual ~AbstractModbusController() {}
 
     virtual esp_err_t getFreshAirState(ControllerDomain::FreshAirState *state,
-                                       std::chrono::system_clock::time_point *time) = 0;
+                                       std::chrono::steady_clock::time_point *time) = 0;
     virtual esp_err_t getMakeupDemand(bool *demand,
-                                      std::chrono::system_clock::time_point *time) = 0;
+                                      std::chrono::steady_clock::time_point *time) = 0;
     virtual esp_err_t getSecondaryControllerState(ControllerDomain::SensorData *sensorData,
                                                   ControllerDomain::Setpoints *setpoints) = 0;
 

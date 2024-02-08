@@ -230,7 +230,11 @@ void UIManager::setCurrentFanSpeed(uint8_t speed) {
 }
 
 void UIManager::setOutTempC(double tc) {
-    lv_label_set_text_fmt(ui_Out_temp_value, "%u°", (uint)(ABS_C_TO_F(tc) + 0.5));
+    if (std::isnan(tc)) {
+        lv_label_set_text(ui_Out_temp_value, "--");
+    } else {
+        lv_label_set_text_fmt(ui_Out_temp_value, "%u°", (uint)(ABS_C_TO_F(tc) + 0.5));
+    }
 }
 
 void UIManager::setInTempC(double tc) {

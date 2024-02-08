@@ -10,7 +10,7 @@ void ModbusController::task() {
         EventBits_t bits = xEventGroupWaitBits(requests_, 0xff, pdTRUE, pdFALSE,
                                                POLL_INTERVAL_SECS * 1000 / portTICK_PERIOD_MS);
 
-        std::chrono::system_clock::time_point now = std::chrono::system_clock::now();
+        std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now();
 
         if (bits & requestBits(RequestType::SetFreshAirSpeed)) {
             xSemaphoreTake(mutex_, portMAX_DELAY);
@@ -80,6 +80,8 @@ void ModbusController::task() {
         bool systemOn = systemOn_;
         xSemaphoreGive(mutex_);
 
+        // TODO: Probably don't want to do this until we've done at least one turn through the loop
+        // maybe even one turn through the loop after getting valid secondary controller state?
         err = client_.setSecondaryControllerData(speed, hvacState, outTempC, systemOn);
         xSemaphoreTake(mutex_, portMAX_DELAY);
         if (err != ESP_OK) {
@@ -92,7 +94,7 @@ void ModbusController::task() {
 }
 
 esp_err_t ModbusController::getFreshAirState(FreshAirState *state,
-                                             std::chrono::system_clock::time_point *time) {
+                                             std::chrono::steady_clock::time_point *time) {
     xSemaphoreTake(mutex_, portMAX_DELAY);
     esp_err_t err = freshAirStateErr_;
     if (err == ESP_OK) {
@@ -104,7 +106,7 @@ esp_err_t ModbusController::getFreshAirState(FreshAirState *state,
     return err;
 }
 esp_err_t ModbusController::getMakeupDemand(bool *demand,
-                                            std::chrono::system_clock::time_point *time) {
+                                            std::chrono::steady_clock::time_point *time) {
     if (!hasMakeupDemand_) {
         return ESP_OK;
     }

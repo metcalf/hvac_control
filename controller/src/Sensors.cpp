@@ -61,7 +61,7 @@ SensorData Sensors::pollInternal() {
         return data;
     }
 
-    data.updateTime = std::chrono::system_clock::now();
+    data.updateTime = std::chrono::steady_clock::now();
     data.errMsg[0] = 0;
 
     return data;

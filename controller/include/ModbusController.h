@@ -28,8 +28,8 @@ class ModbusController : public AbstractModbusController {
     void task();
 
     esp_err_t getFreshAirState(ControllerDomain::FreshAirState *state,
-                               std::chrono::system_clock::time_point *time) override;
-    esp_err_t getMakeupDemand(bool *demand, std::chrono::system_clock::time_point *time) override;
+                               std::chrono::steady_clock::time_point *time) override;
+    esp_err_t getMakeupDemand(bool *demand, std::chrono::steady_clock::time_point *time) override;
     esp_err_t getSecondaryControllerState(ControllerDomain::SensorData *sensorData,
                                           ControllerDomain::Setpoints *setpoints) override;
 
@@ -69,7 +69,7 @@ class ModbusController : public AbstractModbusController {
 
     esp_err_t freshAirStateErr_, makeupDemandErr_, setFancoilErr_, freshAirSpeedErr_,
         secondaryControllerErr_;
-    std::chrono::system_clock::time_point lastFreshAirState_, lastMakeupDemand_;
+    std::chrono::steady_clock::time_point lastFreshAirState_, lastMakeupDemand_;
 
     HVACState hvacState_;
     bool systemOn_;

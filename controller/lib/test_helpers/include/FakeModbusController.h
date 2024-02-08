@@ -7,11 +7,11 @@
 class FakeModbusController : public AbstractModbusController {
   public:
     esp_err_t getFreshAirState(ControllerDomain::FreshAirState *state,
-                               std::chrono::system_clock::time_point *) override {
+                               std::chrono::steady_clock::time_point *) override {
         *state = freshAirState_;
         return ESP_OK;
     }
-    esp_err_t getMakeupDemand(bool *demand, std::chrono::system_clock::time_point *) override {
+    esp_err_t getMakeupDemand(bool *demand, std::chrono::steady_clock::time_point *) override {
         *demand = makeupDemand_;
         return ESP_OK;
     }
