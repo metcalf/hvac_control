@@ -16,6 +16,8 @@
 #include "app_config.h"
 #include "wifi.h"
 
+#define INIT_ERR_RESTART_DELAY_TICKS 15 * 1000 / portTICK_PERIOD_MS
+
 #define UI_TASK_PRIO ESP_TASKD_EVENT_PRIO
 #define SENSOR_TASK_PRIO ESP_TASK_MAIN_PRIO
 #define MODBUS_TASK_PRIO SENSOR_TASK_PRIO + 1
@@ -65,7 +67,13 @@ void uiTask(void *uiManager) {
     }
 }
 
-void mainTask(void *app) { ((ControllerApp *)app)->runTask(); }
+void mainTask(void *app) {
+    bool first = true;
+    while (1) {
+        ((ControllerApp *)app)->task(first);
+        first = false;
+    }
+}
 
 void modbusTask(void *mb) { ((ModbusController *)mb)->task(); }
 
@@ -105,12 +113,16 @@ extern "C" void controller_main() {
     if (sensor_err != 0) {
         snprintf(bootErrMsg, sizeof(bootErrMsg), "Sensor init error: %d", sensor_err);
         app_->bootErr(bootErrMsg);
+        vTaskDelay(INIT_ERR_RESTART_DELAY_TICKS);
+        esp_restart();
     }
 
     esp_err_t err = modbusController_->init();
     if (err != ESP_OK) {
         snprintf(bootErrMsg, sizeof(bootErrMsg), "Modbus init error: %d", err);
         app_->bootErr(bootErrMsg);
+        vTaskDelay(INIT_ERR_RESTART_DELAY_TICKS);
+        esp_restart();
     }
 
     xTaskCreate(sensorTask, "sensorTask", SENSOR_TASK_STACK_SIZE, &sensors_, SENSOR_TASK_PRIO,

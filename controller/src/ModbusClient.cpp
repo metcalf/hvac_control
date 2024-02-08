@@ -185,8 +185,9 @@ esp_err_t ModbusClient::getMakeupDemand(bool *demand) {
     return err;
 }
 
-esp_err_t ModbusClient::setFancoil(FancoilID id, FancoilSpeed speed, bool cool) {
-    uint16_t v = (static_cast<uint16_t>(speed) << 2) | (cool && 0x01);
+esp_err_t ModbusClient::setFancoil(FancoilID id,
+                                   ControllerDomain::DemandRequest::FancoilRequest req) {
+    uint16_t v = (static_cast<uint16_t>(req.speed) << 2) | (req.cool && 0x01);
     CID cid;
     switch (id) {
     case FancoilID::Prim:

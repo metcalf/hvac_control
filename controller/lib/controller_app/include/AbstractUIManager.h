@@ -1,8 +1,5 @@
 #pragma once
 
-#include "freertos/FreeRTOS.h"
-#include "freertos/queue.h"
-
 #include "ControllerDomain.h"
 
 #define UI_MAX_MSG_LEN 18 * 2
@@ -63,6 +60,4 @@ class AbstractUIManager {
 
     virtual void bootDone() = 0;
     virtual void bootErr(const char *msg) = 0;
-
-    virtual void onMessageTimer() = 0;
 };

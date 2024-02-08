@@ -2,7 +2,12 @@
 
 #include <chrono>
 
+#if defined(ESP_PLATFORM)
 #include "esp_err.h"
+#else
+typedef int esp_err_t;
+#define ESP_OK 0
+#endif
 
 #include "ControllerDomain.h"
 
@@ -21,8 +26,8 @@ class AbstractModbusController {
     virtual esp_err_t lastSetFancoilErr() = 0;
 
     virtual void setFreshAirSpeed(ControllerDomain::FanSpeed speed) = 0;
-    virtual void setFancoil(ControllerDomain::FancoilID id, ControllerDomain::FancoilSpeed speed,
-                            bool cool) = 0;
+    virtual void setFancoil(ControllerDomain::FancoilID id,
+                            ControllerDomain::DemandRequest::FancoilRequest req) = 0;
 
     virtual void reportHVACState(ControllerDomain::HVACState hvacState) = 0;
     virtual void reportSystemPower(bool systemOn) = 0;

@@ -31,12 +31,11 @@ void ModbusController::task() {
             } else {
                 id = FancoilID::Sec;
             }
-            FancoilSpeed speed = requestFancoilSpeed_;
-            bool cool = requestFancoilCool_;
+            ControllerDomain::DemandRequest::FancoilRequest req = requestFancoil_;
 
             xSemaphoreGive(mutex_);
 
-            err = client_.setFancoil(id, speed, cool);
+            err = client_.setFancoil(id, req);
             xSemaphoreTake(mutex_, portMAX_DELAY);
             setFancoilErr_ = err;
             xSemaphoreGive(mutex_);
@@ -141,13 +140,13 @@ void ModbusController::setFreshAirSpeed(FanSpeed speed) {
 
     makeRequest(RequestType::SetFreshAirSpeed);
 }
-void ModbusController::setFancoil(FancoilID id, FancoilSpeed speed, bool cool) {
+void ModbusController::setFancoil(FancoilID id,
+                                  ControllerDomain::DemandRequest::FancoilRequest req) {
     if (xSemaphoreTake(mutex_, portMAX_DELAY) != pdTRUE) {
         return;
     }
 
-    requestFancoilSpeed_ = speed;
-    requestFancoilCool_ = cool;
+    requestFancoil_ = req;
     xSemaphoreGive(mutex_);
 
     if (id == FancoilID::Prim) {

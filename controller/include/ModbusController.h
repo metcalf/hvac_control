@@ -37,8 +37,8 @@ class ModbusController : public AbstractModbusController {
     esp_err_t lastSetFancoilErr() override;
 
     void setFreshAirSpeed(ControllerDomain::FanSpeed speed) override;
-    void setFancoil(ControllerDomain::FancoilID id, ControllerDomain::FancoilSpeed speed,
-                    bool cool) override;
+    void setFancoil(ControllerDomain::FancoilID id,
+                    ControllerDomain::DemandRequest::FancoilRequest req) override;
 
     void reportHVACState(ControllerDomain::HVACState hvacState) override;
     void reportSystemPower(bool systemOn) override;
@@ -61,8 +61,7 @@ class ModbusController : public AbstractModbusController {
     EventGroupHandle_t requests_;
     SemaphoreHandle_t mutex_;
 
-    FancoilSpeed requestFancoilSpeed_;
-    bool requestFancoilCool_;
+    ControllerDomain::DemandRequest::FancoilRequest requestFancoil_;
     FanSpeed requestFreshAirSpeed_;
 
     FreshAirState freshAirState_;

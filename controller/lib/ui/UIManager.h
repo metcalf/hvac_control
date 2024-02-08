@@ -36,7 +36,7 @@ class UIManager : public AbstractUIManager {
     void bootDone() override;
     void bootErr(const char *msg) override;
 
-    void onMessageTimer() override;
+    void onMessageTimer();
 
     // Event hooks called by ui_events.cpp
     void eFanOverride();

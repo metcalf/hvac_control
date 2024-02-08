@@ -1,5 +1,7 @@
 #pragma once
 
+#include <functional>
+
 #include "AbstractDemandController.h"
 #include "AbstractLogger.h"
 #include "AbstractModbusController.h"
@@ -11,22 +13,33 @@
 class ControllerApp {
   public:
     typedef void (*cfgUpdateCb_t)(ControllerDomain::Config &config);
-    typedef bool (*uiEvtRcv_t)(AbstractUIManager::Event *evt, uint waitMs);
+    typedef std::function<bool(AbstractUIManager::Event *, uint16_t)> uiEvtRcv_t;
+    //typedef bool (*uiEvtRcv_t)(AbstractUIManager::Event *evt, uint16_t waitMs);
 
     ControllerApp(ControllerDomain::Config config, AbstractLogger *log,
                   AbstractUIManager *uiManager, AbstractModbusController *modbusController,
                   AbstractSensors *sensors, AbstractDemandController *demandController,
-                  AbstractValveCtrl *valveCtrl, cfgUpdateCb_t cfgUpdateCb, uiEvtRcv_t uiEvtRcv)
-        : config_(config), log_(log), uiManager_(uiManager), modbusController_(modbusController),
-          sensors_(sensors), demandController_(demandController), valveCtrl_(valveCtrl),
-          cfgUpdateCb_(cfgUpdateCb), uiEvtRcv_(uiEvtRcv) {
+                  AbstractValveCtrl *valveCtrl, cfgUpdateCb_t cfgUpdateCb,
+                  const uiEvtRcv_t &uiEvtRcv)
+        : log_(log), uiManager_(uiManager), modbusController_(modbusController), sensors_(sensors),
+          demandController_(demandController), valveCtrl_(valveCtrl), cfgUpdateCb_(cfgUpdateCb),
+          uiEvtRcv_(uiEvtRcv) {
+        setConfig(config);
+    }
+    void setConfig(ControllerDomain::Config config) {
+        config_ = config;
         nControllers_ = config.controllerType == Config::ControllerType::Primary ? 2 : 1;
     }
 
-    void runTask();
+    void task(bool firstTime);
     void bootErr(const char *msg);
 
     static size_t nMsgIds() { return static_cast<size_t>(ControllerApp::MsgID::_Last); }
+
+  protected:
+    virtual std::chrono::system_clock::time_point clkNow() {
+        return std::chrono::system_clock::now();
+    }
 
   private:
     using FancoilSpeed = ControllerDomain::FancoilSpeed;
@@ -55,8 +68,8 @@ class ControllerApp {
         _Last,
     };
 
-    void updateACMode(DemandRequest *requests, std::chrono::system_clock::time_point now);
-    FanSpeed computeFanSpeed(DemandRequest *requests, std::chrono::system_clock::time_point now);
+    void updateACMode(DemandRequest *requests);
+    FanSpeed computeFanSpeed(DemandRequest *requests);
     void setFanSpeed(FanSpeed speed);
     bool pollUIEvent(bool wait);
     void handleCancelMessage(MsgID id);
@@ -65,10 +78,11 @@ class ControllerApp {
     void setMessage(MsgID msgID, bool allowCancel, const char *msg);
     void clearMessage(MsgID msgID);
     void checkModbusErrors();
-    void handleFreshAirState(std::chrono::system_clock::time_point now);
+    void handleFreshAirState();
     int getScheduleIdx(int offset);
     Setpoints getCurrentSetpoints();
     void setTempOverride(AbstractUIManager::TempOverride override);
+    uint16_t localMinOfDay();
 
     Config config_;
     AbstractLogger *log_;

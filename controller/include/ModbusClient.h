@@ -12,8 +12,8 @@ class ModbusClient {
     esp_err_t setFreshAirSpeed(ControllerDomain::FanSpeed speed);
 
     esp_err_t getMakeupDemand(bool *demand);
-    esp_err_t setFancoil(ControllerDomain::FancoilID id, ControllerDomain::FancoilSpeed speed,
-                         bool cool);
+    esp_err_t setFancoil(ControllerDomain::FancoilID id,
+                         ControllerDomain::DemandRequest::FancoilRequest req);
 
     esp_err_t getSecondaryControllerState(ControllerDomain::SensorData *sensorData,
                                           ControllerDomain::Setpoints *setpoints);
