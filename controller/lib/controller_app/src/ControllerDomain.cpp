@@ -11,9 +11,9 @@ const char *fancoilSpeedToS(FancoilSpeed speed) {
         return "MED";
     case FancoilSpeed::High:
         return "HIGH";
-    default:
-        __builtin_unreachable();
     }
+
+    __builtin_unreachable();
 }
 
 const char *hvacStateToS(HVACState state) {
@@ -30,8 +30,8 @@ const char *hvacStateToS(HVACState state) {
     case HVACState::ACCool:
         return "AC";
         break;
-    default:
-        __builtin_unreachable();
     }
+
+    __builtin_unreachable();
 }
 } // namespace ControllerDomain

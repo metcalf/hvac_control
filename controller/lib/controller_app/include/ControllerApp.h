@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cmath>
 #include <functional>
 
 #include "AbstractDemandController.h"
@@ -8,6 +9,7 @@
 #include "AbstractSensors.h"
 #include "AbstractUIManager.h"
 #include "AbstractValveCtrl.h"
+#include "AbstractWifi.h"
 #include "ControllerDomain.h"
 
 class ControllerApp {
@@ -19,11 +21,11 @@ class ControllerApp {
     ControllerApp(ControllerDomain::Config config, AbstractLogger *log,
                   AbstractUIManager *uiManager, AbstractModbusController *modbusController,
                   AbstractSensors *sensors, AbstractDemandController *demandController,
-                  AbstractValveCtrl *valveCtrl, cfgUpdateCb_t cfgUpdateCb,
+                  AbstractValveCtrl *valveCtrl, AbstractWifi *wifi, cfgUpdateCb_t cfgUpdateCb,
                   const uiEvtRcv_t &uiEvtRcv)
         : log_(log), uiManager_(uiManager), modbusController_(modbusController), sensors_(sensors),
-          demandController_(demandController), valveCtrl_(valveCtrl), cfgUpdateCb_(cfgUpdateCb),
-          uiEvtRcv_(uiEvtRcv) {
+          demandController_(demandController), valveCtrl_(valveCtrl), wifi_(wifi),
+          cfgUpdateCb_(cfgUpdateCb), uiEvtRcv_(uiEvtRcv) {
         setConfig(config);
     }
     void setConfig(ControllerDomain::Config config) {
@@ -35,6 +37,10 @@ class ControllerApp {
     void bootErr(const char *msg);
 
     static size_t nMsgIds() { return static_cast<size_t>(ControllerApp::MsgID::_Last); }
+    bool clockReady() {
+        // Time is after ~2020
+        return std::chrono::system_clock::to_time_t(realNow()) > (60 * 60 * 24 * 365 * 50);
+    }
 
   protected:
     virtual std::chrono::steady_clock::time_point steadyNow() {
@@ -62,6 +68,7 @@ class ControllerApp {
         TempOverride,
         ACMode,
         Precooling,
+        Wifi,
         SensorErr,
         GetFreshAirStateErr,
         SetFreshAirSpeedErr,
@@ -88,6 +95,9 @@ class ControllerApp {
         case MsgID::Precooling:
             return "Precooling";
             break;
+        case MsgID::Wifi:
+            return "Wifi";
+            break;
         case MsgID::SensorErr:
             return "SensorErr";
             break;
@@ -109,9 +119,9 @@ class ControllerApp {
         case MsgID::_Last:
             return "";
             break;
-        default:
-            __builtin_unreachable();
         }
+
+        __builtin_unreachable();
     }
 
     void updateACMode(DemandRequest *requests);
@@ -132,6 +142,7 @@ class ControllerApp {
     void logState(ControllerDomain::FreshAirState &freshAirState, ControllerDomain::SensorData[],
                   ControllerDomain::DemandRequest[], ControllerDomain::Setpoints setpoints[],
                   ControllerDomain::HVACState[], FanSpeed fanSpeed);
+    void checkWifiState();
 
     Config config_;
     AbstractLogger *log_;
@@ -140,12 +151,13 @@ class ControllerApp {
     AbstractSensors *sensors_;
     AbstractDemandController *demandController_;
     AbstractValveCtrl *valveCtrl_;
+    AbstractWifi *wifi_;
     uint8_t nControllers_;
     cfgUpdateCb_t cfgUpdateCb_;
     uiEvtRcv_t uiEvtRcv_;
 
     AbstractUIManager::TempOverride tempOverride_;
-    int tempOverrideUntilScheduleIdx_;
+    int tempOverrideUntilScheduleIdx_ = -1;
 
     ACMode acMode_;
 

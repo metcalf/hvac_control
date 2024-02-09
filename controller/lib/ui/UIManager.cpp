@@ -175,20 +175,12 @@ UIManager::UIManager(ControllerDomain::Config config, size_t nMsgIds, eventCb_t 
 
     lv_label_set_text_fmt(ui_co2_target_value, "%u", config.co2Target);
 
-    // Hide controls/values for HVAC modes we don't support
-    if (config.heatType == Config::HVACType::None) {
-        lv_obj_add_flag(ui_Heat_setpoint_container, LV_OBJ_FLAG_HIDDEN);
-        lv_obj_add_flag(ui_Override_heat_container, LV_OBJ_FLAG_HIDDEN);
-        lv_obj_add_flag(ui_Day_heat_container, LV_OBJ_FLAG_HIDDEN);
-        lv_obj_add_flag(ui_Night_heat_container, LV_OBJ_FLAG_HIDDEN);
-    }
+    // Hide AC buttons if we don't have active cooling
     if (config.coolType == Config::HVACType::None) {
-        lv_obj_add_flag(ui_Cool_setpoint_container, LV_OBJ_FLAG_HIDDEN);
-        lv_obj_add_flag(ui_Override_cool_container, LV_OBJ_FLAG_HIDDEN);
-        lv_obj_add_flag(ui_Day_cool_container, LV_OBJ_FLAG_HIDDEN);
-        lv_obj_add_flag(ui_Night_cool_container, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_add_flag(ui_ac_button_container, LV_OBJ_FLAG_HIDDEN);
     }
 
+    // Disable some controls on the secondary controller to simplify communications
     if (config.controllerType == Config::ControllerType::Secondary) {
         lv_obj_add_flag(ui_ac_button_container, LV_OBJ_FLAG_HIDDEN);
         lv_obj_add_flag(ui_power_button_container, LV_OBJ_FLAG_HIDDEN);

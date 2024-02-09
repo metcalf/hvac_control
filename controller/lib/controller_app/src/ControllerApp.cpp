@@ -1,7 +1,6 @@
 #include "ControllerApp.h"
 
 #include <algorithm>
-#include <cmath>
 
 #include <cstring>
 
@@ -32,8 +31,6 @@
 
 using FanSpeed = ControllerDomain::FanSpeed;
 using Setpoints = ControllerDomain::Setpoints;
-
-static const char *TAG = "APP";
 
 void ControllerApp::bootErr(const char *msg) {
     uiManager_->bootErr(msg);
@@ -433,7 +430,40 @@ void ControllerApp::logState(ControllerDomain::FreshAirState &freshAirState,
     }
 }
 
+void ControllerApp::checkWifiState() {
+    const char *stateMsg = "", *sep;
+    char wifiMsg_[UI_MAX_MSG_LEN] = "";
+
+    switch (wifi_->getState()) {
+    case AbstractWifi::State::Inactive:
+        stateMsg = "disabled";
+        break;
+    case AbstractWifi::State::Connecting:
+        stateMsg = "connecting";
+        break;
+    case AbstractWifi::State::Connected:
+        clearMessage(MsgID::Wifi);
+        return;
+    case AbstractWifi::State::Err:
+        stateMsg = "error";
+        break;
+    }
+
+    wifi_->msg(wifiMsg_, sizeof(wifiMsg_));
+    if (wifiMsg_[0] != '\0') {
+        sep = ": ";
+    } else {
+        sep = "";
+    }
+
+    setMessageF(MsgID::Wifi, "Wifi %s%s%s", stateMsg, sep, wifiMsg_);
+}
+
 int ControllerApp::getScheduleIdx(int offset) {
+    if (!clockReady()) {
+        return -1;
+    }
+
     int i;
     for (i = 0; i < NUM_SCHEDULE_TIMES; i++) {
         Config::Schedule schedule = config_.schedules[i];
@@ -450,16 +480,31 @@ int ControllerApp::getScheduleIdx(int offset) {
 Setpoints ControllerApp::getCurrentSetpoints() {
     int idx = getScheduleIdx(0);
 
-    if (idx == tempOverrideUntilScheduleIdx_) {
+    if (idx != -1 && idx == tempOverrideUntilScheduleIdx_) {
         tempOverrideUntilScheduleIdx_ = -1;
         clearMessage(MsgID::TempOverride);
-    } else if (tempOverrideUntilScheduleIdx_ != 1) {
+    } else if (tempOverrideUntilScheduleIdx_ != -1) {
         setpointReason_ = "override";
         return Setpoints{
             .heatTemp = tempOverride_.heatC,
             .coolTemp = tempOverride_.coolC,
             .co2 = config_.co2Target,
         };
+    }
+
+    // If we don't have valid time, pick the least active setpoints from the schedules
+    if (idx == -1) {
+        Setpoints setpoints{
+            .heatTemp = 72,
+            .coolTemp = 68,
+            .co2 = config_.co2Target,
+        };
+        for (int i = 0; i < NUM_SCHEDULE_TIMES; i++) {
+            setpoints.heatTemp = std::min(setpoints.heatTemp, config_.schedules[i].heatC);
+            setpoints.coolTemp = std::max(setpoints.coolTemp, config_.schedules[i].coolC);
+        }
+        setpointReason_ = "no_time";
+        return setpoints;
     }
 
     // We search for the first schedule *after* the current time and then look to the
@@ -499,12 +544,19 @@ Setpoints ControllerApp::getCurrentSetpoints() {
 
 void ControllerApp::setTempOverride(AbstractUIManager::TempOverride to) {
     tempOverride_ = to;
-    tempOverrideUntilScheduleIdx_ = getScheduleIdx(1);
-    Config::Schedule schedule = config_.schedules[tempOverrideUntilScheduleIdx_];
+    int idx = getScheduleIdx(1);
+    if (idx == -1) {
+        tempOverrideUntilScheduleIdx_ = 0;
+        setMessageF(MsgID::TempOverride, true, "Hold %d/%d", ABS_C_TO_F(tempOverride_.heatC),
+                    ABS_C_TO_F(tempOverride_.coolC));
+    } else {
+        tempOverrideUntilScheduleIdx_ = idx;
+        Config::Schedule schedule = config_.schedules[tempOverrideUntilScheduleIdx_];
 
-    setMessageF(MsgID::TempOverride, true, "Hold %d/%d until %02d:%02d%c",
-                ABS_C_TO_F(tempOverride_.heatC), ABS_C_TO_F(tempOverride_.coolC),
-                SCHEDULE_TIME_STR_ARGS(schedule));
+        setMessageF(MsgID::TempOverride, true, "Hold %d/%d until %02d:%02d%c",
+                    ABS_C_TO_F(tempOverride_.heatC), ABS_C_TO_F(tempOverride_.coolC),
+                    SCHEDULE_TIME_STR_ARGS(schedule));
+    }
 }
 
 void ControllerApp::handleFreshAirState(ControllerDomain::FreshAirState *freshAirState) {
@@ -557,11 +609,7 @@ void ControllerApp::clearMessage(MsgID msgID) {
 
 void ControllerApp::task(bool firstTime) {
     // TODO: CO2 calibration
-    // TODO: get network status in here
-    // TODO: handle case where we don't have time
     // TODO: Vacation? Other status info from zone controller?
-    std::chrono::steady_clock::time_point now = steadyNow();
-
     ControllerDomain::FreshAirState freshAirState;
     handleFreshAirState(&freshAirState);
 

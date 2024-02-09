@@ -122,7 +122,10 @@
       "ios": "cpp",
       "locale": "cpp",
       "variant": "cpp",
-      "charconv": "cpp"
+      "charconv": "cpp",
+      "any": "cpp",
+      "unordered_set": "cpp",
+      "iomanip": "cpp"
     }
   }
 }

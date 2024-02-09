@@ -74,14 +74,18 @@ void ModbusController::task() {
             secondarySetpoints_ = setpoints;
         }
 
+        // Don't write data to the secondary unless it has been written
+        // by the main loop
+        if (!(speedSet_ && hvacStateSet_ && outTempSet_ && systemOnSet_)) {
+            continue;
+        }
+
         FanSpeed speed = requestFreshAirSpeed_;
         HVACState hvacState = hvacState_;
         double outTempC = outTempC_;
         bool systemOn = systemOn_;
         xSemaphoreGive(mutex_);
 
-        // TODO: Probably don't want to do this until we've done at least one turn through the loop
-        // maybe even one turn through the loop after getting valid secondary controller state?
         err = client_.setSecondaryControllerData(speed, hvacState, outTempC, systemOn);
         xSemaphoreTake(mutex_, portMAX_DELAY);
         if (err != ESP_OK) {
@@ -138,6 +142,7 @@ esp_err_t ModbusController::getSecondaryControllerState(ControllerDomain::Sensor
 void ModbusController::setFreshAirSpeed(FanSpeed speed) {
     xSemaphoreTake(mutex_, portMAX_DELAY);
     requestFreshAirSpeed_ = speed;
+    speedSet_ = true;
     xSemaphoreGive(mutex_);
 
     makeRequest(RequestType::SetFreshAirSpeed);
@@ -169,16 +174,19 @@ EventBits_t ModbusController::requestBits(RequestType request) {
 void ModbusController::reportHVACState(HVACState hvacState) {
     xSemaphoreTake(mutex_, portMAX_DELAY);
     hvacState_ = hvacState;
+    hvacStateSet_ = true;
     xSemaphoreGive(mutex_);
 }
 void ModbusController::reportSystemPower(bool systemOn) {
     xSemaphoreTake(mutex_, portMAX_DELAY);
     systemOn_ = systemOn;
+    systemOnSet_ = true;
     xSemaphoreGive(mutex_);
 }
 void ModbusController::reportOutdoorTemp(double outTempC) {
     xSemaphoreTake(mutex_, portMAX_DELAY);
     outTempC_ = outTempC;
+    outTempSet_ = true;
     xSemaphoreGive(mutex_);
 }
 

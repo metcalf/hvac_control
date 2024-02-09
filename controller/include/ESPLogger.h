@@ -5,6 +5,7 @@
 #include "AbstractLogger.h"
 
 class ESPLogger : public AbstractLogger {
+  public:
     void vlog(Level level, const char *fmt, va_list args) override {
         esp_log_writev((esp_log_level_t)level, "APP", fmt, args);
     }

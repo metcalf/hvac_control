@@ -71,6 +71,7 @@ class ModbusController : public AbstractModbusController {
         secondaryControllerErr_;
     std::chrono::steady_clock::time_point lastFreshAirState_, lastMakeupDemand_;
 
+    bool speedSet_, hvacStateSet_, outTempSet_, systemOnSet_;
     HVACState hvacState_;
     bool systemOn_;
     double outTempC_;

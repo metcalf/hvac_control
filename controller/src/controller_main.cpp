@@ -9,12 +9,12 @@
 #include "ControllerApp.h"
 #include "DemandController.h"
 #include "ESPLogger.h"
+#include "ESPWifi.h"
 #include "ModbusController.h"
 #include "Sensors.h"
 #include "UIManager.h"
 #include "ValveCtrl.h"
 #include "app_config.h"
-#include "wifi.h"
 
 #define INIT_ERR_RESTART_DELAY_TICKS 15 * 1000 / portTICK_PERIOD_MS
 
@@ -30,6 +30,8 @@
 
 #define SENSOR_RETRY_INTERVAL_SECS 1
 #define SENSOR_UPDATE_INTERVAL_SECS 30
+#define CLOCK_POLL_PERIOD_MS 100
+#define CLOCK_WAIT_MS 10 * 1000
 
 #define POSIX_TZ_STR "PST8PDT,M3.2.0/2:00:00,M11.1.0/2:00:00"
 
@@ -43,6 +45,7 @@ Sensors sensors_;
 DemandController demandController_;
 QueueHandle_t uiEvtQueue_;
 ESPLogger logger_;
+ESPWifi wifi_;
 
 void sensorTask(void *sensors) {
     while (1) {
@@ -69,6 +72,15 @@ void uiTask(void *uiManager) {
 
 void mainTask(void *app) {
     bool first = true;
+
+    // Wait a bit of time to get a valid clock before loading
+    for (int i = 0; i < (CLOCK_WAIT_MS / CLOCK_POLL_PERIOD_MS); i++) {
+        if (app_->clockReady()) {
+            break;
+        }
+        vTaskDelay(CLOCK_POLL_PERIOD_MS / portTICK_PERIOD_MS);
+    }
+
     while (1) {
         ((ControllerApp *)app)->task(first);
         first = false;
@@ -97,7 +109,7 @@ extern "C" void controller_main() {
                                config.coolType == Config::HVACType::Valve);
 
     app_ = new ControllerApp(config, &logger_, uiManager_, modbusController_, &sensors_,
-                             &demandController_, valveCtrl_, app_config_save, uiEvtRcv);
+                             &demandController_, valveCtrl_, &wifi_, app_config_save, uiEvtRcv);
 
     xTaskCreate(uiTask, "uiTask", UI_TASK_STACK_SIZE, uiManager_, UI_TASK_PRIO, NULL);
 
@@ -106,8 +118,8 @@ extern "C" void controller_main() {
 
     // TODO: Setup OTA updates
     // TODO: Remote logging
-    wifi_init();
-    wifi_connect();
+    wifi_.init();
+    wifi_.connect();
 
     uint8_t sensor_err = sensors_.init();
     if (sensor_err != 0) {
