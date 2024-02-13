@@ -8,7 +8,7 @@ void ModbusController::task() {
     while (1) {
         esp_err_t err;
         EventBits_t bits = xEventGroupWaitBits(requests_, 0xff, pdTRUE, pdFALSE,
-                                               POLL_INTERVAL_SECS * 1000 / portTICK_PERIOD_MS);
+                                               pdMS_TO_TICKS(POLL_INTERVAL_SECS * 1000));
 
         std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now();
 

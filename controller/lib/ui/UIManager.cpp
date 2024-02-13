@@ -170,8 +170,10 @@ UIManager::UIManager(ControllerDomain::Config config, size_t nMsgIds, eventCb_t 
     : eventCb_(eventCb) {
     minCoolF_ = ABS_C_TO_F(config.minCoolC) + 0.5;
 
-    // Populate schedule values
-    // Populate rollers based on mix/max heat/cool
+    ui_init();
+
+    // TODO: Populate schedule values
+    // TODO: Populate rollers based on mix/max heat/cool
 
     lv_label_set_text_fmt(ui_co2_target_value, "%u", config.co2Target);
 

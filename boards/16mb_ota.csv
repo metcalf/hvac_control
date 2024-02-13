@@ -4,5 +4,5 @@ nvs,      data, nvs,     ,         0x4000
 otadata,  data, ota,     ,         0x2000
 phy_init, data, phy,     ,         0x1000
 coredump, data, coredump,,         64K
-ota_0,    0,    ota_0,   ,         6M
-ota_1,    0,    ota_1,   ,         6M
+ota_0,    0,    ota_0,   ,         4M
+ota_1,    0,    ota_1,   ,         4M

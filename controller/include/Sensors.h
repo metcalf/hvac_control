@@ -17,7 +17,7 @@ class Sensors : public AbstractSensors {
     Sensors() { mutex_ = xSemaphoreCreateMutex(); }
     ~Sensors() { vSemaphoreDelete(mutex_); }
 
-    uint8_t init();
+    int8_t init();
     bool poll();
     SensorData getLatest() override;
 

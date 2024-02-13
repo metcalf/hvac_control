@@ -608,6 +608,7 @@ void ControllerApp::clearMessage(MsgID msgID) {
 }
 
 void ControllerApp::task(bool firstTime) {
+    // TODO: Add config repl, add a name to config
     // TODO: CO2 calibration
     // TODO: Vacation? Other status info from zone controller?
     ControllerDomain::FreshAirState freshAirState;

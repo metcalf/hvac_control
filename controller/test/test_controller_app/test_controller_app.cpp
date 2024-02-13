@@ -98,6 +98,8 @@ TEST_F(ControllerAppTest, Boots) {
 
     // AtMost is somewhat arbitrary, just making sure it's not crazy high
     EXPECT_CALL(uiManager_, clearMessage(_)).Times(AtMost(10));
+    // Should not be called since we don't have a valid measurement
+    EXPECT_CALL(uiManager_, setOutTempC(_)).Times(0);
 
     uiInits += EXPECT_CALL(uiManager_, setHumidity(2.0));
     uiInits += EXPECT_CALL(uiManager_, setCurrentFanSpeed(0));
@@ -105,9 +107,6 @@ TEST_F(ControllerAppTest, Boots) {
     uiInits += EXPECT_CALL(uiManager_, setInCO2(456));
     uiInits += EXPECT_CALL(uiManager_, setHVACState(ControllerDomain::HVACState::Off));
     uiInits += EXPECT_CALL(uiManager_, setCurrentSetpoints(1.0, 2.0));
-
-    // Should not be called since we don't have a valid measurement
-    EXPECT_CALL(uiManager_, setOutTempC(_)).Times(0);
 
     EXPECT_CALL(uiManager_, bootDone()).After(uiInits);
 

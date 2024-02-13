@@ -14,7 +14,7 @@ using SensorData = ControllerDomain::SensorData;
 
 uint16_t paToHpa(uint32_t pa) { return (pa + 100 / 2) / 100; }
 
-uint8_t Sensors::init() {
+int8_t Sensors::init() {
     int8_t err;
 
     err = bme280_init();
