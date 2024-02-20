@@ -14,22 +14,28 @@ using SensorData = ControllerDomain::SensorData;
 
 uint16_t paToHpa(uint32_t pa) { return (pa + 100 / 2) / 100; }
 
-int8_t Sensors::init() {
+bool Sensors::init() {
+    bool ok = true;
     int8_t err;
 
     err = bme280_init();
     if (err != 0) {
         ESP_LOGE(TAG, "PHT init error %d", err);
-        return err;
+        ok = false;
+        return ok;
+    } else {
+        ESP_LOGD(TAG, "PHT init successful");
     }
 
     err = co2_init();
     if (err != 0) {
         ESP_LOGE(TAG, "CO2 init error %d", err);
-        return err;
+        ok = false;
+    } else {
+        ESP_LOGD(TAG, "CO2 init successful");
     }
 
-    return err;
+    return ok;
 }
 
 SensorData Sensors::pollInternal() {

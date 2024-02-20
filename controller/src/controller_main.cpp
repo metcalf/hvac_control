@@ -129,13 +129,13 @@ extern "C" void controller_main() {
     // TODO: connect
     // wifi_.connect();
 
-    int8_t sensor_err = sensors_.init();
-    if (sensor_err != 0) {
-        snprintf(bootErrMsg, sizeof(bootErrMsg), "Sensor init error: %d", sensor_err);
+    if (!sensors_.init()) {
+        snprintf(bootErrMsg, sizeof(bootErrMsg), "Sensor init error");
         app_->bootErr(bootErrMsg);
         vTaskDelay(INIT_ERR_RESTART_DELAY_TICKS);
         esp_restart();
     }
+    ESP_LOGI(TAG, "sensors initialized");
 
     esp_err_t err = modbusController_->init();
     if (err != ESP_OK) {
@@ -144,10 +144,11 @@ extern "C" void controller_main() {
         vTaskDelay(INIT_ERR_RESTART_DELAY_TICKS);
         esp_restart();
     }
+    ESP_LOGI(TAG, "modbus initialized");
 
     xTaskCreate(sensorTask, "sensorTask", SENSOR_TASK_STACK_SIZE, &sensors_, SENSOR_TASK_PRIO,
                 NULL);
-    xTaskCreate(modbusTask, "modbusTask", MODBUS_TASK_STACK_SIZE, &modbusController_,
+    xTaskCreate(modbusTask, "modbusTask", MODBUS_TASK_STACK_SIZE, modbusController_,
                 MODBUS_TASK_PRIO, NULL);
     xTaskCreate(mainTask, "mainTask", MAIN_TASK_STACK_SIZE, app_, MAIN_TASK_PRIO, NULL);
 }

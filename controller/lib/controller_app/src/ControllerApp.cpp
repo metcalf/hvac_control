@@ -33,8 +33,8 @@ using FanSpeed = ControllerDomain::FanSpeed;
 using Setpoints = ControllerDomain::Setpoints;
 
 void ControllerApp::bootErr(const char *msg) {
-    uiManager_->bootErr(msg);
     log_->err("%s", msg);
+    uiManager_->bootErr(msg);
 }
 
 void ControllerApp::updateACMode(DemandRequest *requests) {
