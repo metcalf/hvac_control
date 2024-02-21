@@ -17,15 +17,19 @@ void resetAndResumeTimer(lv_event_t *e) {
 }
 
 void UIManager::bootDone() {
+    xSemaphoreTake(mutex_, portMAX_DELAY);
     _ui_screen_change(&ui_Home, LV_SCR_LOAD_ANIM_FADE_ON, 500, 0, &ui_Home_screen_init);
+    xSemaphoreGive(mutex_);
 }
 
 void UIManager::bootErr(const char *msg) {
+    xSemaphoreTake(mutex_, portMAX_DELAY);
     lv_label_set_text(ui_boot_error_text, msg);
 
     lv_obj_add_flag(ui_boot_message, LV_OBJ_FLAG_HIDDEN);
     lv_obj_clear_flag(ui_boot_error_heading, LV_OBJ_FLAG_HIDDEN);
     lv_obj_clear_flag(ui_boot_error_text, LV_OBJ_FLAG_HIDDEN);
+    xSemaphoreGive(mutex_);
 }
 
 void UIManager::sendACOverrideEvent(ACOverride override) {
@@ -168,6 +172,8 @@ void UIManager::onMessageTimer() {
 
 UIManager::UIManager(ControllerDomain::Config config, size_t nMsgIds, eventCb_t eventCb)
     : eventCb_(eventCb) {
+    mutex_ = xSemaphoreCreateMutex();
+
     minCoolF_ = ABS_C_TO_F(config.minCoolC) + 0.5;
 
     ui_init();
@@ -212,32 +218,43 @@ UIManager::UIManager(ControllerDomain::Config config, size_t nMsgIds, eventCb_t 
 }
 
 void UIManager::setHumidity(double h) {
-    lv_label_set_text_fmt(ui_Humidity_value, "%u", std::min(99U, (uint)(h + 0.5)));
+    xSemaphoreTake(mutex_, portMAX_DELAY);
+    lv_label_set_text_fmt(ui_Humidity_value, "%u%%", std::min(99U, (uint)(h + 0.5)));
+    xSemaphoreGive(mutex_);
 }
 
 void UIManager::setCurrentFanSpeed(uint8_t speed) {
+    xSemaphoreTake(mutex_, portMAX_DELAY);
     if (speed == 0) {
         lv_label_set_text(ui_Fan_value, "OFF");
     } else {
         lv_label_set_text_fmt(ui_Fan_value, "%u%%", (uint)(speed / 255.0 * 100 + 0.5));
     }
+    xSemaphoreGive(mutex_);
 }
 
 void UIManager::setOutTempC(double tc) {
+    xSemaphoreTake(mutex_, portMAX_DELAY);
     if (std::isnan(tc)) {
         lv_label_set_text(ui_Out_temp_value, "--");
     } else {
         lv_label_set_text_fmt(ui_Out_temp_value, "%u°", (uint)(ABS_C_TO_F(tc) + 0.5));
     }
+    xSemaphoreGive(mutex_);
 }
 
 void UIManager::setInTempC(double tc) {
     lv_label_set_text_fmt(ui_Indoor_temp_value, "%u°", (uint)(ABS_C_TO_F(tc) + 0.5));
 }
 
-void UIManager::setInCO2(uint16_t ppm) { lv_label_set_text_fmt(ui_co2_value, "%u", ppm); }
+void UIManager::setInCO2(uint16_t ppm) {
+    xSemaphoreTake(mutex_, portMAX_DELAY);
+    lv_label_set_text_fmt(ui_co2_value, "%u", ppm);
+    xSemaphoreGive(mutex_);
+}
 
 void UIManager::setHVACState(ControllerDomain::HVACState state) {
+    xSemaphoreTake(mutex_, portMAX_DELAY);
     if (state == HVACState::Off) {
         lv_obj_set_style_border_side(ui_Indoor_temp_value, LV_BORDER_SIDE_NONE, 0);
     } else {
@@ -254,14 +271,18 @@ void UIManager::setHVACState(ControllerDomain::HVACState state) {
         lv_obj_add_flag(ui_use_ac_button, LV_OBJ_FLAG_HIDDEN);
         lv_obj_clear_flag(ui_stop_ac_button, LV_OBJ_FLAG_HIDDEN);
     }
+    xSemaphoreGive(mutex_);
 }
 
 void UIManager::setCurrentSetpoints(double heatC, double coolC) {
+    xSemaphoreTake(mutex_, portMAX_DELAY);
     lv_label_set_text_fmt(ui_Heat_setpoint, "%u", (uint)(ABS_C_TO_F(heatC) + 0.5));
     lv_label_set_text_fmt(ui_Cool_setpoint, "%u", (uint)(ABS_C_TO_F(coolC) + 0.5));
+    xSemaphoreGive(mutex_);
 }
 
 void UIManager::setSystemPower(bool on) {
+    xSemaphoreTake(mutex_, portMAX_DELAY);
     lv_obj_t *objs[] = {
         ui_Temp_setpoint_container,
         ui_co2_setpoint_container,
@@ -275,9 +296,11 @@ void UIManager::setSystemPower(bool on) {
 
     lv_obj_add_flag(on ? ui_on_button : ui_off_button, LV_OBJ_FLAG_HIDDEN);
     lv_obj_clear_flag(on ? ui_off_button : ui_on_button, LV_OBJ_FLAG_HIDDEN);
+    xSemaphoreGive(mutex_);
 }
 
 void UIManager::setMessage(uint8_t msgID, bool allowCancel, const char *msg) {
+    xSemaphoreTake(mutex_, portMAX_DELAY);
     MessageContainer *msgContainer = messages_[msgID];
 
     msgContainer->setText(msg);
@@ -293,9 +316,14 @@ void UIManager::setMessage(uint8_t msgID, bool allowCancel, const char *msg) {
     }
 
     msgContainer->setVisibility(true);
+    xSemaphoreGive(mutex_);
 }
 
-void UIManager::clearMessage(uint8_t msgID) { messages_[msgID]->setVisibility(false); }
+void UIManager::clearMessage(uint8_t msgID) {
+    xSemaphoreTake(mutex_, portMAX_DELAY);
+    messages_[msgID]->setVisibility(false);
+    xSemaphoreGive(mutex_);
+}
 
 UIManager::MessageContainer::MessageContainer(lv_obj_t *parent) {
     lv_obj_t *ui_message_container, *ui_message_close, *ui_message_text;

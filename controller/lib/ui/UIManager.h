@@ -4,6 +4,8 @@
 
 #include "AbstractUIManager.h"
 #include "ControllerDomain.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/semphr.h"
 #include "ui.h"
 #include "ui_events.h"
 
@@ -16,10 +18,16 @@ class UIManager : public AbstractUIManager {
             delete messages_[i];
         }
         delete messages_;
+        vSemaphoreDelete(mutex_);
     }
 
     void tick(uint32_t ms) { lv_tick_inc(ms); }
-    void handleTasks() { lv_timer_handler(); }
+    uint32_t handleTasks() {
+        xSemaphoreTake(mutex_, portMAX_DELAY);
+        auto rv = lv_timer_handler();
+        xSemaphoreGive(mutex_);
+        return rv;
+    }
 
     void setHumidity(double h) override;
     void setCurrentFanSpeed(uint8_t speed) override;
@@ -83,6 +91,7 @@ class UIManager : public AbstractUIManager {
 
     inline static UIManager *eventsInst_;
 
+    SemaphoreHandle_t mutex_;
     MessageContainer **messages_;
     size_t nMsgIds_;
     uint8_t minCoolF_;
