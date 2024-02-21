@@ -12,6 +12,12 @@ static lv_disp_draw_buf_t disp_buf;
 
 void esp_lvgl_log_cb(const char *buf) { ESP_LOGI("LV", "%s", buf); }
 
+void esp_lvgl_monitor_cb(struct _lv_disp_drv_t *disp_drv, uint32_t time, uint32_t px) {
+    ESP_LOGD("LV", "Refresh done: %lums %lupx", time, px);
+}
+
+void esp_lvgl_wait_cb(struct _lv_disp_drv_t *disp_drv) { taskYIELD(); }
+
 void init_touch() {
     /* Register an input device */
     lv_indev_drv_init(&indev_drv);
@@ -21,6 +27,18 @@ void init_touch() {
 }
 
 void init_display(gpio_num_t csPin) {
+    // Drive chip-select pin low. We'll need to make this dynamic if we ever want to use
+    // the sdcard. For some reason using the ESP32 host-based chip-select isn't working.
+    gpio_config_t io_conf = {
+        .pin_bit_mask = 1ULL << csPin,
+        .mode = GPIO_MODE_OUTPUT,
+        .pull_up_en = GPIO_PULLUP_DISABLE,
+        .pull_down_en = GPIO_PULLDOWN_DISABLE,
+        .intr_type = GPIO_INTR_DISABLE,
+    };
+    ESP_ERROR_CHECK(gpio_config(&io_conf));
+    ESP_ERROR_CHECK(gpio_set_level(csPin, 0));
+
     lv_log_register_print_cb(esp_lvgl_log_cb);
     lv_init();
     lvgl_driver_init();
@@ -38,6 +56,8 @@ void init_display(gpio_num_t csPin) {
     disp_drv.hor_res = 320;
     disp_drv.ver_res = 240;
     disp_drv.flush_cb = disp_driver_flush;
+    disp_drv.monitor_cb = esp_lvgl_monitor_cb;
+    disp_drv.wait_cb = esp_lvgl_wait_cb;
     disp_drv.draw_buf = &disp_buf;
 
 #if defined CONFIG_DISPLAY_ORIENTATION_PORTRAIT ||                                                 \
