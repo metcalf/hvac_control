@@ -51,6 +51,8 @@ SensorData Sensors::pollInternal() {
         return data;
     }
 
+    ESP_LOGD(TAG, "PHT updated: %.1f %.1f %lu", data.temp, data.humidity, data.pressurePa);
+
     uint16_t hpa = paToHpa(data.pressurePa);
 
     if (hpa != lastHpa) {
@@ -61,10 +63,16 @@ SensorData Sensors::pollInternal() {
         }
     }
 
-    err = co2_read(&data.co2);
+    bool co2_updated;
+    err = co2_read(&co2_updated, &data.co2);
     if (err != 0) {
         snprintf(data.errMsg, sizeof(data.errMsg), "CO2 read error %d", err);
         return data;
+    }
+    if (!co2_updated) {
+        ESP_LOGD(TAG, "CO2 not ready");
+    } else {
+        ESP_LOGD(TAG, "CO2 updated: %u", data.co2);
     }
 
     data.updateTime = std::chrono::steady_clock::now();

@@ -147,7 +147,7 @@ void UIManager::eHomeLoadStart() {
 void UIManager::eHomeUnloadStart() { lv_timer_pause(msgTimer_); }
 
 void UIManager::onMessageTimer() {
-    // TODO: It'd be nicer to make this a circular scroll
+    // TODO(future): It'd be nicer to make this a circular scroll
 
     lv_coord_t currY = lv_obj_get_scroll_y(ui_Footer);
 

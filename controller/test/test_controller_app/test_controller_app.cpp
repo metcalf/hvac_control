@@ -9,7 +9,6 @@
 #include "FakeWifi.h"
 #include "MockUIManager.h"
 #include "MockValveCtrl.h"
-#include "TestLogger.h"
 
 using ::testing::_;
 using ::testing::AtMost;
@@ -41,7 +40,7 @@ class ControllerAppTest : public testing::Test {
   protected:
     void SetUp() override {
         using namespace std::placeholders;
-        app_ = new TestControllerApp({}, &logger_, &uiManager_, &modbusController_, &sensors_,
+        app_ = new TestControllerApp({}, &uiManager_, &modbusController_, &sensors_,
                                      &demandController_, &valveCtrl_, &wifi_, configUpdateCb,
                                      std::bind(&ControllerAppTest::uiEvtRcv, this, _1, _2));
 
@@ -65,7 +64,6 @@ class ControllerAppTest : public testing::Test {
     FakeSensors sensors_;
     MockUIManager uiManager_;
     MockValveCtrl valveCtrl_;
-    TestLogger logger_;
     FakeWifi wifi_;
 
     ControllerDomain::Config savedConfig_;

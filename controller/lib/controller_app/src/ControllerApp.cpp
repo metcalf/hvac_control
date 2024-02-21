@@ -1,8 +1,9 @@
 #include "ControllerApp.h"
 
 #include <algorithm>
-
 #include <cstring>
+
+#include "esp_log.h"
 
 #define SCHEDULE_TIME_STR_ARGS(s) (s.startHr - 1) % 12 + 1, s.startMin, s.startHr < 12 ? 'a' : 'p'
 
@@ -29,11 +30,13 @@
 #define MIN_FAN_SPEED_VALUE (FanSpeed)10
 #define MIN_FAN_RUNNING_RPM 1000
 
+static const char *TAG = "CTRL";
+
 using FanSpeed = ControllerDomain::FanSpeed;
 using Setpoints = ControllerDomain::Setpoints;
 
 void ControllerApp::bootErr(const char *msg) {
-    log_->err("%s", msg);
+    ESP_LOGE(TAG, "%s", msg);
     uiManager_->bootErr(msg);
 }
 
@@ -170,7 +173,7 @@ FanSpeed ControllerApp::computeFanSpeed(DemandRequest *requests) {
         char errMsg[UI_MAX_MSG_LEN];
         snprintf(errMsg, sizeof(errMsg), "Error getting makeup demand: %d", err);
         setMessage(MsgID::GetMakeupDemandErr, false, errMsg);
-        log_->err("%s", errMsg);
+        ESP_LOGE(TAG, "%s", errMsg);
     }
 
     return fanSpeed;
@@ -178,7 +181,7 @@ FanSpeed ControllerApp::computeFanSpeed(DemandRequest *requests) {
 
 void ControllerApp::setFanSpeed(FanSpeed speed) {
     if (speed > 0 && speed < MIN_FAN_SPEED_VALUE) {
-        log_->err("Unexpected fan speeed 0<%d<%d: ", MIN_FAN_SPEED_VALUE, speed);
+        ESP_LOGE(TAG, "Unexpected fan speeed 0<%d<%d: ", MIN_FAN_SPEED_VALUE, speed);
         speed = 0;
     }
 
@@ -198,8 +201,8 @@ bool ControllerApp::pollUIEvent(bool wait) {
     switch (uiEvent.type) {
     case AbstractUIManager::EventType::SetSchedule: {
         ControllerDomain::Config::Schedule *schedules = uiEvent.payload.schedules;
-        log_->info(
-            "SetSchedule:\t%.1f/%.1f@%02d:%02d\t%.1f/%.1f@%02d:%02d",
+        ESP_LOGI(
+            TAG, "SetSchedule:\t%.1f/%.1f@%02d:%02d\t%.1f/%.1f@%02d:%02d",
             // Day
             schedules[0].heatC, schedules[0].coolC, schedules[0].startHr, schedules[0].startMin,
             // Night
@@ -216,12 +219,12 @@ bool ControllerApp::pollUIEvent(bool wait) {
         break;
     }
     case AbstractUIManager::EventType::SetCO2Target:
-        log_->info("SetCO2Target:\t%u", uiEvent.payload.co2Target);
+        ESP_LOGI(TAG, "SetCO2Target:\t%u", uiEvent.payload.co2Target);
         config_.co2Target = uiEvent.payload.co2Target;
         cfgUpdateCb_(config_);
         break;
     case AbstractUIManager::EventType::SetSystemPower:
-        log_->info("SetSystemPower:\t%d", uiEvent.payload.systemPower);
+        ESP_LOGI(TAG, "SetSystemPower:\t%d", uiEvent.payload.systemPower);
         config_.systemOn = uiEvent.payload.systemPower;
         cfgUpdateCb_(config_);
         if (config_.systemOn) {
@@ -237,40 +240,40 @@ bool ControllerApp::pollUIEvent(bool wait) {
         fanOverrideSpeed_ = uiEvent.payload.fanOverride.speed;
         fanOverrideUntil_ =
             steadyNow() + std::chrono::minutes{uiEvent.payload.fanOverride.timeMins};
-        log_->info("FanOveride:\tspeed=%u\tmins=%u", fanOverrideSpeed_,
-                   uiEvent.payload.fanOverride.timeMins);
+        ESP_LOGI(TAG, "FanOveride:\tspeed=%u\tmins=%u", fanOverrideSpeed_,
+                 uiEvent.payload.fanOverride.timeMins);
         // TODO: Implement "until" in this message
         setMessageF(MsgID::FanOverride, true, "Fan set to %u%%",
                     (uint8_t)(fanOverrideSpeed_ / 255.0 * 100));
         break;
     case AbstractUIManager::EventType::TempOverride: {
-        log_->info("TempOverride:\theat=%.1f\tcool=%.1f", uiEvent.payload.tempOverride.heatC,
-                   uiEvent.payload.tempOverride.coolC);
+        ESP_LOGI(TAG, "TempOverride:\theat=%.1f\tcool=%.1f", uiEvent.payload.tempOverride.heatC,
+                 uiEvent.payload.tempOverride.coolC);
         setTempOverride(uiEvent.payload.tempOverride);
         break;
     }
     case AbstractUIManager::EventType::ACOverride:
         switch (uiEvent.payload.acOverride) {
         case AbstractUIManager::ACOverride::Normal:
-            log_->info("ACOverride: NORMAL");
+            ESP_LOGI(TAG, "ACOverride: NORMAL");
             // Don't set to zero, updateACMode will handle that and clearing the message
             acMode_ = ACMode::Standby;
             clearMessage(MsgID::ACMode);
             break;
         case AbstractUIManager::ACOverride::Force:
             acMode_ = ACMode::On;
-            log_->info("ACOverride: ON");
+            ESP_LOGI(TAG, "ACOverride: ON");
             setMessage(MsgID::ACMode, true, "Forcing A/C on");
             break;
         case AbstractUIManager::ACOverride::Stop:
             acMode_ = ACMode::Off;
-            log_->info("ACOverride: OFF");
+            ESP_LOGI(TAG, "ACOverride: OFF");
             setMessage(MsgID::ACMode, true, "A/C disabled");
             break;
         }
         break;
     case AbstractUIManager::EventType::MsgCancel:
-        log_->info("MsgCancel: %s", msgIDToS((MsgID)uiEvent.payload.msgID));
+        ESP_LOGI(TAG, "MsgCancel: %s", msgIDToS((MsgID)uiEvent.payload.msgID));
         handleCancelMessage((MsgID)uiEvent.payload.msgID);
         break;
     }
@@ -306,7 +309,7 @@ void ControllerApp::handleCancelMessage(MsgID id) {
         break;
     }
     default:
-        log_->err("Unexpected message cancellation for: %d", static_cast<int>(id));
+        ESP_LOGE(TAG, "Unexpected message cancellation for: %d", static_cast<int>(id));
     }
 }
 
@@ -354,7 +357,7 @@ void ControllerApp::setHVAC(DemandRequest *requests, HVACState *states) {
             if (i == 0) {
                 valveCtrl_->setMode(cool, speed != FancoilSpeed::Off);
             } else {
-                log_->err("Not implemented: valves on secondary controller");
+                ESP_LOGE(TAG, "Not implemented: valves on secondary controller");
             }
             break;
         }
@@ -390,29 +393,29 @@ void ControllerApp::logState(ControllerDomain::FreshAirState &freshAirState,
                              ControllerDomain::DemandRequest requests[],
                              ControllerDomain::Setpoints setpoints[],
                              ControllerDomain::HVACState hvacStates[], FanSpeed fanSpeed) {
-    AbstractLogger::Level statusLevel;
+    esp_log_level_t statusLevel;
     auto now = steadyNow();
     if (now - lastStatusLog_ > STATUS_LOG_INTERVAL) {
-        statusLevel = AbstractLogger::Level::Info;
+        statusLevel = ESP_LOG_INFO;
         lastStatusLog_ = now;
     } else {
-        statusLevel = AbstractLogger::Level::Debug;
+        statusLevel = ESP_LOG_DEBUG;
     }
 
     if (freshAirState.pressurePa == 0) {
-        log_->log(statusLevel, "FreshAir: no data");
+        ESP_LOG_LEVEL(statusLevel, TAG, "FreshAir: no data");
     } else {
-        log_->log(
-            statusLevel,
-            "FreshAir:\traw_t=%.1f\tout_t=%.1f\th=%.1f\tp=%u\trpm=%u\ttarget_speed=%u\treason=%s",
+        ESP_LOG_LEVEL(
+            statusLevel, TAG,
+            "FreshAir:\traw_t=%.1f\tout_t=%.1f\th=%.1f\tp=%lu\trpm=%u\ttarget_speed=%u\treason=%s",
             freshAirState.temp, outdoorTempC_, freshAirState.humidity, freshAirState.pressurePa,
             fanSpeed, freshAirState.fanRpm, fanSpeedReason_);
     }
     for (int i = 0; i < nControllers_; i++) {
-        log_->log(
-            statusLevel,
+        ESP_LOG_LEVEL(
+            statusLevel, TAG,
             "ctrl(%d):"
-            "\tt=%0.1f\th=%0.1f\tp=%u\tco2=%u"                                          // Sensors
+            "\tt=%0.1f\th=%0.1f\tp=%lu\tco2=%u"                                         // Sensors
             "\tset_h=%.1f\tset_c=%.1f\tset_co2=%u\tset_r=%s"                            // Setpoints
             "\tt_vent=%u\tt_cool=%u\tmax_cool=%u\tmax_vent=%u\tfc_speed=%s\tfc_cool=%d" // DemandRequest
             "\thvac=%s",                                                                // HVACState
@@ -580,7 +583,7 @@ void ControllerApp::handleFreshAirState(ControllerDomain::FreshAirState *freshAi
         char errMsg[UI_MAX_MSG_LEN];
         snprintf(errMsg, sizeof(errMsg), "Error getting fresh air state: %d", err);
         setMessage(MsgID::GetFreshAirStateErr, false, errMsg);
-        log_->err("%s", errMsg);
+        ESP_LOGE(TAG, "%s", errMsg);
     }
 
     if (now - lastOutdoorTempUpdate_ > OUTDOOR_TEMP_MAX_AGE) {
@@ -630,7 +633,7 @@ void ControllerApp::task(bool firstTime) {
         uiManager_->setInTempC(sensorData[0].temp);
         uiManager_->setInCO2(sensorData[0].co2);
     } else {
-        log_->err(sensorData[0].errMsg);
+        ESP_LOGE(TAG, "%s", sensorData[0].errMsg);
         setMessage(MsgID::SensorErr, false, sensorData[0].errMsg);
     }
 
@@ -644,7 +647,7 @@ void ControllerApp::task(bool firstTime) {
             char errMsg[UI_MAX_MSG_LEN];
             snprintf(errMsg, sizeof(errMsg), "Sec ctrl err: %d", err);
             setMessage(MsgID::SecondaryControllerErr, false, errMsg);
-            log_->err("%s", errMsg);
+            ESP_LOGE(TAG, "%s", errMsg);
         }
 
         requests[1] = demandController_->update(sensorData[1], setpoints[1], outdoorTempC_);

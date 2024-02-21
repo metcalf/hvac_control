@@ -10,7 +10,6 @@
 
 #include "ControllerApp.h"
 #include "DemandController.h"
-#include "ESPLogger.h"
 #include "ESPWifi.h"
 #include "ModbusController.h"
 #include "Sensors.h"
@@ -48,7 +47,6 @@ static ValveCtrl *valveCtrl_;
 static Sensors sensors_;
 static DemandController demandController_;
 static QueueHandle_t uiEvtQueue_;
-static ESPLogger logger_;
 static ESPWifi wifi_;
 
 void sensorTask(void *sensors) {
@@ -116,8 +114,8 @@ extern "C" void controller_main() {
     modbusController_ = new ModbusController(config.hasMakeupDemand);
     valveCtrl_ = new ValveCtrl(config.heatType == Config::HVACType::Valve,
                                config.coolType == Config::HVACType::Valve);
-    app_ = new ControllerApp(config, &logger_, uiManager_, modbusController_, &sensors_,
-                             &demandController_, valveCtrl_, &wifi_, app_config_save, uiEvtRcv);
+    app_ = new ControllerApp(config, uiManager_, modbusController_, &sensors_, &demandController_,
+                             valveCtrl_, &wifi_, app_config_save, uiEvtRcv);
     xTaskCreate(uiTask, "uiTask", UI_TASK_STACK_SIZE, uiManager_, UI_TASK_PRIO, NULL);
 
     setenv("TZ", POSIX_TZ_STR, 1);
@@ -125,9 +123,9 @@ extern "C" void controller_main() {
 
     // TODO: Setup OTA updates
     // TODO: Remote logging
+    // TODO: Use interrupt pin for touchscreen events
     wifi_.init();
-    // TODO: connect
-    // wifi_.connect();
+    wifi_.connect();
 
     if (!sensors_.init()) {
         snprintf(bootErrMsg, sizeof(bootErrMsg), "Sensor init error");

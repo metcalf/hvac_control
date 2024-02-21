@@ -4,7 +4,6 @@
 #include <functional>
 
 #include "AbstractDemandController.h"
-#include "AbstractLogger.h"
 #include "AbstractModbusController.h"
 #include "AbstractSensors.h"
 #include "AbstractUIManager.h"
@@ -18,12 +17,11 @@ class ControllerApp {
     typedef std::function<bool(AbstractUIManager::Event *, uint16_t)> uiEvtRcv_t;
     //typedef bool (*uiEvtRcv_t)(AbstractUIManager::Event *evt, uint16_t waitMs);
 
-    ControllerApp(ControllerDomain::Config config, AbstractLogger *log,
-                  AbstractUIManager *uiManager, AbstractModbusController *modbusController,
-                  AbstractSensors *sensors, AbstractDemandController *demandController,
-                  AbstractValveCtrl *valveCtrl, AbstractWifi *wifi, cfgUpdateCb_t cfgUpdateCb,
-                  const uiEvtRcv_t &uiEvtRcv)
-        : log_(log), uiManager_(uiManager), modbusController_(modbusController), sensors_(sensors),
+    ControllerApp(ControllerDomain::Config config, AbstractUIManager *uiManager,
+                  AbstractModbusController *modbusController, AbstractSensors *sensors,
+                  AbstractDemandController *demandController, AbstractValveCtrl *valveCtrl,
+                  AbstractWifi *wifi, cfgUpdateCb_t cfgUpdateCb, const uiEvtRcv_t &uiEvtRcv)
+        : uiManager_(uiManager), modbusController_(modbusController), sensors_(sensors),
           demandController_(demandController), valveCtrl_(valveCtrl), wifi_(wifi),
           cfgUpdateCb_(cfgUpdateCb), uiEvtRcv_(uiEvtRcv) {
         setConfig(config);
@@ -145,7 +143,6 @@ class ControllerApp {
     void checkWifiState();
 
     Config config_;
-    AbstractLogger *log_;
     AbstractUIManager *uiManager_;
     AbstractModbusController *modbusController_;
     AbstractSensors *sensors_;

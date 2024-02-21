@@ -20,14 +20,14 @@ void init_touch() {
     assert(lv_indev_drv_register(&indev_drv) != NULL);
 }
 
-void init_display() {
+void init_display(gpio_num_t csPin) {
     lv_log_register_print_cb(esp_lvgl_log_cb);
     lv_init();
     lvgl_driver_init();
 
-    lv_color_t *buf1 = heap_caps_malloc(DISP_BUF_SIZE * sizeof(lv_color_t), MALLOC_CAP_SPIRAM);
+    lv_color_t *buf1 = heap_caps_malloc(DISP_BUF_SIZE * sizeof(lv_color_t), MALLOC_CAP_DMA);
     assert(buf1);
-    lv_color_t *buf2 = heap_caps_malloc(DISP_BUF_SIZE * sizeof(lv_color_t), MALLOC_CAP_SPIRAM);
+    lv_color_t *buf2 = heap_caps_malloc(DISP_BUF_SIZE * sizeof(lv_color_t), MALLOC_CAP_DMA);
     assert(buf2);
 
     lv_disp_draw_buf_init(&disp_buf, buf1, buf2, DISP_BUF_SIZE);
@@ -35,8 +35,8 @@ void init_display() {
     /*Initialize the display*/
     static lv_disp_drv_t disp_drv;
     lv_disp_drv_init(&disp_drv);
-    disp_drv.hor_res = 480;
-    disp_drv.ver_res = 320;
+    disp_drv.hor_res = 320;
+    disp_drv.ver_res = 240;
     disp_drv.flush_cb = disp_driver_flush;
     disp_drv.draw_buf = &disp_buf;
 
