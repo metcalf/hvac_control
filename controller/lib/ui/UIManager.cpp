@@ -153,7 +153,7 @@ void UIManager::eSchedule() {
                                {
                                    .heatC = getHeatRollerValue(ui_Night_heat_setpoint),
                                    .coolC = getHeatRollerValue(ui_Night_cool_setpoint),
-                                   .startHr = (uint8_t)lv_roller_get_selected(ui_Night_hr),
+                                   .startHr = (uint8_t)(lv_roller_get_selected(ui_Night_hr) + 12),
                                    .startMin = (uint8_t)lv_roller_get_selected(ui_Night_min),
                                },
                            }}};
@@ -194,12 +194,17 @@ void UIManager::eScheduleLoadStart() {
     lv_roller_set_selected(ui_Day_cool_setpoint,
                            std::round(ABS_C_TO_F(currSchedules_[0].coolC)) - minCoolDeg_,
                            LV_ANIM_OFF);
+    lv_roller_set_selected(ui_Day_hr, currSchedules_[0].startHr, LV_ANIM_OFF);
+    lv_roller_set_selected(ui_Day_min, currSchedules_[0].startMin, LV_ANIM_OFF);
+
     lv_roller_set_selected(ui_Night_heat_setpoint,
                            std::round(ABS_C_TO_F(currSchedules_[1].heatC)) - minHeatDeg_,
                            LV_ANIM_OFF);
     lv_roller_set_selected(ui_Night_cool_setpoint,
                            std::round(ABS_C_TO_F(currSchedules_[1].coolC)) - minCoolDeg_,
                            LV_ANIM_OFF);
+    lv_roller_set_selected(ui_Night_hr, currSchedules_[1].startHr - 12, LV_ANIM_OFF);
+    lv_roller_set_selected(ui_Night_min, currSchedules_[1].startMin, LV_ANIM_OFF);
 }
 
 void UIManager::onMessageTimer() {

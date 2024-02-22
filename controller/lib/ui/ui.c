@@ -335,7 +335,7 @@ if ( event_code == LV_EVENT_SCREEN_LOAD_START) {
 void ui_event_Schedule_header_Setting_back_button( lv_event_t * e) {
     lv_event_code_t event_code = lv_event_get_code(e);lv_obj_t * target = lv_event_get_target(e);
 if ( event_code == LV_EVENT_CLICKED) {
-      _ui_screen_change( &ui_Home, LV_SCR_LOAD_ANIM_NONE, 0, 0, &ui_Home_screen_init);
+      _ui_screen_change( &ui_Thermostat, LV_SCR_LOAD_ANIM_NONE, 0, 0, &ui_Thermostat_screen_init);
 }
 }
 void ui_event_Schedule_header_Setting_accept_button( lv_event_t * e) {

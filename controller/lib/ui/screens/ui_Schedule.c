@@ -144,7 +144,7 @@ lv_obj_set_align( ui_Day_hrs_container, LV_ALIGN_LEFT_MID );
 lv_obj_clear_flag( ui_Day_hrs_container, LV_OBJ_FLAG_SCROLLABLE );    /// Flags
 
 ui_Day_hr = lv_roller_create(ui_Day_hrs_container);
-lv_roller_set_options( ui_Day_hr, "01\n02\n03\n04\n05\n06\n07\n08\n09\n10\n11\n12", LV_ROLLER_MODE_NORMAL );
+lv_roller_set_options( ui_Day_hr, "12\n1\n2\n3\n4\n5\n6\n7\n8\n9\n10\n11", LV_ROLLER_MODE_NORMAL );
 lv_obj_set_height( ui_Day_hr, 100);
 lv_obj_set_width( ui_Day_hr, LV_SIZE_CONTENT);  /// 1
 lv_obj_set_align( ui_Day_hr, LV_ALIGN_TOP_MID );
@@ -281,7 +281,7 @@ lv_obj_set_align( ui_Night_hrs_container, LV_ALIGN_LEFT_MID );
 lv_obj_clear_flag( ui_Night_hrs_container, LV_OBJ_FLAG_SCROLLABLE );    /// Flags
 
 ui_Night_hr = lv_roller_create(ui_Night_hrs_container);
-lv_roller_set_options( ui_Night_hr, "01\n02\n03\n04\n05\n06\n07\n08\n09\n10\n11\n12", LV_ROLLER_MODE_NORMAL );
+lv_roller_set_options( ui_Night_hr, "12\n1\n2\n3\n4\n5\n6\n7\n8\n9\n10\n11", LV_ROLLER_MODE_NORMAL );
 lv_obj_set_height( ui_Night_hr, 100);
 lv_obj_set_width( ui_Night_hr, LV_SIZE_CONTENT);  /// 1
 lv_obj_set_align( ui_Night_hr, LV_ALIGN_TOP_MID );
@@ -320,7 +320,7 @@ ui_Label20 = lv_label_create(ui_Night_time_container);
 lv_obj_set_width( ui_Label20, LV_SIZE_CONTENT);  /// 1
 lv_obj_set_height( ui_Label20, LV_SIZE_CONTENT);   /// 1
 lv_obj_set_align( ui_Label20, LV_ALIGN_BOTTOM_MID );
-lv_label_set_text(ui_Label20,"START (AM)");
+lv_label_set_text(ui_Label20,"START (PM)");
 lv_obj_set_style_text_color(ui_Label20, lv_color_hex(0x808080), LV_PART_MAIN | LV_STATE_DEFAULT );
 lv_obj_set_style_text_opa(ui_Label20, 255, LV_PART_MAIN| LV_STATE_DEFAULT);
 lv_obj_set_style_text_font(ui_Label20, &lv_font_montserrat_18, LV_PART_MAIN| LV_STATE_DEFAULT);
