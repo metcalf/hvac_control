@@ -1,6 +1,7 @@
 #pragma once
 
 #include <chrono>
+#include <cmath>
 #include <stdint.h>
 
 #define NUM_SCHEDULE_TIMES 2
@@ -23,7 +24,7 @@ struct FreshAirState {
 };
 
 struct SensorData {
-    double temp, humidity;
+    double temp = std::nan(""), humidity = std::nan("");
     uint32_t pressurePa;
     uint16_t co2;
     std::chrono::steady_clock::time_point updateTime;

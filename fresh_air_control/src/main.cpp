@@ -104,7 +104,7 @@ int main(void) {
 
     // High-byte runs at a bit less than 1.2khz to support full 8 bit range
     // 20e6 CPU / 64 prescaler / 256
-    // Low byte runs at exactly 2khz to act as a tick counter
+    // Low byte runs at ~2khz to act as a tick counter
     // 20e6 CPU / 64 prescaler / 156
     TCA0.SPLIT.LPER = 156;
 

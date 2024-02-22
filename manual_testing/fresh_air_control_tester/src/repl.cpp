@@ -6,6 +6,8 @@
 #include "esp_console.h"
 #include "esp_log.h"
 
+#include "modbus_client.h"
+
 #define LEDC_TIMER LEDC_TIMER_0
 #define LEDC_MODE LEDC_LOW_SPEED_MODE
 #define LEDC_OUTPUT_IO (5) // Define the output GPIO
@@ -21,13 +23,16 @@ static struct {
     struct arg_end *end;
 } set_pwm_args;
 
-static repl_set_speed_func set_speed_;
-static repl_fetch_func fetch_;
-
 static struct {
     struct arg_int *speed;
     struct arg_end *end;
 } set_speed_args;
+
+static struct {
+    struct arg_str *mode;
+    struct arg_int *speed;
+    struct arg_end *end;
+} set_fancoil_args;
 
 static int set_pwm_cmd(int argc, char **argv) {
     int nerrors = arg_parse(argc, argv, (void **)&set_pwm_args);
@@ -106,7 +111,7 @@ static int set_speed_cmd(int argc, char **argv) {
         return 1;
     }
 
-    esp_err_t err = set_speed_((uint8_t)speed);
+    esp_err_t err = set_fan_speed((uint8_t)speed);
 
     return err;
 }
@@ -123,7 +128,7 @@ static void register_set_speed() {
     ESP_ERROR_CHECK(esp_console_cmd_register(&cmd));
 }
 
-static int fetch_cmd(int argc, char **argv) { return fetch_(); }
+static int fetch_cmd(int argc, char **argv) { return read_fresh_air_data(); }
 
 static void register_fetch() {
     const esp_console_cmd_t cmd = {.command = "fetch",
@@ -134,10 +139,53 @@ static void register_fetch() {
     ESP_ERROR_CHECK(esp_console_cmd_register(&cmd));
 }
 
-void repl_start(repl_set_speed_func set_speed, repl_fetch_func fetch) {
-    set_speed_ = set_speed;
-    fetch_ = fetch;
+static int makeup_cmd(int argc, char **argv) { return read_makeup(); }
 
+static void register_makeup() {
+    const esp_console_cmd_t cmd = {.command = "makeup",
+                                   .help = "read makeup air status",
+                                   .hint = NULL,
+                                   .func = &makeup_cmd,
+                                   .argtable = NULL};
+    ESP_ERROR_CHECK(esp_console_cmd_register(&cmd));
+}
+
+static int set_fancoil_cmd(int argc, char **argv) {
+    int nerrors = arg_parse(argc, argv, (void **)&set_fancoil_args);
+    if (nerrors != 0) {
+        arg_print_errors(stderr, set_fancoil_args.end, argv[0]);
+        return 1;
+    }
+
+    char mode = set_fancoil_args.mode->sval[0][0];
+    if (mode != 'h' && mode != 'c') {
+        ESP_LOGE(TAG, "mode must be h or c, got: %c", mode);
+        return 1;
+    }
+
+    int speed = set_fancoil_args.speed->ival[0];
+    if (speed < 0 || speed > 3) {
+        ESP_LOGE(TAG, "speed must be 0-3, got: %d", speed);
+        return 1;
+    }
+
+    return set_fancoil(mode == 'c', (FancoilSpeed)(speed));
+}
+
+static void register_fancoil() {
+    set_fancoil_args.mode = arg_str1(NULL, NULL, "<h/c>", "heat/cool");
+    set_fancoil_args.speed = arg_int1(NULL, NULL, "<0,1,2,3>", "speed");
+    set_fancoil_args.end = arg_end(1);
+
+    const esp_console_cmd_t cmd = {.command = "fc",
+                                   .help = "Set fancoil",
+                                   .hint = NULL,
+                                   .func = &set_fancoil_cmd,
+                                   .argtable = &set_fancoil_args};
+    ESP_ERROR_CHECK(esp_console_cmd_register(&cmd));
+}
+
+void repl_start() {
     esp_console_repl_t *repl = NULL;
     esp_console_repl_config_t repl_config = ESP_CONSOLE_REPL_CONFIG_DEFAULT();
     repl_config.prompt = ">";
@@ -147,6 +195,8 @@ void repl_start(repl_set_speed_func set_speed, repl_fetch_func fetch) {
     esp_console_register_help_command();
     register_set_speed();
     register_fetch();
+    register_makeup();
+    register_fancoil();
 
     register_set_pwm();
     init_pwm();

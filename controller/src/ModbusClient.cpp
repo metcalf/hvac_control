@@ -156,7 +156,7 @@ esp_err_t ModbusClient::init() {
 }
 
 esp_err_t ModbusClient::getFreshAirState(FreshAirState *state) {
-    uint16_t data[4];
+    uint16_t data[4] = {0};
     esp_err_t err = getParam(CID::FreshAirState, (uint8_t *)&data);
 
     if (err == ESP_OK) {
@@ -175,7 +175,7 @@ esp_err_t ModbusClient::setFreshAirSpeed(FanSpeed speed) {
 }
 
 esp_err_t ModbusClient::getMakeupDemand(bool *demand) {
-    uint16_t data;
+    uint16_t data = 0;
     esp_err_t err = getParam(CID::MakeupDemandState, (uint8_t *)&data);
 
     if (err == ESP_OK) {
@@ -187,7 +187,7 @@ esp_err_t ModbusClient::getMakeupDemand(bool *demand) {
 
 esp_err_t ModbusClient::setFancoil(FancoilID id,
                                    ControllerDomain::DemandRequest::FancoilRequest req) {
-    uint16_t v = (static_cast<uint16_t>(req.speed) << 2) | (req.cool && 0x01);
+    uint16_t v = (static_cast<uint16_t>(req.speed) << 1) | (req.cool && 0x01);
     CID cid;
     switch (id) {
     case FancoilID::Prim:

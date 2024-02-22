@@ -38,62 +38,73 @@ bool Sensors::init() {
     return ok;
 }
 
-SensorData Sensors::pollInternal() {
+bool Sensors::pollInternal(SensorData &prevData) {
     int8_t err;
 
-    SensorData data;
+    double temp, humidity;
+    uint32_t pressurePa;
 
-    uint16_t lastHpa = paToHpa(data.pressurePa);
+    uint16_t lastHpa = paToHpa(prevData.pressurePa);
 
-    err = bme280_get_latest(&data.temp, &data.humidity, &data.pressurePa);
+    err = bme280_get_latest(&temp, &humidity, &pressurePa);
     if (err != 0) {
-        snprintf(data.errMsg, sizeof(data.errMsg), "PHT poll error %d", err);
-        return data;
+        snprintf(prevData.errMsg, sizeof(prevData.errMsg), "PHT poll error %d", err);
+        return false;
     }
 
-    ESP_LOGD(TAG, "PHT updated: %.1f %.1f %lu", data.temp, data.humidity, data.pressurePa);
+    prevData.temp = temp;
+    prevData.humidity = humidity;
+    prevData.pressurePa = pressurePa;
 
-    uint16_t hpa = paToHpa(data.pressurePa);
+    ESP_LOGD(TAG, "PHT updated: %.1f %.1f %lu", prevData.temp, prevData.humidity,
+             prevData.pressurePa);
+
+    uint16_t hpa = paToHpa(prevData.pressurePa);
 
     if (hpa != lastHpa) {
         err = co2_set_pressure(hpa);
         if (err != 0) {
-            snprintf(data.errMsg, sizeof(data.errMsg), "CO2 set pressure error %d", err);
-            return data;
+            snprintf(prevData.errMsg, sizeof(prevData.errMsg), "CO2 set pressure error %d", err);
+            return false;
         }
     }
 
     bool co2_updated;
-    err = co2_read(&co2_updated, &data.co2);
+    uint16_t co2;
+    err = co2_read(&co2_updated, &co2);
     if (err != 0) {
-        snprintf(data.errMsg, sizeof(data.errMsg), "CO2 read error %d", err);
-        return data;
+        snprintf(prevData.errMsg, sizeof(prevData.errMsg), "CO2 read error %d", err);
+        return false;
     }
-    if (!co2_updated) {
-        ESP_LOGD(TAG, "CO2 not ready");
+    if (co2_updated) {
+        prevData.co2 = co2;
+        ESP_LOGD(TAG, "CO2 updated: %u", prevData.co2);
     } else {
-        ESP_LOGD(TAG, "CO2 updated: %u", data.co2);
+        ESP_LOGD(TAG, "CO2 not ready");
     }
 
-    data.updateTime = std::chrono::steady_clock::now();
-    data.errMsg[0] = 0;
+    prevData.updateTime = std::chrono::steady_clock::now();
+    prevData.errMsg[0] = 0;
 
-    return data;
+    return co2_updated;
 }
 
 bool Sensors::poll() {
-    SensorData data = pollInternal();
+    xSemaphoreTake(mutex_, portMAX_DELAY);
+    SensorData data = lastData_;
+    xSemaphoreGive(mutex_);
+
+    bool res = pollInternal(data);
 
     xSemaphoreTake(mutex_, portMAX_DELAY);
     lastData_ = data;
     xSemaphoreGive(mutex_);
 
-    if (strlen(data.errMsg) == 0) {
-        return true;
-    } else {
+    if (strlen(data.errMsg) > 0) {
         ESP_LOGE(TAG, "%s", data.errMsg);
-        return false;
     }
+
+    return res;
 }
 
 SensorData Sensors::getLatest() {

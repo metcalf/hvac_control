@@ -24,15 +24,15 @@ void ModbusController::task() {
         }
         if (bits &
             (requestBits(RequestType::SetFancoilPrim) | requestBits(RequestType::SetFancoilSec))) {
-            xSemaphoreTake(mutex_, portMAX_DELAY);
             FancoilID id;
             if (bits & requestBits(RequestType::SetFancoilPrim)) {
                 id = FancoilID::Prim;
             } else {
                 id = FancoilID::Sec;
             }
-            ControllerDomain::DemandRequest::FancoilRequest req = requestFancoil_;
 
+            xSemaphoreTake(mutex_, portMAX_DELAY);
+            ControllerDomain::DemandRequest::FancoilRequest req = requestFancoil_;
             xSemaphoreGive(mutex_);
 
             err = client_.setFancoil(id, req);
@@ -45,21 +45,26 @@ void ModbusController::task() {
         // through the loop even though this happens both at the poll interval and on
         // every set* request. Extra queries are harmless and it makes the code simpler.
         if (hasMakeupDemand_) {
-            err = client_.getMakeupDemand(&makeupDemand_);
+            bool makeupDemand;
+
+            err = client_.getMakeupDemand(&makeupDemand);
 
             xSemaphoreTake(mutex_, portMAX_DELAY);
             makeupDemandErr_ = err;
             if (makeupDemandErr_ == ESP_OK) {
+                makeupDemand_ = makeupDemand;
                 lastMakeupDemand_ = now;
             }
             xSemaphoreGive(mutex_);
         }
 
-        err = client_.getFreshAirState(&freshAirState_);
+        FreshAirState freshAirState;
+        err = client_.getFreshAirState(&freshAirState);
 
         xSemaphoreTake(mutex_, portMAX_DELAY);
         freshAirStateErr_ = err;
         if (freshAirStateErr_ == ESP_OK) {
+            freshAirState_ = freshAirState;
             lastFreshAirState_ = now;
         }
         xSemaphoreGive(mutex_);
@@ -77,6 +82,7 @@ void ModbusController::task() {
         // Don't write data to the secondary unless it has been written
         // by the main loop
         if (!(speedSet_ && hvacStateSet_ && outTempSet_ && systemOnSet_)) {
+            xSemaphoreGive(mutex_);
             continue;
         }
 

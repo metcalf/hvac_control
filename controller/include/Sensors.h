@@ -25,5 +25,5 @@ class Sensors : public AbstractSensors {
     SensorData lastData_;
     SemaphoreHandle_t mutex_;
 
-    SensorData pollInternal();
+    bool pollInternal(SensorData &);
 };

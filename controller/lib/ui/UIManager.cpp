@@ -53,6 +53,7 @@ double UIManager::getCoolRollerValue(lv_obj_t *roller) {
 }
 
 void UIManager::setupTempRoller(lv_obj_t *roller, uint8_t minDeg, uint8_t maxDeg) {
+    // TODO: Maintain required degree separate between temp rollers
     assert(maxDeg > minDeg);
     assert(maxDeg < 100);
 
@@ -286,7 +287,12 @@ UIManager::UIManager(ControllerDomain::Config config, size_t nMsgIds, eventCb_t 
 
 void UIManager::setHumidity(double h) {
     xSemaphoreTake(mutex_, portMAX_DELAY);
-    lv_label_set_text_fmt(ui_Humidity_value, "%u%%", std::min(99U, (uint)std::round(h)));
+    if (std::isnan(h)) {
+        lv_label_set_text(ui_Humidity_value, "--%");
+    } else {
+        lv_label_set_text_fmt(ui_Humidity_value, "%u%%", std::min(99U, (uint)std::round(h)));
+    }
+
     xSemaphoreGive(mutex_);
 }
 
@@ -303,7 +309,7 @@ void UIManager::setCurrentFanSpeed(uint8_t speed) {
 void UIManager::setOutTempC(double tc) {
     xSemaphoreTake(mutex_, portMAX_DELAY);
     if (std::isnan(tc)) {
-        lv_label_set_text(ui_Out_temp_value, "--");
+        lv_label_set_text(ui_Out_temp_value, "--°");
     } else {
         lv_label_set_text_fmt(ui_Out_temp_value, "%u°", (uint)std::round(ABS_C_TO_F(tc)));
     }
@@ -311,7 +317,13 @@ void UIManager::setOutTempC(double tc) {
 }
 
 void UIManager::setInTempC(double tc) {
-    lv_label_set_text_fmt(ui_Indoor_temp_value, "%u°", (uint)std::round(ABS_C_TO_F(tc)));
+    xSemaphoreTake(mutex_, portMAX_DELAY);
+    if (std::isnan(tc)) {
+        lv_label_set_text(ui_Indoor_temp_value, "--°");
+    } else {
+        lv_label_set_text_fmt(ui_Indoor_temp_value, "%u", (uint)std::round(ABS_C_TO_F(tc)));
+    }
+    xSemaphoreGive(mutex_);
 }
 
 void UIManager::setInCO2(uint16_t ppm) {
