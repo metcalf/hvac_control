@@ -1,0 +1,8 @@
+{
+  "name": "printf_esp_log",
+  "version": "0.0.0",
+  "build": {
+    "includeDir": ".",
+    "headers": "esp_log.h"
+  }
+}
