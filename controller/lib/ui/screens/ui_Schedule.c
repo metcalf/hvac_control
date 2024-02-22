@@ -325,6 +325,8 @@ lv_obj_set_style_text_color(ui_Label20, lv_color_hex(0x808080), LV_PART_MAIN | L
 lv_obj_set_style_text_opa(ui_Label20, 255, LV_PART_MAIN| LV_STATE_DEFAULT);
 lv_obj_set_style_text_font(ui_Label20, &lv_font_montserrat_18, LV_PART_MAIN| LV_STATE_DEFAULT);
 
-lv_obj_add_event_cb(ui_comp_get_child(ui_Schedule_header, UI_COMP_SETTING_HEADER_SETTING_ACCEPT_BUTTON_SETTING_ACCEPT_LABEL), ui_event_Schedule_header_Setting_accept_button_Setting_accept_label, LV_EVENT_ALL, NULL);
+lv_obj_add_event_cb(ui_comp_get_child(ui_Schedule_header, UI_COMP_SETTING_HEADER_SETTING_BACK_BUTTON), ui_event_Schedule_header_Setting_back_button, LV_EVENT_ALL, NULL);
+lv_obj_add_event_cb(ui_comp_get_child(ui_Schedule_header, UI_COMP_SETTING_HEADER_SETTING_ACCEPT_BUTTON), ui_event_Schedule_header_Setting_accept_button, LV_EVENT_ALL, NULL);
+lv_obj_add_event_cb(ui_Schedule, ui_event_Schedule, LV_EVENT_ALL, NULL);
 
 }

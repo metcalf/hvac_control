@@ -3317,7 +3317,6 @@
                           {
                             "nid": 360639779,
                             "strtype": "CHANGE SCREEN/Speed",
-                            "integer": 500,
                             "InheritedType": 6
                           },
                           {
@@ -8783,7 +8782,6 @@
                           {
                             "nid": 1122285171,
                             "strtype": "CHANGE SCREEN/Speed",
-                            "integer": 500,
                             "InheritedType": 6
                           },
                           {
@@ -8798,7 +8796,8 @@
                     "InheritedType": 4
                   }
                 ],
-                "saved_objtypeKey": "CONTAINER"
+                "saved_objtypeKey": "CONTAINER",
+                "tree_closed": true
               },
               {
                 "guid": "GUID61386825-838121S479330",
@@ -11217,7 +11216,6 @@
                           {
                             "nid": 2129032468,
                             "strtype": "CHANGE SCREEN/Speed",
-                            "integer": 500,
                             "InheritedType": 6
                           },
                           {
@@ -13331,7 +13329,6 @@
                           {
                             "nid": 1387507871,
                             "strtype": "CHANGE SCREEN/Speed",
-                            "integer": 500,
                             "InheritedType": 6
                           },
                           {
@@ -14361,7 +14358,6 @@
                           {
                             "nid": -848346412,
                             "strtype": "CHANGE SCREEN/Speed",
-                            "integer": 500,
                             "InheritedType": 6
                           },
                           {
@@ -21048,7 +21044,6 @@
                           {
                             "nid": -409237401,
                             "strtype": "CHANGE SCREEN/Speed",
-                            "integer": 500,
                             "InheritedType": 6
                           },
                           {
@@ -22116,7 +22111,6 @@
                           {
                             "nid": -952954739,
                             "strtype": "CHANGE SCREEN/Speed",
-                            "integer": 500,
                             "InheritedType": 6
                           },
                           {
@@ -25485,7 +25479,6 @@
                               {
                                 "nid": 1800213241,
                                 "strtype": "CHANGE SCREEN/Speed",
-                                "integer": 500,
                                 "InheritedType": 6
                               },
                               {
@@ -31695,7 +31688,6 @@
                           {
                             "nid": 1500641614,
                             "strtype": "CHANGE SCREEN/Speed",
-                            "integer": 500,
                             "InheritedType": 6
                           },
                           {
@@ -32763,7 +32755,6 @@
                           {
                             "nid": 533544296,
                             "strtype": "CHANGE SCREEN/Speed",
-                            "integer": 500,
                             "InheritedType": 6
                           },
                           {
@@ -36846,7 +36837,6 @@
                           {
                             "nid": 785794189,
                             "strtype": "CHANGE SCREEN/Speed",
-                            "integer": 500,
                             "InheritedType": 6
                           },
                           {
@@ -37914,7 +37904,6 @@
                           {
                             "nid": 1849096364,
                             "strtype": "CHANGE SCREEN/Speed",
-                            "integer": 500,
                             "InheritedType": 6
                           },
                           {
@@ -48404,7 +48393,7 @@
     "theme_color2": 0,
     "uiExportFolderPath": "/Users/andrew/code/hvac_control/controller/lib/ui",
     "projectExportFolderPath": "",
-    "backup_cnt": 2367,
+    "backup_cnt": 2379,
     "autosave_cnt": 0,
     "lvgl_version": "8.3.6",
     "callfuncsexport": "CPP_FILE",

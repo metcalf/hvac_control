@@ -9,6 +9,8 @@
 #include "ui.h"
 #include "ui_events.h"
 
+#include "esp_log.h"
+
 class UIManager : public AbstractUIManager {
   public:
     UIManager(ControllerDomain::Config config, size_t nMsgIds, eventCb_t eventCb);
@@ -21,7 +23,6 @@ class UIManager : public AbstractUIManager {
         vSemaphoreDelete(mutex_);
     }
 
-    void tick(uint32_t ms) { lv_tick_inc(ms); }
     uint32_t handleTasks() {
         xSemaphoreTake(mutex_, portMAX_DELAY);
         auto rv = lv_timer_handler();
@@ -58,6 +59,9 @@ class UIManager : public AbstractUIManager {
     void eSchedule();
     void eHomeLoadStart();
     void eHomeUnloadStart();
+    void eCO2LoadStart();
+    void eThermostatLoadStart();
+    void eScheduleLoadStart();
 
     static void setEventsInst(UIManager *inst) { eventsInst_ = inst; }
     static UIManager *eventsInst() { return eventsInst_; }
@@ -87,6 +91,7 @@ class UIManager : public AbstractUIManager {
     void sendPowerEvent(bool on);
     double getHeatRollerValue(lv_obj_t *roller);
     double getCoolRollerValue(lv_obj_t *roller);
+    void setupTempRoller(lv_obj_t *roller, uint8_t minDeg, uint8_t maxDeg);
     MessageContainer *focusedMessage();
 
     inline static UIManager *eventsInst_;
@@ -94,8 +99,12 @@ class UIManager : public AbstractUIManager {
     SemaphoreHandle_t mutex_;
     MessageContainer **messages_;
     size_t nMsgIds_;
-    uint8_t minCoolF_;
     lv_timer_t *msgTimer_;
     lv_coord_t msgHeight_;
     eventCb_t eventCb_;
+
+    uint16_t co2Target_;
+    uint8_t minHeatDeg_ = 50, maxHeatDeg_, minCoolDeg_, maxCoolDeg_ = 99, currHeatDeg_,
+            currCoolDeg_;
+    ControllerDomain::Config::Schedule currSchedules_[NUM_SCHEDULE_TIMES];
 };

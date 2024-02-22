@@ -125,7 +125,10 @@
       "charconv": "cpp",
       "any": "cpp",
       "unordered_set": "cpp",
-      "iomanip": "cpp"
+      "iomanip": "cpp",
+      "lv_timer.h": "c",
+      "lvgl_spi_conf.h": "c",
+      "touch_driver.h": "c"
     }
   }
 }

@@ -65,8 +65,8 @@ lv_obj_t *ui_co2_target_value;
 void ui_Fan_speed_override_screen_init(void);
 lv_obj_t *ui_Fan_speed_override;
 lv_obj_t *ui_fan_setting_header;
-void ui_event_fan_setting_header_Setting_back_button_Setting_back_label( lv_event_t * e);
-void ui_event_fan_setting_header_Setting_accept_button_Setting_accept_label( lv_event_t * e);
+void ui_event_fan_setting_header_Setting_back_button( lv_event_t * e);
+void ui_event_fan_setting_header_Setting_accept_button( lv_event_t * e);
 lv_obj_t *ui_fan_override_container;
 lv_obj_t *ui_Override_speed_container;
 lv_obj_t *ui_Fan_override_speed;
@@ -86,10 +86,11 @@ lv_obj_t *ui_Label21;
 
 // SCREEN: ui_Thermostat
 void ui_Thermostat_screen_init(void);
+void ui_event_Thermostat( lv_event_t * e);
 lv_obj_t *ui_Thermostat;
 lv_obj_t *ui_Thermostat_setting_header;
-void ui_event_Thermostat_setting_header_Setting_back_button_Setting_back_label( lv_event_t * e);
-void ui_event_Thermostat_setting_header_Setting_accept_button_Setting_accept_label( lv_event_t * e);
+void ui_event_Thermostat_setting_header_Setting_back_button( lv_event_t * e);
+void ui_event_Thermostat_setting_header_Setting_accept_button( lv_event_t * e);
 lv_obj_t *ui_Container1;
 lv_obj_t *ui_Override_heat_container;
 lv_obj_t *ui_Heat_override_setpoint;
@@ -123,10 +124,11 @@ lv_obj_t *ui_Label10;
 
 // SCREEN: ui_CO2
 void ui_CO2_screen_init(void);
+void ui_event_CO2( lv_event_t * e);
 lv_obj_t *ui_CO2;
 lv_obj_t *ui_Thermostat_setting_header1;
-void ui_event_Thermostat_setting_header1_Setting_back_button_Setting_back_label( lv_event_t * e);
-void ui_event_Thermostat_setting_header1_Setting_accept_button_Setting_accept_label( lv_event_t * e);
+void ui_event_Thermostat_setting_header1_Setting_back_button( lv_event_t * e);
+void ui_event_Thermostat_setting_header1_Setting_accept_button( lv_event_t * e);
 lv_obj_t *ui_Container2;
 lv_obj_t *ui_Override_speed_container1;
 lv_obj_t *ui_co2_target;
@@ -137,9 +139,11 @@ lv_obj_t *ui_Label11;
 
 // SCREEN: ui_Schedule
 void ui_Schedule_screen_init(void);
+void ui_event_Schedule( lv_event_t * e);
 lv_obj_t *ui_Schedule;
 lv_obj_t *ui_Schedule_header;
-void ui_event_Schedule_header_Setting_accept_button_Setting_accept_label( lv_event_t * e);
+void ui_event_Schedule_header_Setting_back_button( lv_event_t * e);
+void ui_event_Schedule_header_Setting_accept_button( lv_event_t * e);
 lv_obj_t *ui_Container14;
 lv_obj_t *ui_TabView1;
 lv_obj_t *ui_DAY;
@@ -220,51 +224,57 @@ if ( event_code == LV_EVENT_SCREEN_UNLOAD_START) {
 void ui_event_Fan( lv_event_t * e) {
     lv_event_code_t event_code = lv_event_get_code(e);lv_obj_t * target = lv_event_get_target(e);
 if ( event_code == LV_EVENT_CLICKED) {
-      _ui_screen_change( &ui_Fan_speed_override, LV_SCR_LOAD_ANIM_FADE_ON, 500, 0, &ui_Fan_speed_override_screen_init);
+      _ui_screen_change( &ui_Fan_speed_override, LV_SCR_LOAD_ANIM_NONE, 0, 0, &ui_Fan_speed_override_screen_init);
 }
 }
 void ui_event_indoor_temps_container( lv_event_t * e) {
     lv_event_code_t event_code = lv_event_get_code(e);lv_obj_t * target = lv_event_get_target(e);
 if ( event_code == LV_EVENT_CLICKED) {
-      _ui_screen_change( &ui_Thermostat, LV_SCR_LOAD_ANIM_FADE_ON, 500, 0, &ui_Thermostat_screen_init);
+      _ui_screen_change( &ui_Thermostat, LV_SCR_LOAD_ANIM_NONE, 0, 0, &ui_Thermostat_screen_init);
 }
 }
 void ui_event_co2_container( lv_event_t * e) {
     lv_event_code_t event_code = lv_event_get_code(e);lv_obj_t * target = lv_event_get_target(e);
 if ( event_code == LV_EVENT_CLICKED) {
-      _ui_screen_change( &ui_CO2, LV_SCR_LOAD_ANIM_FADE_ON, 500, 0, &ui_CO2_screen_init);
+      _ui_screen_change( &ui_CO2, LV_SCR_LOAD_ANIM_NONE, 0, 0, &ui_CO2_screen_init);
 }
 }
-void ui_event_fan_setting_header_Setting_back_button_Setting_back_label( lv_event_t * e) {
+void ui_event_fan_setting_header_Setting_back_button( lv_event_t * e) {
     lv_event_code_t event_code = lv_event_get_code(e);lv_obj_t * target = lv_event_get_target(e);
 if ( event_code == LV_EVENT_CLICKED) {
-      _ui_screen_change( &ui_Home, LV_SCR_LOAD_ANIM_FADE_ON, 500, 0, &ui_Home_screen_init);
+      _ui_screen_change( &ui_Home, LV_SCR_LOAD_ANIM_NONE, 0, 0, &ui_Home_screen_init);
 }
 }
-void ui_event_fan_setting_header_Setting_accept_button_Setting_accept_label( lv_event_t * e) {
+void ui_event_fan_setting_header_Setting_accept_button( lv_event_t * e) {
     lv_event_code_t event_code = lv_event_get_code(e);lv_obj_t * target = lv_event_get_target(e);
 if ( event_code == LV_EVENT_CLICKED) {
-      _ui_screen_change( &ui_Home, LV_SCR_LOAD_ANIM_FADE_ON, 500, 0, &ui_Home_screen_init);
+      _ui_screen_change( &ui_Home, LV_SCR_LOAD_ANIM_NONE, 0, 0, &ui_Home_screen_init);
       set_fan_override( e );
 }
 }
-void ui_event_Thermostat_setting_header_Setting_back_button_Setting_back_label( lv_event_t * e) {
+void ui_event_Thermostat( lv_event_t * e) {
     lv_event_code_t event_code = lv_event_get_code(e);lv_obj_t * target = lv_event_get_target(e);
-if ( event_code == LV_EVENT_CLICKED) {
-      _ui_screen_change( &ui_Home, LV_SCR_LOAD_ANIM_FADE_ON, 500, 0, &ui_Home_screen_init);
+if ( event_code == LV_EVENT_SCREEN_LOAD_START) {
+      thermostat_load_start( e );
 }
 }
-void ui_event_Thermostat_setting_header_Setting_accept_button_Setting_accept_label( lv_event_t * e) {
+void ui_event_Thermostat_setting_header_Setting_back_button( lv_event_t * e) {
     lv_event_code_t event_code = lv_event_get_code(e);lv_obj_t * target = lv_event_get_target(e);
 if ( event_code == LV_EVENT_CLICKED) {
-      _ui_screen_change( &ui_Home, LV_SCR_LOAD_ANIM_FADE_ON, 500, 0, &ui_Home_screen_init);
+      _ui_screen_change( &ui_Home, LV_SCR_LOAD_ANIM_NONE, 0, 0, &ui_Home_screen_init);
+}
+}
+void ui_event_Thermostat_setting_header_Setting_accept_button( lv_event_t * e) {
+    lv_event_code_t event_code = lv_event_get_code(e);lv_obj_t * target = lv_event_get_target(e);
+if ( event_code == LV_EVENT_CLICKED) {
       set_thermostat_override( e );
+      _ui_screen_change( &ui_Home, LV_SCR_LOAD_ANIM_NONE, 0, 0, &ui_Home_screen_init);
 }
 }
 void ui_event_schedule_button( lv_event_t * e) {
     lv_event_code_t event_code = lv_event_get_code(e);lv_obj_t * target = lv_event_get_target(e);
 if ( event_code == LV_EVENT_CLICKED) {
-      _ui_screen_change( &ui_Schedule, LV_SCR_LOAD_ANIM_FADE_ON, 500, 0, &ui_Schedule_screen_init);
+      _ui_screen_change( &ui_Schedule, LV_SCR_LOAD_ANIM_NONE, 0, 0, &ui_Schedule_screen_init);
 }
 }
 void ui_event_use_ac_button( lv_event_t * e) {
@@ -297,24 +307,42 @@ if ( event_code == LV_EVENT_CLICKED) {
       set_system_on( e );
 }
 }
-void ui_event_Thermostat_setting_header1_Setting_back_button_Setting_back_label( lv_event_t * e) {
+void ui_event_CO2( lv_event_t * e) {
     lv_event_code_t event_code = lv_event_get_code(e);lv_obj_t * target = lv_event_get_target(e);
-if ( event_code == LV_EVENT_CLICKED) {
-      _ui_screen_change( &ui_Home, LV_SCR_LOAD_ANIM_FADE_ON, 500, 0, &ui_Home_screen_init);
+if ( event_code == LV_EVENT_SCREEN_LOAD_START) {
+      co2_load_start( e );
 }
 }
-void ui_event_Thermostat_setting_header1_Setting_accept_button_Setting_accept_label( lv_event_t * e) {
+void ui_event_Thermostat_setting_header1_Setting_back_button( lv_event_t * e) {
     lv_event_code_t event_code = lv_event_get_code(e);lv_obj_t * target = lv_event_get_target(e);
 if ( event_code == LV_EVENT_CLICKED) {
-      _ui_screen_change( &ui_Home, LV_SCR_LOAD_ANIM_FADE_ON, 500, 0, &ui_Home_screen_init);
+      _ui_screen_change( &ui_Home, LV_SCR_LOAD_ANIM_NONE, 0, 0, &ui_Home_screen_init);
+}
+}
+void ui_event_Thermostat_setting_header1_Setting_accept_button( lv_event_t * e) {
+    lv_event_code_t event_code = lv_event_get_code(e);lv_obj_t * target = lv_event_get_target(e);
+if ( event_code == LV_EVENT_CLICKED) {
       set_target_co2( e );
+      _ui_screen_change( &ui_Home, LV_SCR_LOAD_ANIM_NONE, 0, 0, &ui_Home_screen_init);
 }
 }
-void ui_event_Schedule_header_Setting_accept_button_Setting_accept_label( lv_event_t * e) {
+void ui_event_Schedule( lv_event_t * e) {
+    lv_event_code_t event_code = lv_event_get_code(e);lv_obj_t * target = lv_event_get_target(e);
+if ( event_code == LV_EVENT_SCREEN_LOAD_START) {
+      schedule_load_start( e );
+}
+}
+void ui_event_Schedule_header_Setting_back_button( lv_event_t * e) {
     lv_event_code_t event_code = lv_event_get_code(e);lv_obj_t * target = lv_event_get_target(e);
 if ( event_code == LV_EVENT_CLICKED) {
-      _ui_screen_change( &ui_Thermostat, LV_SCR_LOAD_ANIM_FADE_ON, 500, 0, &ui_Thermostat_screen_init);
+      _ui_screen_change( &ui_Home, LV_SCR_LOAD_ANIM_NONE, 0, 0, &ui_Home_screen_init);
+}
+}
+void ui_event_Schedule_header_Setting_accept_button( lv_event_t * e) {
+    lv_event_code_t event_code = lv_event_get_code(e);lv_obj_t * target = lv_event_get_target(e);
+if ( event_code == LV_EVENT_CLICKED) {
       set_schedule( e );
+      _ui_screen_change( &ui_Home, LV_SCR_LOAD_ANIM_NONE, 0, 0, &ui_Home_screen_init);
 }
 }
 

@@ -27,3 +27,9 @@ void set_schedule(lv_event_t *e) { UIManager::eventsInst()->eSchedule(); }
 void on_home_load_start(lv_event_t *e) { UIManager::eventsInst()->eHomeLoadStart(); }
 
 void on_home_unload_start(lv_event_t *e) { UIManager::eventsInst()->eHomeUnloadStart(); }
+
+void co2_load_start(lv_event_t *e) { UIManager::eventsInst()->eCO2LoadStart(); }
+
+void thermostat_load_start(lv_event_t *e) { UIManager::eventsInst()->eThermostatLoadStart(); }
+
+void schedule_load_start(lv_event_t *e) { UIManager::eventsInst()->eScheduleLoadStart(); }

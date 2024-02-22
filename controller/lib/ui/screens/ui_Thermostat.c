@@ -254,13 +254,14 @@ lv_obj_set_align( ui_Label10, LV_ALIGN_CENTER );
 lv_label_set_text(ui_Label10,"ON");
 lv_obj_set_style_text_font(ui_Label10, &lv_font_montserrat_18, LV_PART_MAIN| LV_STATE_DEFAULT);
 
-lv_obj_add_event_cb(ui_comp_get_child(ui_Thermostat_setting_header, UI_COMP_SETTING_HEADER_SETTING_BACK_BUTTON_SETTING_BACK_LABEL), ui_event_Thermostat_setting_header_Setting_back_button_Setting_back_label, LV_EVENT_ALL, NULL);
-lv_obj_add_event_cb(ui_comp_get_child(ui_Thermostat_setting_header, UI_COMP_SETTING_HEADER_SETTING_ACCEPT_BUTTON_SETTING_ACCEPT_LABEL), ui_event_Thermostat_setting_header_Setting_accept_button_Setting_accept_label, LV_EVENT_ALL, NULL);
+lv_obj_add_event_cb(ui_comp_get_child(ui_Thermostat_setting_header, UI_COMP_SETTING_HEADER_SETTING_BACK_BUTTON), ui_event_Thermostat_setting_header_Setting_back_button, LV_EVENT_ALL, NULL);
+lv_obj_add_event_cb(ui_comp_get_child(ui_Thermostat_setting_header, UI_COMP_SETTING_HEADER_SETTING_ACCEPT_BUTTON), ui_event_Thermostat_setting_header_Setting_accept_button, LV_EVENT_ALL, NULL);
 lv_obj_add_event_cb(ui_schedule_button, ui_event_schedule_button, LV_EVENT_ALL, NULL);
 lv_obj_add_event_cb(ui_use_ac_button, ui_event_use_ac_button, LV_EVENT_ALL, NULL);
 lv_obj_add_event_cb(ui_stop_ac_button, ui_event_stop_ac_button, LV_EVENT_ALL, NULL);
 lv_obj_add_event_cb(ui_allow_ac_button, ui_event_allow_ac_button, LV_EVENT_ALL, NULL);
 lv_obj_add_event_cb(ui_off_button, ui_event_off_button, LV_EVENT_ALL, NULL);
 lv_obj_add_event_cb(ui_on_button, ui_event_on_button, LV_EVENT_ALL, NULL);
+lv_obj_add_event_cb(ui_Thermostat, ui_event_Thermostat, LV_EVENT_ALL, NULL);
 
 }

@@ -13,13 +13,16 @@ extern "C" {
 void on_home_load_start(lv_event_t * e);
 void on_home_unload_start(lv_event_t * e);
 void set_fan_override(lv_event_t * e);
+void thermostat_load_start(lv_event_t * e);
 void set_thermostat_override(lv_event_t * e);
 void set_use_ac(lv_event_t * e);
 void set_stop_ac(lv_event_t * e);
 void set_allow_ac(lv_event_t * e);
 void set_system_off(lv_event_t * e);
 void set_system_on(lv_event_t * e);
+void co2_load_start(lv_event_t * e);
 void set_target_co2(lv_event_t * e);
+void schedule_load_start(lv_event_t * e);
 void set_schedule(lv_event_t * e);
 
 #ifdef __cplusplus

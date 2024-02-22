@@ -1,6 +1,9 @@
 #include "UIManager.h"
 
+#include "esp_log.h"
 #include <cmath>
+
+static const char *TAG = "UI";
 
 using HVACState = ControllerDomain::HVACState;
 using Config = ControllerDomain::Config;
@@ -18,7 +21,7 @@ void resetAndResumeTimer(lv_event_t *e) {
 
 void UIManager::bootDone() {
     xSemaphoreTake(mutex_, portMAX_DELAY);
-    _ui_screen_change(&ui_Home, LV_SCR_LOAD_ANIM_FADE_ON, 500, 0, &ui_Home_screen_init);
+    _ui_screen_change(&ui_Home, LV_SCR_LOAD_ANIM_NONE, 0, 0, &ui_Home_screen_init);
     xSemaphoreGive(mutex_);
 }
 
@@ -43,10 +46,24 @@ void UIManager::sendPowerEvent(bool on) {
 }
 
 double UIManager::getHeatRollerValue(lv_obj_t *roller) {
-    return ABS_F_TO_C(MIN_HEAT_F + lv_roller_get_selected(roller));
+    return ABS_F_TO_C(minHeatDeg_ + lv_roller_get_selected(roller));
 }
 double UIManager::getCoolRollerValue(lv_obj_t *roller) {
-    return ABS_F_TO_C(minCoolF_ + lv_roller_get_selected(roller));
+    return ABS_F_TO_C(minCoolDeg_ + lv_roller_get_selected(roller));
+}
+
+void UIManager::setupTempRoller(lv_obj_t *roller, uint8_t minDeg, uint8_t maxDeg) {
+    assert(maxDeg > minDeg);
+    assert(maxDeg < 100);
+
+    char opts[300] = "";
+    size_t pos = 0;
+    for (uint8_t currDeg = minDeg; currDeg < maxDeg; currDeg++) {
+        pos += snprintf(opts + pos, sizeof(opts) - pos, "%u\n", currDeg);
+    }
+    sprintf(opts + pos, "%u", maxDeg); // No trailing newline on the last element
+
+    lv_roller_set_options(roller, opts, LV_ROLLER_MODE_NORMAL);
 }
 
 UIManager::MessageContainer *UIManager::focusedMessage() {
@@ -117,11 +134,11 @@ void UIManager::eSystemOn() {
 }
 
 void UIManager::eTargetCO2() {
-    uint16_t target = 800 + lv_roller_get_selected(ui_co2_target) * 50;
-    Event evt{EventType::SetCO2Target, EventPayload{.co2Target = target}};
+    co2Target_ = 800 + lv_roller_get_selected(ui_co2_target) * 50;
+    Event evt{EventType::SetCO2Target, EventPayload{.co2Target = co2Target_}};
     eventCb_(evt);
 
-    lv_label_set_text_fmt(ui_co2_target_value, "%u", target);
+    lv_label_set_text_fmt(ui_co2_target_value, "%u", co2Target_);
 }
 
 void UIManager::eSchedule() {
@@ -140,15 +157,50 @@ void UIManager::eSchedule() {
                                    .startMin = (uint8_t)lv_roller_get_selected(ui_Night_min),
                                },
                            }}};
+
+    currSchedules_[0] = evt.payload.schedules[0];
+    currSchedules_[1] = evt.payload.schedules[1];
+
     eventCb_(evt);
 }
 
 void UIManager::eHomeLoadStart() {
+    ESP_LOGD(TAG, "homeLoadStart");
     lv_timer_reset(msgTimer_);
     lv_timer_resume(msgTimer_);
 }
 
-void UIManager::eHomeUnloadStart() { lv_timer_pause(msgTimer_); }
+void UIManager::eHomeUnloadStart() {
+    ESP_LOGD(TAG, "homeUnloadStart");
+    lv_timer_pause(msgTimer_);
+}
+
+void UIManager::eCO2LoadStart() {
+    ESP_LOGD(TAG, "co2LoadStart");
+    lv_roller_set_selected(ui_co2_target, (co2Target_ - 800) / 50, LV_ANIM_OFF);
+}
+
+void UIManager::eThermostatLoadStart() {
+    ESP_LOGD(TAG, "thermostatLoadStart");
+    lv_roller_set_selected(ui_Heat_override_setpoint, currHeatDeg_ - minHeatDeg_, LV_ANIM_OFF);
+    lv_roller_set_selected(ui_Cool_override_setpoint, currCoolDeg_ - minCoolDeg_, LV_ANIM_OFF);
+}
+
+void UIManager::eScheduleLoadStart() {
+    ESP_LOGD(TAG, "scheduleLoadStart");
+    lv_roller_set_selected(ui_Day_heat_setpoint,
+                           std::round(ABS_C_TO_F(currSchedules_[0].heatC)) - minHeatDeg_,
+                           LV_ANIM_OFF);
+    lv_roller_set_selected(ui_Day_cool_setpoint,
+                           std::round(ABS_C_TO_F(currSchedules_[0].coolC)) - minCoolDeg_,
+                           LV_ANIM_OFF);
+    lv_roller_set_selected(ui_Night_heat_setpoint,
+                           std::round(ABS_C_TO_F(currSchedules_[1].heatC)) - minHeatDeg_,
+                           LV_ANIM_OFF);
+    lv_roller_set_selected(ui_Night_cool_setpoint,
+                           std::round(ABS_C_TO_F(currSchedules_[1].coolC)) - minCoolDeg_,
+                           LV_ANIM_OFF);
+}
 
 void UIManager::onMessageTimer() {
     // TODO(future): It'd be nicer to make this a circular scroll
@@ -174,12 +226,22 @@ UIManager::UIManager(ControllerDomain::Config config, size_t nMsgIds, eventCb_t 
     : eventCb_(eventCb) {
     mutex_ = xSemaphoreCreateMutex();
 
-    minCoolF_ = ABS_C_TO_F(config.minCoolC) + 0.5;
+    co2Target_ = config.co2Target;
 
     ui_init();
 
-    // TODO: Populate schedule values
-    // TODO: Populate rollers based on mix/max heat/cool
+    for (int i = 0; i < NUM_SCHEDULE_TIMES; i++) {
+        currSchedules_[i] = config.schedules[i];
+    }
+    maxHeatDeg_ = std::round(ABS_C_TO_F(config.maxHeatC));
+    minCoolDeg_ = std::round(ABS_C_TO_F(config.minCoolC));
+
+    setupTempRoller(ui_Heat_override_setpoint, minHeatDeg_, maxHeatDeg_);
+    setupTempRoller(ui_Cool_override_setpoint, minCoolDeg_, maxCoolDeg_);
+    setupTempRoller(ui_Day_heat_setpoint, minHeatDeg_, maxHeatDeg_);
+    setupTempRoller(ui_Day_cool_setpoint, minCoolDeg_, maxCoolDeg_);
+    setupTempRoller(ui_Night_heat_setpoint, minHeatDeg_, maxHeatDeg_);
+    setupTempRoller(ui_Night_cool_setpoint, minCoolDeg_, maxCoolDeg_);
 
     lv_label_set_text_fmt(ui_co2_target_value, "%u", config.co2Target);
 
@@ -219,7 +281,7 @@ UIManager::UIManager(ControllerDomain::Config config, size_t nMsgIds, eventCb_t 
 
 void UIManager::setHumidity(double h) {
     xSemaphoreTake(mutex_, portMAX_DELAY);
-    lv_label_set_text_fmt(ui_Humidity_value, "%u%%", std::min(99U, (uint)(h + 0.5)));
+    lv_label_set_text_fmt(ui_Humidity_value, "%u%%", std::min(99U, (uint)std::round(h)));
     xSemaphoreGive(mutex_);
 }
 
@@ -228,7 +290,7 @@ void UIManager::setCurrentFanSpeed(uint8_t speed) {
     if (speed == 0) {
         lv_label_set_text(ui_Fan_value, "OFF");
     } else {
-        lv_label_set_text_fmt(ui_Fan_value, "%u%%", (uint)(speed / 255.0 * 100 + 0.5));
+        lv_label_set_text_fmt(ui_Fan_value, "%u%%", (uint)std::round(speed / 255.0 * 100));
     }
     xSemaphoreGive(mutex_);
 }
@@ -238,13 +300,13 @@ void UIManager::setOutTempC(double tc) {
     if (std::isnan(tc)) {
         lv_label_set_text(ui_Out_temp_value, "--");
     } else {
-        lv_label_set_text_fmt(ui_Out_temp_value, "%u°", (uint)(ABS_C_TO_F(tc) + 0.5));
+        lv_label_set_text_fmt(ui_Out_temp_value, "%u°", (uint)std::round(ABS_C_TO_F(tc)));
     }
     xSemaphoreGive(mutex_);
 }
 
 void UIManager::setInTempC(double tc) {
-    lv_label_set_text_fmt(ui_Indoor_temp_value, "%u°", (uint)(ABS_C_TO_F(tc) + 0.5));
+    lv_label_set_text_fmt(ui_Indoor_temp_value, "%u°", (uint)std::round(ABS_C_TO_F(tc)));
 }
 
 void UIManager::setInCO2(uint16_t ppm) {
@@ -275,9 +337,12 @@ void UIManager::setHVACState(ControllerDomain::HVACState state) {
 }
 
 void UIManager::setCurrentSetpoints(double heatC, double coolC) {
+    currHeatDeg_ = std::round(ABS_C_TO_F(heatC));
+    currCoolDeg_ = std::round(ABS_C_TO_F(coolC));
+
     xSemaphoreTake(mutex_, portMAX_DELAY);
-    lv_label_set_text_fmt(ui_Heat_setpoint, "%u", (uint)(ABS_C_TO_F(heatC) + 0.5));
-    lv_label_set_text_fmt(ui_Cool_setpoint, "%u", (uint)(ABS_C_TO_F(coolC) + 0.5));
+    lv_label_set_text_fmt(ui_Heat_setpoint, "%u", currHeatDeg_);
+    lv_label_set_text_fmt(ui_Cool_setpoint, "%u", currCoolDeg_);
     xSemaphoreGive(mutex_);
 }
 

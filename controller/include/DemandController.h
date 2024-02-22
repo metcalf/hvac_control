@@ -1,5 +1,7 @@
 #pragma once
 
+#include <cmath>
+
 #include "AbstractDemandController.h"
 #include "ControllerDomain.h"
 #include "SetpointHandler.h"
@@ -43,8 +45,7 @@ class DemandController : public AbstractDemandController {
                 return min_.speed;
             }
 
-            return min_.speed +
-                   (FanSpeed)((value - min_.value) * step_ + 0.5); // + 0.5 for rounding
+            return min_.speed + (FanSpeed)std::round((value - min_.value) * step_);
         };
 
       private:

@@ -4,12 +4,10 @@
 #include <stdint.h>
 
 #define NUM_SCHEDULE_TIMES 2
-#define MIN_HEAT_F 50
-#define MAX_COOL_F 99
 #define REL_F_TO_C(t) (t * 5.0 / 9.0)
-#define ABS_F_TO_C(t) REL_F_TO_C(t - 32)
+#define ABS_F_TO_C(t) REL_F_TO_C((t - 32))
 #define REL_C_TO_F(t) (t * 9.0 / 5.0)
-#define ABS_C_TO_F(t) REL_C_TO_F(t) + 32
+#define ABS_C_TO_F(t) (REL_C_TO_F(t) + 32)
 
 namespace ControllerDomain {
 typedef uint8_t FanSpeed;

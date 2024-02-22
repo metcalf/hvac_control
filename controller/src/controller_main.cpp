@@ -59,14 +59,14 @@ void sensorTask(void *sensors) {
     }
 }
 
-void uiTickHook() { uiManager_->tick(portTICK_PERIOD_MS); }
-
 void uiTask(void *uiManager) {
-    esp_register_freertos_tick_hook_for_cpu(uiTickHook, 1);
-
     while (1) {
-        ((UIManager *)uiManager)->handleTasks();
-        vTaskDelay(1);
+        uint32_t delayMs = ((UIManager *)uiManager)->handleTasks();
+        if (delayMs < portTICK_PERIOD_MS) {
+            taskYIELD();
+        } else {
+            vTaskDelay(pdMS_TO_TICKS(delayMs));
+        }
     }
 }
 

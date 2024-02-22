@@ -62,3 +62,7 @@ def co2_load_start(event_struct):
 def thermostat_load_start(event_struct):
     return
 
+
+def schedule_load_start(event_struct):
+    return
+

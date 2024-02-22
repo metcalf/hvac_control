@@ -163,7 +163,7 @@ lv_label_set_text(ui_Label21,"PLEASE USE PRIMARY \nCONTROLLER TO SET \nFAN OVERR
 lv_obj_set_style_text_align(ui_Label21, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN| LV_STATE_DEFAULT);
 lv_obj_set_style_text_font(ui_Label21, &lv_font_montserrat_18, LV_PART_MAIN| LV_STATE_DEFAULT);
 
-lv_obj_add_event_cb(ui_comp_get_child(ui_fan_setting_header, UI_COMP_SETTING_HEADER_SETTING_BACK_BUTTON_SETTING_BACK_LABEL), ui_event_fan_setting_header_Setting_back_button_Setting_back_label, LV_EVENT_ALL, NULL);
-lv_obj_add_event_cb(ui_comp_get_child(ui_fan_setting_header, UI_COMP_SETTING_HEADER_SETTING_ACCEPT_BUTTON_SETTING_ACCEPT_LABEL), ui_event_fan_setting_header_Setting_accept_button_Setting_accept_label, LV_EVENT_ALL, NULL);
+lv_obj_add_event_cb(ui_comp_get_child(ui_fan_setting_header, UI_COMP_SETTING_HEADER_SETTING_BACK_BUTTON), ui_event_fan_setting_header_Setting_back_button, LV_EVENT_ALL, NULL);
+lv_obj_add_event_cb(ui_comp_get_child(ui_fan_setting_header, UI_COMP_SETTING_HEADER_SETTING_ACCEPT_BUTTON), ui_event_fan_setting_header_Setting_accept_button, LV_EVENT_ALL, NULL);
 
 }
