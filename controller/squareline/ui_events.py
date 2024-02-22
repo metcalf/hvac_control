@@ -54,3 +54,11 @@ def on_home_load_start(event_struct):
 def on_home_unload_start(event_struct):
     return
 
+
+def co2_load_start(event_struct):
+    return
+
+
+def thermostat_load_start(event_struct):
+    return
+
