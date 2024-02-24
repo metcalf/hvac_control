@@ -79209,7 +79209,7 @@
                       {
                         "nid": 479192064,
                         "strtype": "TEXTAREA/Max_text_length",
-                        "integer": 98989898,
+                        "integer": 32,
                         "InheritedType": 6
                       }
                     ],
@@ -80108,7 +80108,7 @@
                       {
                         "nid": 1026968923,
                         "strtype": "TEXTAREA/Placeholder",
-                        "strval": "",
+                        "strval": "******    ",
                         "InheritedType": 10
                       },
                       {
@@ -80132,7 +80132,7 @@
                       {
                         "nid": -1778886071,
                         "strtype": "TEXTAREA/Max_text_length",
-                        "integer": 98989898,
+                        "integer": 64,
                         "InheritedType": 6
                       }
                     ],
@@ -81055,7 +81055,7 @@
                       {
                         "nid": -1124576297,
                         "strtype": "TEXTAREA/Max_text_length",
-                        "integer": 98989898,
+                        "integer": 24,
                         "InheritedType": 6
                       }
                     ],
@@ -81880,6 +81880,7 @@
               {
                 "nid": -167880367,
                 "strtype": "KEYBOARD/Target_textarea",
+                "strval": "-",
                 "InheritedType": 9
               },
               {
@@ -82968,7 +82969,7 @@
     "theme_color2": 0,
     "uiExportFolderPath": "/Users/andrew/code/hvac_control/controller/lib/ui",
     "projectExportFolderPath": "",
-    "backup_cnt": 2540,
+    "backup_cnt": 2550,
     "autosave_cnt": 0,
     "lvgl_version": "8.3.6",
     "callfuncsexport": "CPP_FILE",

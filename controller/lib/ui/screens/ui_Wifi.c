@@ -56,6 +56,7 @@ ui_wifi_ssid = lv_textarea_create(ui_ssid_container);
 lv_obj_set_width( ui_wifi_ssid, 170);
 lv_obj_set_height( ui_wifi_ssid, LV_SIZE_CONTENT);   /// 70
 lv_obj_set_align( ui_wifi_ssid, LV_ALIGN_RIGHT_MID );
+lv_textarea_set_max_length(ui_wifi_ssid,32);
 lv_textarea_set_one_line(ui_wifi_ssid,true);
 lv_obj_set_style_text_align(ui_wifi_ssid, LV_TEXT_ALIGN_RIGHT, LV_PART_MAIN| LV_STATE_DEFAULT);
 
@@ -80,6 +81,8 @@ ui_wifi_password = lv_textarea_create(ui_password_container);
 lv_obj_set_width( ui_wifi_password, 170);
 lv_obj_set_height( ui_wifi_password, LV_SIZE_CONTENT);   /// 70
 lv_obj_set_align( ui_wifi_password, LV_ALIGN_RIGHT_MID );
+lv_textarea_set_max_length(ui_wifi_password,64);
+lv_textarea_set_placeholder_text(ui_wifi_password,"******    ");
 lv_textarea_set_one_line(ui_wifi_password,true);
 lv_obj_set_style_text_align(ui_wifi_password, LV_TEXT_ALIGN_RIGHT, LV_PART_MAIN| LV_STATE_DEFAULT);
 
@@ -104,6 +107,7 @@ ui_log_name = lv_textarea_create(ui_log_name_container);
 lv_obj_set_width( ui_log_name, 170);
 lv_obj_set_height( ui_log_name, LV_SIZE_CONTENT);   /// 70
 lv_obj_set_align( ui_log_name, LV_ALIGN_RIGHT_MID );
+lv_textarea_set_max_length(ui_log_name,24);
 lv_textarea_set_one_line(ui_log_name,true);
 lv_obj_set_style_text_align(ui_log_name, LV_TEXT_ALIGN_RIGHT, LV_PART_MAIN| LV_STATE_DEFAULT);
 
