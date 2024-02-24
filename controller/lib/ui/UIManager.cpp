@@ -3,8 +3,6 @@
 #include "esp_log.h"
 #include <cmath>
 
-static const char *TAG = "UI";
-
 using HVACState = ControllerDomain::HVACState;
 using Config = ControllerDomain::Config;
 
@@ -15,6 +13,15 @@ using Config = ControllerDomain::Config;
 #define MAX_COOL_DEG 99
 #define MIN_HEAT_COOL_DELTA_DEG 2
 #define MIN_HEAT_COOL_DELTA_C ABS_F_TO_C(MIN_HEAT_COOL_DELTA_DEG)
+
+static const char *TAG = "UI";
+
+lv_obj_t *wifiTextareas[] = {
+    ui_wifi_ssid,
+    ui_wifi_password,
+    ui_log_name,
+};
+size_t nWifiTextareas = sizeof(wifiTextareas) / sizeof(wifiTextareas[0]);
 
 uint8_t getTempOffsetTenthDeg(lv_obj_t *roller) { return lv_roller_get_selected(roller) - 50; }
 
@@ -31,6 +38,10 @@ void pauseTimer(lv_event_t *e) { lv_timer_pause((lv_timer_t *)e->user_data); }
 void resetAndResumeTimer(lv_event_t *e) {
     lv_timer_reset((lv_timer_t *)e->user_data);
     lv_timer_resume((lv_timer_t *)e->user_data);
+}
+
+void wifiTextareaEventCb(lv_event_t *e) {
+    ((UIManager *)lv_event_get_user_data(e))->eWifiTextarea(e);
 }
 
 void objSetFlag(bool on, lv_obj_t *obj, lv_obj_flag_t f) {
@@ -315,6 +326,24 @@ void UIManager::eSaveTempOffsets() {
     eventCb_(evt);
 }
 
+void UIManager::eSaveWifiSettings() {
+    // NB: strncat used to ensure null termination
+    strncat(wifi_.ssid, lv_textarea_get_text(ui_wifi_ssid), sizeof(wifi_.ssid) - 1);
+    strncat(wifi_.logName, lv_textarea_get_text(ui_log_name), sizeof(wifi_.logName) - 1);
+
+    const char *pswd = lv_textarea_get_text(ui_wifi_password);
+    if (strlen(pswd) > 0) {
+        strncat(wifi_.password, pswd, sizeof(wifi_.password) - 1);
+    }
+
+    Event evt{
+        EventType::SetWifi,
+        EventPayload{.wifi = wifi_},
+    };
+
+    eventCb_(evt);
+}
+
 void UIManager::eEquipmentSettingsLoadStart() {
     lv_dropdown_set_selected(ui_controller_type, static_cast<uint16_t>(equipment_.controllerType));
     lv_dropdown_set_selected(ui_heat_type, static_cast<uint16_t>(equipment_.heatType));
@@ -337,11 +366,42 @@ void UIManager::eTempOffsetsLoadStart() {
     eTempOffsetChanged(); // Trigger update of current temp values
 }
 
+void UIManager::eWifiSettingsLoadStart() {
+    lv_textarea_set_text(ui_wifi_ssid, wifi_.ssid);
+    lv_textarea_set_text(ui_wifi_password, "");
+    lv_textarea_set_text(ui_log_name, wifi_.logName);
+}
+
 void UIManager::eTempOffsetChanged() {
     lv_label_set_text_fmt(ui_indoor_offset_label, "%.1f°",
-                          ABS_C_TO_F(currInTempC_) + getTempOffsetF(ui_indoor_offset), LV_ANIM_OFF);
+                          ABS_C_TO_F(currInTempC_) + getTempOffsetF(ui_indoor_offset));
     lv_label_set_text_fmt(ui_fan_offset_label, "%.1f°",
-                          ABS_C_TO_F(currOutTempC_) + getTempOffsetF(ui_fan_offset), LV_ANIM_OFF);
+                          ABS_C_TO_F(currOutTempC_) + getTempOffsetF(ui_fan_offset));
+}
+
+void UIManager::eWifiTextarea(lv_event_t *e) {
+    lv_event_code_t code = lv_event_get_code(e);
+    lv_obj_t *ta = lv_event_get_target(e);
+    if (code == LV_EVENT_FOCUSED) {
+        lv_keyboard_set_textarea(ui_wifi_keyboard, ta);
+        objSetVisibility(true, ui_wifi_keyboard);
+
+        for (int i = 0; i < nWifiTextareas; i++) {
+            objSetVisibility(ta == wifiTextareas[i], wifiTextareas[i]);
+        }
+    } else if (code == LV_EVENT_READY || code == LV_EVENT_CANCEL || code == LV_EVENT_DEFOCUSED) {
+        if (code == LV_EVENT_DEFOCUSED) {
+            lv_keyboard_set_textarea(ui_wifi_keyboard, NULL);
+        }
+
+        objSetVisibility(false, ui_wifi_keyboard);
+
+        for (int i = 0; i < nWifiTextareas; i++) {
+            objSetVisibility(true, wifiTextareas[i]);
+        }
+
+        lv_indev_reset(NULL, ta); /*To forget the last clicked object to make it focusable again*/
+    }
 }
 
 // TODO: Fix message scrolling
@@ -408,10 +468,15 @@ UIManager::UIManager(ControllerDomain::Config config, size_t nMsgIds, eventCb_t 
 
     inTempOffsetC_ = config.inTempOffsetC;
     outTempOffsetC_ = config.outTempOffsetC;
-    equipment_ = config.equipment;
     co2Target_ = config.co2Target;
+    equipment_ = config.equipment;
+    wifi_ = config.wifi;
 
     ui_init();
+
+    for (int i = 0; i < nWifiTextareas; i++) {
+        lv_obj_add_event_cb(wifiTextareas[i], wifiTextareaEventCb, LV_EVENT_ALL, this);
+    }
 
     for (int i = 0; i < NUM_SCHEDULE_TIMES; i++) {
         currSchedules_[i] = config.schedules[i];

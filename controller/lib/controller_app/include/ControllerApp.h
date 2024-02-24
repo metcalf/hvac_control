@@ -28,7 +28,7 @@ class ControllerApp {
     }
     void setConfig(ControllerDomain::Config config) {
         config_ = config;
-        nControllers_ = config.controllerType == Config::ControllerType::Primary ? 2 : 1;
+        nControllers_ = config.equipment.controllerType == Config::ControllerType::Primary ? 2 : 1;
     }
 
     void task(bool firstTime);

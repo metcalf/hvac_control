@@ -9,8 +9,6 @@
 
 class ValveCtrl : public AbstractValveCtrl {
   public:
-    ValveCtrl(bool hasHeat, bool hasCool) : hasHeat_(hasHeat), hasCool_(hasCool) {}
-
     void init() {
         uint64_t mask = (1ULL << HEAT_VLV_GPIO) || (1ULL << COOL_VLV_GPIO);
 
@@ -28,14 +26,7 @@ class ValveCtrl : public AbstractValveCtrl {
         // Always turn off the valve we're not setting (e.g. turn off the heat valve if
         // `cool` is true).
         // NB: IOs are inverted
-        if (hasHeat_) {
-            ESP_ERROR_CHECK(gpio_set_level(HEAT_VLV_GPIO, cool ? 1 : !on));
-        }
-        if (hasCool_) {
-            ESP_ERROR_CHECK(gpio_set_level(COOL_VLV_GPIO, cool ? !on : 1));
-        }
+        ESP_ERROR_CHECK(gpio_set_level(HEAT_VLV_GPIO, cool ? 1 : !on));
+        ESP_ERROR_CHECK(gpio_set_level(COOL_VLV_GPIO, cool ? !on : 1));
     }
-
-  private:
-    bool hasHeat_, hasCool_;
 };

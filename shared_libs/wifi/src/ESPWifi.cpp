@@ -44,9 +44,9 @@ void eventHandler(void *arg, esp_event_base_t eventBase, int32_t eventId, void *
     }
 }
 
-void ESPWifi::connect() {
-    memcpy(config_.sta.ssid, wifi_ssid, sizeof(config_.sta.ssid));
-    memcpy(config_.sta.password, wifi_pswd, sizeof(config_.sta.password));
+void ESPWifi::connect(const char *ssid, const char *password) {
+    memcpy(config_.sta.ssid, ssid, sizeof(config_.sta.ssid));
+    memcpy(config_.sta.password, password, sizeof(config_.sta.password));
 
     xSemaphoreTake(mutex_, portMAX_DELAY);
     state_ = State::Connecting;
@@ -88,6 +88,11 @@ void ESPWifi::disconnect() {
     state_ = State::Inactive;
     msg_[0] = '\0';
     xSemaphoreGive(mutex_);
+}
+
+void ESPWifi::updateSTA(const char *ssid, const char *password) {
+    disconnect();
+    connect(ssid, password);
 }
 
 void ESPWifi::onWifiEvent(int32_t eventId, void *eventData) {

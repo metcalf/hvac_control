@@ -59,8 +59,16 @@ struct Config {
         HVACType heatType, coolType;
         bool hasMakeupDemand;
     };
+    struct Wifi {
+        // NB: These are 1 byte longer than the ESP32 structs so we can
+        // guarantee null-termination
+        char ssid[33];
+        char password[65];
+        char logName[25];
+    };
 
     Equipment equipment;
+    Wifi wifi;
 
     Schedule schedules[NUM_SCHEDULE_TIMES]; // Must be in order starting from midnight
     uint16_t co2Target;

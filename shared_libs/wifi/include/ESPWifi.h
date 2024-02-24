@@ -14,7 +14,7 @@ class ESPWifi : public AbstractWifi {
     ~ESPWifi() { vSemaphoreDelete(mutex_); }
 
     void init();
-    void connect();
+    void connect(const char *ssid, const char *password);
     void disconnect();
 
     void msg(char *msg, size_t n) override {
@@ -28,6 +28,7 @@ class ESPWifi : public AbstractWifi {
         xSemaphoreGive(mutex_);
         return state;
     }
+    void updateSTA(const char *ssid, const char *password) override;
 
     void onWifiEvent(int32_t event_id, void *event_data);
     void onIPEvent(int32_t event_id, void *event_data);

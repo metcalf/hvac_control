@@ -43,7 +43,7 @@ using Config = ControllerDomain::Config;
 static ControllerApp *app_;
 static ModbusController *modbusController_;
 static UIManager *uiManager_;
-static ValveCtrl *valveCtrl_;
+static ValveCtrl valveCtrl_;
 static Sensors sensors_;
 static DemandController demandController_;
 static QueueHandle_t uiEvtQueue_;
@@ -111,11 +111,9 @@ extern "C" void controller_main() {
     Config config = app_config_load();
     uiManager_ = new UIManager(config, ControllerApp::nMsgIds(), uiEvtCb);
     UIManager::setEventsInst(uiManager_);
-    modbusController_ = new ModbusController(config.hasMakeupDemand);
-    valveCtrl_ = new ValveCtrl(config.heatType == Config::HVACType::Valve,
-                               config.coolType == Config::HVACType::Valve);
+    modbusController_ = new ModbusController(config.equipment.hasMakeupDemand);
     app_ = new ControllerApp(config, uiManager_, modbusController_, &sensors_, &demandController_,
-                             valveCtrl_, &wifi_, app_config_save, uiEvtRcv);
+                             &valveCtrl_, &wifi_, app_config_save, uiEvtRcv);
     xTaskCreate(uiTask, "uiTask", UI_TASK_STACK_SIZE, uiManager_, UI_TASK_PRIO, NULL);
 
     setenv("TZ", POSIX_TZ_STR, 1);
@@ -123,9 +121,9 @@ extern "C" void controller_main() {
 
     // TODO: Setup OTA updates
     // TODO: Remote logging
-    // TODO: Use interrupt pin for touchscreen events
+    // TODO: Use interrupt pin for touchscreen events? May not matter enough
     wifi_.init();
-    wifi_.connect();
+    wifi_.connect(config.wifi.ssid, config.wifi.password);
 
     if (!sensors_.init()) {
         snprintf(bootErrMsg, sizeof(bootErrMsg), "Sensor init error");

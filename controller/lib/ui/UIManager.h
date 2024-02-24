@@ -71,6 +71,7 @@ class UIManager : public AbstractUIManager {
     void eTempOffsetsLoadStart();
     void eWifiSettingsLoadStart();
     void eTempOffsetChanged();
+    void eWifiTextarea(lv_event_t *e);
 
     static void setEventsInst(UIManager *inst) { eventsInst_ = inst; }
     static UIManager *eventsInst() { return eventsInst_; }
@@ -119,4 +120,5 @@ class UIManager : public AbstractUIManager {
     double currInTempC_, currOutTempC_, inTempOffsetC_, outTempOffsetC_;
     ControllerDomain::Config::Schedule currSchedules_[NUM_SCHEDULE_TIMES];
     ControllerDomain::Config::Equipment equipment_;
+    ControllerDomain::Config::Wifi wifi_;
 };

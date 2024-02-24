@@ -1,7 +1,10 @@
 #include "app_config.h"
 
+#include <cstring>
+
 #include "esp_log.h"
 #include "nvs_flash.h"
+#include "wifi_credentials.h"
 
 #define NVS_CONFIG_VERSION 0
 #define STORAGE_NAMESPACE "config"
@@ -13,7 +16,18 @@ bool version_written = false;
 using Config = ControllerDomain::Config;
 
 Config default_config() {
-    return Config{
+    Config cfg{
+        .equipment =
+            {
+                .controllerType = Config::ControllerType::Only,
+                .heatType = Config::HVACType::Fancoil,
+                .coolType = Config::HVACType::Fancoil,
+                .hasMakeupDemand = false,
+            },
+        .wifi =
+            {
+                .logName = "unnamed_hvac_ctrl",
+            },
         .schedules =
             {
                 {
@@ -35,11 +49,13 @@ Config default_config() {
         .inTempOffsetC = 0,
         .outTempOffsetC = 0,
         .systemOn = true,
-        .hasMakeupDemand = false,
-        .controllerType = Config::ControllerType::Only,
-        .heatType = Config::HVACType::Fancoil,
-        .coolType = Config::HVACType::Fancoil,
     };
+
+    // NB: strncat used to ensure null termination
+    strncat(cfg.wifi.ssid, default_wifi_ssid, sizeof(cfg.wifi.ssid) - 1);
+    strncat(cfg.wifi.password, default_wifi_pswd, sizeof(cfg.wifi.password) - 1);
+
+    return cfg;
 }
 
 Config app_config_load() {

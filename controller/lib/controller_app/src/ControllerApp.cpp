@@ -159,23 +159,21 @@ FanSpeed ControllerApp::computeFanSpeed(DemandRequest *requests) {
         }
     }
 
-    if (config_.equipment.hasMakeupDemand) {
-        std::chrono::steady_clock::time_point mdTime;
-        bool makeupDemand;
-        esp_err_t err = modbusController_->getMakeupDemand(&makeupDemand, &mdTime);
-        if (err == ESP_OK) {
-            clearMessage(MsgID::GetMakeupDemandErr);
+    std::chrono::steady_clock::time_point mdTime;
+    bool makeupDemand;
+    esp_err_t err = modbusController_->getMakeupDemand(&makeupDemand, &mdTime);
+    if (err == ESP_OK) {
+        clearMessage(MsgID::GetMakeupDemandErr);
 
-            if (makeupDemand && now - mdTime < MAKEUP_MAX_AGE && fanSpeed < MAKEUP_FAN_SPEED) {
-                fanSpeedReason_ = "makeup_air";
-                fanSpeed = MAKEUP_FAN_SPEED;
-            }
-        } else {
-            char errMsg[UI_MAX_MSG_LEN];
-            snprintf(errMsg, sizeof(errMsg), "Error getting makeup demand: %d", err);
-            setMessage(MsgID::GetMakeupDemandErr, false, errMsg);
-            ESP_LOGE(TAG, "%s", errMsg);
+        if (makeupDemand && now - mdTime < MAKEUP_MAX_AGE && fanSpeed < MAKEUP_FAN_SPEED) {
+            fanSpeedReason_ = "makeup_air";
+            fanSpeed = MAKEUP_FAN_SPEED;
         }
+    } else {
+        char errMsg[UI_MAX_MSG_LEN];
+        snprintf(errMsg, sizeof(errMsg), "Error getting makeup demand: %d", err);
+        setMessage(MsgID::GetMakeupDemandErr, false, errMsg);
+        ESP_LOGE(TAG, "%s", errMsg);
     }
 
     return fanSpeed;
@@ -255,11 +253,18 @@ bool ControllerApp::pollUIEvent(bool wait) {
         cfgUpdateCb_(config_);
         break;
     case EventType::SetEquipment: {
-        // NB: We don't handle change of controller type, instead we reboot
+        // NB: We don't handle change of controller type, instead we reboot from the UIManager
         config_.equipment = uiEvent.payload.equipment;
         cfgUpdateCb_(config_);
+        modbusController_->setHasMakeupDemand(config_.equipment.hasMakeupDemand);
         break;
     }
+    case EventType::SetWifi:
+        config_.wifi = uiEvent.payload.wifi;
+        cfgUpdateCb_(config_);
+        wifi_->updateSTA(config_.wifi.ssid, config_.wifi.password);
+        // TODO: Update remote logger with name when we have it
+        break;
     case EventType::FanOverride:
         fanOverrideSpeed_ = uiEvent.payload.fanOverride.speed;
         fanOverrideUntil_ =
