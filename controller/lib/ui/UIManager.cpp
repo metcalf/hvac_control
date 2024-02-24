@@ -44,6 +44,16 @@ void wifiTextareaEventCb(lv_event_t *e) {
     ((UIManager *)lv_event_get_user_data(e))->eWifiTextarea(e);
 }
 
+void heatRollerChangeCb(lv_event_t *e) {
+    UIManager::eventsInst()->handleTempRollerChange(true, lv_event_get_target(e),
+                                                    (lv_obj_t *)lv_event_get_user_data(e));
+}
+
+void coolRollerChangeCb(lv_event_t *e) {
+    UIManager::eventsInst()->handleTempRollerChange(true, (lv_obj_t *)lv_event_get_user_data(e),
+                                                    lv_event_get_target(e));
+}
+
 void objSetFlag(bool on, lv_obj_t *obj, lv_obj_flag_t f) {
     if (on) {
         lv_obj_add_flag(obj, f);
@@ -82,15 +92,48 @@ void UIManager::sendPowerEvent(bool on) {
     eventCb_(evt);
 }
 
-double UIManager::getHeatRollerValue(lv_obj_t *roller) {
-    return ABS_F_TO_C(MIN_HEAT_DEG + lv_roller_get_selected(roller));
+int UIManager::getHeatRollerValueDeg(lv_obj_t *roller) {
+    return MIN_HEAT_DEG + lv_roller_get_selected(roller);
 }
-double UIManager::getCoolRollerValue(lv_obj_t *roller) {
-    return ABS_F_TO_C(minCoolDeg_ + lv_roller_get_selected(roller));
+
+int UIManager::getCoolRollerValueDeg(lv_obj_t *roller) {
+    return minCoolDeg_ + lv_roller_get_selected(roller);
+}
+
+double UIManager::getHeatRollerValueC(lv_obj_t *roller) {
+    return ABS_F_TO_C(getHeatRollerValueDeg(roller));
+}
+double UIManager::getCoolRollerValueC(lv_obj_t *roller) {
+    return ABS_F_TO_C(getCoolRollerValueDeg(roller));
+}
+
+void UIManager::setupTempRollerPair(lv_obj_t *heatRoller, lv_obj_t *coolRoller) {
+    setupTempRoller(heatRoller, MIN_HEAT_DEG, maxHeatDeg_);
+    setupTempRoller(coolRoller, minCoolDeg_, MAX_COOL_DEG);
+
+    lv_obj_add_event_cb(heatRoller, heatRollerChangeCb, LV_EVENT_VALUE_CHANGED, coolRoller);
+    lv_obj_add_event_cb(coolRoller, coolRollerChangeCb, LV_EVENT_VALUE_CHANGED, heatRoller);
+}
+
+// Maintain the minimum separation between heat/cool setpoints as rollers update
+void UIManager::handleTempRollerChange(bool heatChanged, lv_obj_t *heatRoller,
+                                       lv_obj_t *coolRoller) {
+    int heatDeg = getHeatRollerValueDeg(heatRoller);
+    int coolDeg = getCoolRollerValueDeg(coolRoller);
+
+    if (coolDeg - heatDeg < MIN_HEAT_COOL_DELTA_DEG) {
+        if (heatChanged) {
+            lv_roller_set_selected(coolRoller, (heatDeg + MIN_HEAT_COOL_DELTA_DEG) - minCoolDeg_,
+                                   LV_ANIM_ON);
+        } else {
+            lv_roller_set_selected(heatRoller, (coolDeg - MIN_HEAT_COOL_DELTA_DEG) - MIN_HEAT_DEG,
+                                   LV_ANIM_ON);
+        }
+    }
 }
 
 void UIManager::setupTempRoller(lv_obj_t *roller, uint8_t minDeg, uint8_t maxDeg) {
-    // TODO: Maintain required degree separate between temp rollers
+
     assert(maxDeg > minDeg);
     assert(maxDeg < 100);
 
@@ -131,8 +174,8 @@ void UIManager::eFanOverride() {
 void UIManager::eThermotatOverride() {
     Event evt{EventType::TempOverride,
               EventPayload{.tempOverride = {
-                               .heatC = getHeatRollerValue(ui_Heat_override_setpoint),
-                               .coolC = getCoolRollerValue(ui_Cool_override_setpoint),
+                               .heatC = getHeatRollerValueC(ui_Heat_override_setpoint),
+                               .coolC = getCoolRollerValueC(ui_Cool_override_setpoint),
                            }}};
     eventCb_(evt);
 }
@@ -181,14 +224,14 @@ void UIManager::eTargetCO2() {
 
 void UIManager::eSchedule() {
     currSchedules_[0] = {
-        .heatC = getHeatRollerValue(ui_Day_heat_setpoint),
-        .coolC = getHeatRollerValue(ui_Day_cool_setpoint),
+        .heatC = getHeatRollerValueC(ui_Day_heat_setpoint),
+        .coolC = getHeatRollerValueC(ui_Day_cool_setpoint),
         .startHr = (uint8_t)lv_roller_get_selected(ui_Day_hr),
         .startMin = (uint8_t)lv_roller_get_selected(ui_Day_min),
     };
     currSchedules_[1] = {
-        .heatC = getHeatRollerValue(ui_Night_heat_setpoint),
-        .coolC = getHeatRollerValue(ui_Night_cool_setpoint),
+        .heatC = getHeatRollerValueC(ui_Night_heat_setpoint),
+        .coolC = getHeatRollerValueC(ui_Night_cool_setpoint),
         .startHr = (uint8_t)(lv_roller_get_selected(ui_Night_hr) + 12),
         .startMin = (uint8_t)lv_roller_get_selected(ui_Night_min),
     };
@@ -429,12 +472,9 @@ void UIManager::updateTempLimits(uint8_t maxHeatDeg, uint8_t minCoolDeg) {
     maxHeatDeg_ = maxHeatDeg;
     minCoolDeg_ = minCoolDeg;
 
-    setupTempRoller(ui_Heat_override_setpoint, MIN_HEAT_DEG, maxHeatDeg_);
-    setupTempRoller(ui_Cool_override_setpoint, minCoolDeg_, MAX_COOL_DEG);
-    setupTempRoller(ui_Day_heat_setpoint, MIN_HEAT_DEG, maxHeatDeg_);
-    setupTempRoller(ui_Day_cool_setpoint, minCoolDeg_, MAX_COOL_DEG);
-    setupTempRoller(ui_Night_heat_setpoint, MIN_HEAT_DEG, maxHeatDeg_);
-    setupTempRoller(ui_Night_cool_setpoint, minCoolDeg_, MAX_COOL_DEG);
+    setupTempRollerPair(ui_Heat_override_setpoint, ui_Cool_override_setpoint);
+    setupTempRollerPair(ui_Day_heat_setpoint, ui_Day_cool_setpoint);
+    setupTempRollerPair(ui_Night_heat_setpoint, ui_Night_cool_setpoint);
 }
 
 void UIManager::updateUIForEquipment() {

@@ -45,7 +45,9 @@ class UIManager : public AbstractUIManager {
     void bootDone() override;
     void bootErr(const char *msg) override;
 
+    // Hooks called by event/timer callbacks
     void onMessageTimer();
+    void handleTempRollerChange(bool heatChanged, lv_obj_t *heatRoller, lv_obj_t *coolRoller);
 
     // Event hooks called by ui_events.cpp
     void eFanOverride();
@@ -99,8 +101,11 @@ class UIManager : public AbstractUIManager {
 
     void sendACOverrideEvent(ACOverride override);
     void sendPowerEvent(bool on);
-    double getHeatRollerValue(lv_obj_t *roller);
-    double getCoolRollerValue(lv_obj_t *roller);
+    int getHeatRollerValueDeg(lv_obj_t *roller);
+    int getCoolRollerValueDeg(lv_obj_t *roller);
+    double getHeatRollerValueC(lv_obj_t *roller);
+    double getCoolRollerValueC(lv_obj_t *roller);
+    void setupTempRollerPair(lv_obj_t *heatRoller, lv_obj_t *coolRoller);
     void setupTempRoller(lv_obj_t *roller, uint8_t minDeg, uint8_t maxDeg);
     MessageContainer *focusedMessage();
     void updateTempLimits(uint8_t maxHeatDeg, uint8_t minCoolDeg);
