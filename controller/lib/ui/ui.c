@@ -34,6 +34,9 @@ lv_obj_t *ui_Fan_value;
 lv_obj_t *ui_out_temp;
 lv_obj_t *ui_out_symbol;
 lv_obj_t *ui_Out_temp_value;
+void ui_event_settings( lv_event_t * e);
+lv_obj_t *ui_settings;
+lv_obj_t *ui_settings_symbol;
 lv_obj_t *ui_Footer;
 lv_obj_t *ui_message_container;
 lv_obj_t *ui_message_close;
@@ -176,6 +179,114 @@ lv_obj_t *ui_Label19;
 lv_obj_t *ui_Night_min_container;
 lv_obj_t *ui_Night_min;
 lv_obj_t *ui_Label20;
+
+
+// SCREEN: ui_Settings
+void ui_Settings_screen_init(void);
+lv_obj_t *ui_Settings;
+lv_obj_t *ui_Setting_header1;
+lv_obj_t *ui_Container3;
+lv_obj_t *ui_Settings_buttons_left;
+void ui_event_equipment_button( lv_event_t * e);
+lv_obj_t *ui_equipment_button;
+lv_obj_t *ui_Label25;
+void ui_event_temp_limit_button( lv_event_t * e);
+lv_obj_t *ui_temp_limit_button;
+lv_obj_t *ui_Label26;
+void ui_event_equipment_button2( lv_event_t * e);
+lv_obj_t *ui_equipment_button2;
+lv_obj_t *ui_Label27;
+lv_obj_t *ui_Divider4;
+lv_obj_t *ui_Settings_buttons_right;
+void ui_event_schedule_button2( lv_event_t * e);
+lv_obj_t *ui_schedule_button2;
+lv_obj_t *ui_Label23;
+
+
+// SCREEN: ui_Equipment
+void ui_Equipment_screen_init(void);
+void ui_event_Equipment( lv_event_t * e);
+lv_obj_t *ui_Equipment;
+lv_obj_t *ui_Setting_header2;
+void ui_event_Setting_header2_Setting_back_button( lv_event_t * e);
+void ui_event_Setting_header2_Setting_accept_button( lv_event_t * e);
+lv_obj_t *ui_Container4;
+lv_obj_t *ui_controller_type_container;
+lv_obj_t *ui_Label35;
+lv_obj_t *ui_controller_type;
+lv_obj_t *ui_heat_type_container;
+lv_obj_t *ui_Label36;
+lv_obj_t *ui_heat_type;
+lv_obj_t *ui_cool_type_container;
+lv_obj_t *ui_Label37;
+lv_obj_t *ui_cool_type;
+lv_obj_t *ui_makeup_air_container;
+lv_obj_t *ui_Label38;
+lv_obj_t *ui_makeup_air_switch;
+
+
+// SCREEN: ui_Temp_limits
+void ui_Temp_limits_screen_init(void);
+void ui_event_Temp_limits( lv_event_t * e);
+lv_obj_t *ui_Temp_limits;
+lv_obj_t *ui_Thermostat_setting_header2;
+void ui_event_Thermostat_setting_header2_Setting_back_button( lv_event_t * e);
+void ui_event_Thermostat_setting_header2_Setting_accept_button( lv_event_t * e);
+lv_obj_t *ui_Container5;
+lv_obj_t *ui_heat_limit_container;
+lv_obj_t *ui_heat_limit;
+lv_obj_t *ui_Label28;
+lv_obj_t *ui_Divider5;
+lv_obj_t *ui_Override_cool_container1;
+lv_obj_t *ui_cool_limit;
+lv_obj_t *ui_Label29;
+
+
+// SCREEN: ui_Temp_offsets
+void ui_Temp_offsets_screen_init(void);
+void ui_event_Temp_offsets( lv_event_t * e);
+lv_obj_t *ui_Temp_offsets;
+lv_obj_t *ui_Thermostat_setting_header3;
+void ui_event_Thermostat_setting_header3_Setting_back_button( lv_event_t * e);
+void ui_event_Thermostat_setting_header3_Setting_accept_button( lv_event_t * e);
+lv_obj_t *ui_Container7;
+lv_obj_t *ui_indoor_offset_container;
+lv_obj_t *ui_Label30;
+void ui_event_indoor_offset( lv_event_t * e);
+lv_obj_t *ui_indoor_offset;
+lv_obj_t *ui_indoor_offset_label;
+lv_obj_t *ui_fan_offset_divider;
+lv_obj_t *ui_fan_offset_container;
+lv_obj_t *ui_Label39;
+void ui_event_fan_offset( lv_event_t * e);
+lv_obj_t *ui_fan_offset;
+lv_obj_t *ui_fan_offset_label;
+
+
+// SCREEN: ui_Wifi
+void ui_Wifi_screen_init(void);
+void ui_event_Wifi( lv_event_t * e);
+lv_obj_t *ui_Wifi;
+lv_obj_t *ui_Setting_header3;
+void ui_event_Setting_header3_Setting_back_button( lv_event_t * e);
+void ui_event_Setting_header3_Setting_accept_button( lv_event_t * e);
+lv_obj_t *ui_Container8;
+lv_obj_t *ui_ssid_container;
+lv_obj_t *ui_Label40;
+lv_obj_t *ui_wifi_ssid;
+lv_obj_t *ui_password_container;
+lv_obj_t *ui_Label41;
+lv_obj_t *ui_wifi_password;
+lv_obj_t *ui_log_name_container;
+lv_obj_t *ui_Label42;
+lv_obj_t *ui_log_name;
+lv_obj_t *ui_wifi_keyboard;
+
+
+// SCREEN: ui_Restart
+void ui_Restart_screen_init(void);
+lv_obj_t *ui_Restart;
+lv_obj_t *ui_boot_message1;
 lv_obj_t *ui____initial_actions0;
 
 ///////////////////// TEST LVGL SETTINGS ////////////////////
@@ -225,6 +336,12 @@ void ui_event_Fan( lv_event_t * e) {
     lv_event_code_t event_code = lv_event_get_code(e);lv_obj_t * target = lv_event_get_target(e);
 if ( event_code == LV_EVENT_CLICKED) {
       _ui_screen_change( &ui_Fan_speed_override, LV_SCR_LOAD_ANIM_NONE, 0, 0, &ui_Fan_speed_override_screen_init);
+}
+}
+void ui_event_settings( lv_event_t * e) {
+    lv_event_code_t event_code = lv_event_get_code(e);lv_obj_t * target = lv_event_get_target(e);
+if ( event_code == LV_EVENT_CLICKED) {
+      _ui_screen_change( &ui_Settings, LV_SCR_LOAD_ANIM_NONE, 0, 0, &ui_Settings_screen_init);
 }
 }
 void ui_event_indoor_temps_container( lv_event_t * e) {
@@ -345,6 +462,117 @@ if ( event_code == LV_EVENT_CLICKED) {
       _ui_screen_change( &ui_Home, LV_SCR_LOAD_ANIM_NONE, 0, 0, &ui_Home_screen_init);
 }
 }
+void ui_event_equipment_button( lv_event_t * e) {
+    lv_event_code_t event_code = lv_event_get_code(e);lv_obj_t * target = lv_event_get_target(e);
+if ( event_code == LV_EVENT_CLICKED) {
+      _ui_screen_change( &ui_Equipment, LV_SCR_LOAD_ANIM_NONE, 0, 0, &ui_Equipment_screen_init);
+}
+}
+void ui_event_temp_limit_button( lv_event_t * e) {
+    lv_event_code_t event_code = lv_event_get_code(e);lv_obj_t * target = lv_event_get_target(e);
+if ( event_code == LV_EVENT_CLICKED) {
+      _ui_screen_change( &ui_Temp_limits, LV_SCR_LOAD_ANIM_NONE, 0, 0, &ui_Temp_limits_screen_init);
+}
+}
+void ui_event_equipment_button2( lv_event_t * e) {
+    lv_event_code_t event_code = lv_event_get_code(e);lv_obj_t * target = lv_event_get_target(e);
+if ( event_code == LV_EVENT_CLICKED) {
+      _ui_screen_change( &ui_Temp_offsets, LV_SCR_LOAD_ANIM_NONE, 0, 0, &ui_Temp_offsets_screen_init);
+}
+}
+void ui_event_schedule_button2( lv_event_t * e) {
+    lv_event_code_t event_code = lv_event_get_code(e);lv_obj_t * target = lv_event_get_target(e);
+if ( event_code == LV_EVENT_CLICKED) {
+      _ui_screen_change( &ui_Wifi, LV_SCR_LOAD_ANIM_NONE, 0, 0, &ui_Wifi_screen_init);
+}
+}
+void ui_event_Equipment( lv_event_t * e) {
+    lv_event_code_t event_code = lv_event_get_code(e);lv_obj_t * target = lv_event_get_target(e);
+if ( event_code == LV_EVENT_SCREEN_LOAD_START) {
+      equipment_settings_load_start( e );
+}
+}
+void ui_event_Setting_header2_Setting_back_button( lv_event_t * e) {
+    lv_event_code_t event_code = lv_event_get_code(e);lv_obj_t * target = lv_event_get_target(e);
+if ( event_code == LV_EVENT_CLICKED) {
+      _ui_screen_change( &ui_Settings, LV_SCR_LOAD_ANIM_NONE, 0, 0, &ui_Settings_screen_init);
+}
+}
+void ui_event_Setting_header2_Setting_accept_button( lv_event_t * e) {
+    lv_event_code_t event_code = lv_event_get_code(e);lv_obj_t * target = lv_event_get_target(e);
+if ( event_code == LV_EVENT_CLICKED) {
+      save_equipment_settings( e );
+}
+}
+void ui_event_Temp_limits( lv_event_t * e) {
+    lv_event_code_t event_code = lv_event_get_code(e);lv_obj_t * target = lv_event_get_target(e);
+if ( event_code == LV_EVENT_SCREEN_LOAD_START) {
+      temp_limits_load_start( e );
+}
+}
+void ui_event_Thermostat_setting_header2_Setting_back_button( lv_event_t * e) {
+    lv_event_code_t event_code = lv_event_get_code(e);lv_obj_t * target = lv_event_get_target(e);
+if ( event_code == LV_EVENT_CLICKED) {
+      _ui_screen_change( &ui_Settings, LV_SCR_LOAD_ANIM_NONE, 0, 0, &ui_Settings_screen_init);
+}
+}
+void ui_event_Thermostat_setting_header2_Setting_accept_button( lv_event_t * e) {
+    lv_event_code_t event_code = lv_event_get_code(e);lv_obj_t * target = lv_event_get_target(e);
+if ( event_code == LV_EVENT_CLICKED) {
+      save_temp_limits( e );
+      _ui_screen_change( &ui_Home, LV_SCR_LOAD_ANIM_NONE, 0, 0, &ui_Home_screen_init);
+}
+}
+void ui_event_Temp_offsets( lv_event_t * e) {
+    lv_event_code_t event_code = lv_event_get_code(e);lv_obj_t * target = lv_event_get_target(e);
+if ( event_code == LV_EVENT_SCREEN_LOAD_START) {
+      temp_offsets_load_start( e );
+}
+}
+void ui_event_Thermostat_setting_header3_Setting_back_button( lv_event_t * e) {
+    lv_event_code_t event_code = lv_event_get_code(e);lv_obj_t * target = lv_event_get_target(e);
+if ( event_code == LV_EVENT_CLICKED) {
+      _ui_screen_change( &ui_Settings, LV_SCR_LOAD_ANIM_NONE, 0, 0, &ui_Settings_screen_init);
+}
+}
+void ui_event_Thermostat_setting_header3_Setting_accept_button( lv_event_t * e) {
+    lv_event_code_t event_code = lv_event_get_code(e);lv_obj_t * target = lv_event_get_target(e);
+if ( event_code == LV_EVENT_CLICKED) {
+      save_temp_offsets( e );
+      _ui_screen_change( &ui_Home, LV_SCR_LOAD_ANIM_NONE, 0, 0, &ui_Home_screen_init);
+}
+}
+void ui_event_indoor_offset( lv_event_t * e) {
+    lv_event_code_t event_code = lv_event_get_code(e);lv_obj_t * target = lv_event_get_target(e);
+if ( event_code == LV_EVENT_VALUE_CHANGED) {
+      temp_offset_changed( e );
+}
+}
+void ui_event_fan_offset( lv_event_t * e) {
+    lv_event_code_t event_code = lv_event_get_code(e);lv_obj_t * target = lv_event_get_target(e);
+if ( event_code == LV_EVENT_VALUE_CHANGED) {
+      temp_offset_changed( e );
+}
+}
+void ui_event_Wifi( lv_event_t * e) {
+    lv_event_code_t event_code = lv_event_get_code(e);lv_obj_t * target = lv_event_get_target(e);
+if ( event_code == LV_EVENT_SCREEN_LOAD_START) {
+      wifi_settings_load_start( e );
+}
+}
+void ui_event_Setting_header3_Setting_back_button( lv_event_t * e) {
+    lv_event_code_t event_code = lv_event_get_code(e);lv_obj_t * target = lv_event_get_target(e);
+if ( event_code == LV_EVENT_CLICKED) {
+      _ui_screen_change( &ui_Settings, LV_SCR_LOAD_ANIM_FADE_ON, 500, 0, &ui_Settings_screen_init);
+}
+}
+void ui_event_Setting_header3_Setting_accept_button( lv_event_t * e) {
+    lv_event_code_t event_code = lv_event_get_code(e);lv_obj_t * target = lv_event_get_target(e);
+if ( event_code == LV_EVENT_CLICKED) {
+      _ui_screen_change( &ui_Settings, LV_SCR_LOAD_ANIM_NONE, 0, 0, &ui_Settings_screen_init);
+      save_wifi_settings( e );
+}
+}
 
 ///////////////////// SCREENS ////////////////////
 
@@ -360,6 +588,12 @@ ui_Fan_speed_override_screen_init();
 ui_Thermostat_screen_init();
 ui_CO2_screen_init();
 ui_Schedule_screen_init();
+ui_Settings_screen_init();
+ui_Equipment_screen_init();
+ui_Temp_limits_screen_init();
+ui_Temp_offsets_screen_init();
+ui_Wifi_screen_init();
+ui_Restart_screen_init();
 ui____initial_actions0 = lv_obj_create(NULL);
 lv_disp_load_scr( ui_Boot);
 }

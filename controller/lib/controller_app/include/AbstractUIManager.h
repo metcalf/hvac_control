@@ -17,10 +17,21 @@ class AbstractUIManager {
         double heatC, coolC;
     };
 
+    struct TempLimits {
+        double maxHeatC, minCoolC;
+    };
+
+    struct TempOffsets {
+        double inTempOffsetC, outTempOffsetC;
+    };
+
     enum class EventType {
         SetSchedule,
         SetCO2Target,
         SetSystemPower,
+        SetTempLimits,
+        SetTempOffsets,
+        SetEquipment,
         FanOverride,
         TempOverride,
         ACOverride,
@@ -33,6 +44,9 @@ class AbstractUIManager {
         bool systemPower;
         FanOverride fanOverride;
         TempOverride tempOverride;
+        TempLimits tempLimits;
+        TempOffsets tempOffsets;
+        ControllerDomain::Config::Equipment equipment;
         ACOverride acOverride;
         uint8_t msgID;
     };

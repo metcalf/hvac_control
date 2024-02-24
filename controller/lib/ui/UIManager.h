@@ -62,6 +62,15 @@ class UIManager : public AbstractUIManager {
     void eCO2LoadStart();
     void eThermostatLoadStart();
     void eScheduleLoadStart();
+    void eSaveEquipmentSettings();
+    void eSaveTempLimits();
+    void eSaveTempOffsets();
+    void eSaveWifiSettings();
+    void eEquipmentSettingsLoadStart();
+    void eTempLimitsLoadStart();
+    void eTempOffsetsLoadStart();
+    void eWifiSettingsLoadStart();
+    void eTempOffsetChanged();
 
     static void setEventsInst(UIManager *inst) { eventsInst_ = inst; }
     static UIManager *eventsInst() { return eventsInst_; }
@@ -93,18 +102,21 @@ class UIManager : public AbstractUIManager {
     double getCoolRollerValue(lv_obj_t *roller);
     void setupTempRoller(lv_obj_t *roller, uint8_t minDeg, uint8_t maxDeg);
     MessageContainer *focusedMessage();
+    void updateTempLimits(uint8_t maxHeatDeg, uint8_t minCoolDeg);
+    void updateUIForEquipment();
 
     inline static UIManager *eventsInst_;
 
     SemaphoreHandle_t mutex_;
     MessageContainer **messages_;
     size_t nMsgIds_;
-    lv_timer_t *msgTimer_;
+    lv_timer_t *msgTimer_, *restartTimer_;
     lv_coord_t msgHeight_;
     eventCb_t eventCb_;
 
     uint16_t co2Target_;
-    uint8_t minHeatDeg_ = 50, maxHeatDeg_, minCoolDeg_, maxCoolDeg_ = 99, currHeatDeg_,
-            currCoolDeg_;
+    uint8_t maxHeatDeg_, minCoolDeg_, currHeatDeg_, currCoolDeg_;
+    double currInTempC_, currOutTempC_, inTempOffsetC_, outTempOffsetC_;
     ControllerDomain::Config::Schedule currSchedules_[NUM_SCHEDULE_TIMES];
+    ControllerDomain::Config::Equipment equipment_;
 };

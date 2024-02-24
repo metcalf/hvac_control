@@ -8,15 +8,41 @@ static const char *TAG = "UI";
 using HVACState = ControllerDomain::HVACState;
 using Config = ControllerDomain::Config;
 
+#define RESTART_DELAY_MS 1500
 #define MSG_SCROLL_MS 5 * 1000
+#define TEMP_LIMIT_ROLLER_START 64
+#define MIN_HEAT_DEG 50
+#define MAX_COOL_DEG 99
+#define MIN_HEAT_COOL_DELTA_DEG 2
+#define MIN_HEAT_COOL_DELTA_C ABS_F_TO_C(MIN_HEAT_COOL_DELTA_DEG)
+
+uint8_t getTempOffsetTenthDeg(lv_obj_t *roller) { return lv_roller_get_selected(roller) - 50; }
+
+double getTempOffsetF(lv_obj_t *roller) { return ((double)getTempOffsetTenthDeg(roller)) / 10; }
+
+uint16_t tempOffsetRollerOpt(double tempOffsetC) { return REL_C_TO_F(tempOffsetC) * 10 + 50; }
 
 void messageTimerCb(lv_timer_t *timer) { ((UIManager *)timer->user_data)->onMessageTimer(); }
+
+void restartCb(lv_timer_t *) { esp_restart(); }
 
 void pauseTimer(lv_event_t *e) { lv_timer_pause((lv_timer_t *)e->user_data); }
 
 void resetAndResumeTimer(lv_event_t *e) {
     lv_timer_reset((lv_timer_t *)e->user_data);
     lv_timer_resume((lv_timer_t *)e->user_data);
+}
+
+void objSetFlag(bool on, lv_obj_t *obj, lv_obj_flag_t f) {
+    if (on) {
+        lv_obj_add_flag(obj, f);
+    } else {
+        lv_obj_clear_flag(obj, f);
+    }
+}
+
+void objSetVisibility(bool visible, lv_obj_t *obj) {
+    objSetFlag(!visible, obj, LV_OBJ_FLAG_HIDDEN);
 }
 
 void UIManager::bootDone() {
@@ -29,9 +55,9 @@ void UIManager::bootErr(const char *msg) {
     xSemaphoreTake(mutex_, portMAX_DELAY);
     lv_label_set_text(ui_boot_error_text, msg);
 
-    lv_obj_add_flag(ui_boot_message, LV_OBJ_FLAG_HIDDEN);
-    lv_obj_clear_flag(ui_boot_error_heading, LV_OBJ_FLAG_HIDDEN);
-    lv_obj_clear_flag(ui_boot_error_text, LV_OBJ_FLAG_HIDDEN);
+    objSetVisibility(false, ui_boot_message);
+    objSetVisibility(true, ui_boot_error_heading);
+    objSetVisibility(true, ui_boot_error_text);
     xSemaphoreGive(mutex_);
 }
 
@@ -46,7 +72,7 @@ void UIManager::sendPowerEvent(bool on) {
 }
 
 double UIManager::getHeatRollerValue(lv_obj_t *roller) {
-    return ABS_F_TO_C(minHeatDeg_ + lv_roller_get_selected(roller));
+    return ABS_F_TO_C(MIN_HEAT_DEG + lv_roller_get_selected(roller));
 }
 double UIManager::getCoolRollerValue(lv_obj_t *roller) {
     return ABS_F_TO_C(minCoolDeg_ + lv_roller_get_selected(roller));
@@ -104,24 +130,24 @@ void UIManager::eUseAC() {
     sendACOverrideEvent(ACOverride::Force);
 
     // Hide "use A/C" and show "stop A/C"
-    lv_obj_add_flag(ui_use_ac_button, LV_OBJ_FLAG_HIDDEN);
-    lv_obj_clear_flag(ui_stop_ac_button, LV_OBJ_FLAG_HIDDEN);
+    objSetVisibility(false, ui_use_ac_button);
+    objSetVisibility(true, ui_stop_ac_button);
 }
 
 void UIManager::eStopAC() {
     sendACOverrideEvent(ACOverride::Stop);
 
     // Hide "stop A/C" and show "allow A/C"
-    lv_obj_add_flag(ui_stop_ac_button, LV_OBJ_FLAG_HIDDEN);
-    lv_obj_clear_flag(ui_allow_ac_button, LV_OBJ_FLAG_HIDDEN);
+    objSetVisibility(false, ui_stop_ac_button);
+    objSetVisibility(true, ui_allow_ac_button);
 }
 
 void UIManager::eAllowAC() {
     sendACOverrideEvent(ACOverride::Normal);
 
     // Hide "allow A/C" and show "stop A/C"
-    lv_obj_add_flag(ui_allow_ac_button, LV_OBJ_FLAG_HIDDEN);
-    lv_obj_clear_flag(ui_stop_ac_button, LV_OBJ_FLAG_HIDDEN);
+    objSetVisibility(false, ui_allow_ac_button);
+    objSetVisibility(true, ui_stop_ac_button);
 }
 
 void UIManager::eSystemOff() {
@@ -143,25 +169,23 @@ void UIManager::eTargetCO2() {
 }
 
 void UIManager::eSchedule() {
-    Event evt{EventType::SetSchedule,
-              EventPayload{.schedules = {
-                               {
-                                   .heatC = getHeatRollerValue(ui_Day_heat_setpoint),
-                                   .coolC = getHeatRollerValue(ui_Day_cool_setpoint),
-                                   .startHr = (uint8_t)lv_roller_get_selected(ui_Day_hr),
-                                   .startMin = (uint8_t)lv_roller_get_selected(ui_Day_min),
-                               },
-                               {
-                                   .heatC = getHeatRollerValue(ui_Night_heat_setpoint),
-                                   .coolC = getHeatRollerValue(ui_Night_cool_setpoint),
-                                   .startHr = (uint8_t)(lv_roller_get_selected(ui_Night_hr) + 12),
-                                   .startMin = (uint8_t)lv_roller_get_selected(ui_Night_min),
-                               },
-                           }}};
+    currSchedules_[0] = {
+        .heatC = getHeatRollerValue(ui_Day_heat_setpoint),
+        .coolC = getHeatRollerValue(ui_Day_cool_setpoint),
+        .startHr = (uint8_t)lv_roller_get_selected(ui_Day_hr),
+        .startMin = (uint8_t)lv_roller_get_selected(ui_Day_min),
+    };
+    currSchedules_[1] = {
+        .heatC = getHeatRollerValue(ui_Night_heat_setpoint),
+        .coolC = getHeatRollerValue(ui_Night_cool_setpoint),
+        .startHr = (uint8_t)(lv_roller_get_selected(ui_Night_hr) + 12),
+        .startMin = (uint8_t)lv_roller_get_selected(ui_Night_min),
+    };
 
-    currSchedules_[0] = evt.payload.schedules[0];
-    currSchedules_[1] = evt.payload.schedules[1];
-
+    Event evt{EventType::SetSchedule, EventPayload{.schedules = {
+                                                       currSchedules_[0],
+                                                       currSchedules_[1],
+                                                   }}};
     eventCb_(evt);
 }
 
@@ -183,14 +207,14 @@ void UIManager::eCO2LoadStart() {
 
 void UIManager::eThermostatLoadStart() {
     ESP_LOGD(TAG, "thermostatLoadStart");
-    lv_roller_set_selected(ui_Heat_override_setpoint, currHeatDeg_ - minHeatDeg_, LV_ANIM_OFF);
+    lv_roller_set_selected(ui_Heat_override_setpoint, currHeatDeg_ - MIN_HEAT_DEG, LV_ANIM_OFF);
     lv_roller_set_selected(ui_Cool_override_setpoint, currCoolDeg_ - minCoolDeg_, LV_ANIM_OFF);
 }
 
 void UIManager::eScheduleLoadStart() {
     ESP_LOGD(TAG, "scheduleLoadStart");
     lv_roller_set_selected(ui_Day_heat_setpoint,
-                           std::round(ABS_C_TO_F(currSchedules_[0].heatC)) - minHeatDeg_,
+                           std::round(ABS_C_TO_F(currSchedules_[0].heatC)) - MIN_HEAT_DEG,
                            LV_ANIM_OFF);
     lv_roller_set_selected(ui_Day_cool_setpoint,
                            std::round(ABS_C_TO_F(currSchedules_[0].coolC)) - minCoolDeg_,
@@ -199,7 +223,7 @@ void UIManager::eScheduleLoadStart() {
     lv_roller_set_selected(ui_Day_min, currSchedules_[0].startMin, LV_ANIM_OFF);
 
     lv_roller_set_selected(ui_Night_heat_setpoint,
-                           std::round(ABS_C_TO_F(currSchedules_[1].heatC)) - minHeatDeg_,
+                           std::round(ABS_C_TO_F(currSchedules_[1].heatC)) - MIN_HEAT_DEG,
                            LV_ANIM_OFF);
     lv_roller_set_selected(ui_Night_cool_setpoint,
                            std::round(ABS_C_TO_F(currSchedules_[1].coolC)) - minCoolDeg_,
@@ -208,6 +232,119 @@ void UIManager::eScheduleLoadStart() {
     lv_roller_set_selected(ui_Night_min, currSchedules_[1].startMin, LV_ANIM_OFF);
 }
 
+void UIManager::eSaveEquipmentSettings() {
+    Config::ControllerType newType =
+        Config::ControllerType(lv_dropdown_get_selected(ui_controller_type));
+    bool typeChanged = newType != equipment_.controllerType;
+
+    equipment_.controllerType = newType;
+    equipment_.heatType = Config::HVACType(lv_dropdown_get_selected(ui_heat_type));
+    equipment_.coolType = Config::HVACType(lv_dropdown_get_selected(ui_cool_type));
+    equipment_.hasMakeupDemand = lv_obj_has_state(ui_makeup_air_switch, LV_STATE_CHECKED);
+
+    updateUIForEquipment();
+
+    Event evt{
+        EventType::SetEquipment,
+        EventPayload{.equipment = equipment_},
+    };
+
+    eventCb_(evt);
+
+    // Show reboot screen if the controller changed, otherwise back to settings
+    if (typeChanged) {
+        lv_timer_resume(restartTimer_);
+        _ui_screen_change(&ui_Restart, LV_SCR_LOAD_ANIM_NONE, 0, 0, &ui_Restart_screen_init);
+    } else {
+        _ui_screen_change(&ui_Settings, LV_SCR_LOAD_ANIM_NONE, 0, 0, &ui_Settings_screen_init);
+    }
+}
+
+void UIManager::eSaveTempLimits() {
+    double maxHeatC = ABS_F_TO_C(maxHeatDeg_);
+    double minCoolC = ABS_F_TO_C(minCoolDeg_);
+
+    updateTempLimits(lv_roller_get_selected(ui_heat_limit) + TEMP_LIMIT_ROLLER_START,
+                     lv_roller_get_selected(ui_cool_limit) + TEMP_LIMIT_ROLLER_START);
+    Event evt{EventType::SetTempLimits, EventPayload{.tempLimits = {
+                                                         .maxHeatC = maxHeatC,
+                                                         .minCoolC = minCoolC,
+                                                     }}};
+    eventCb_(evt);
+
+    // Update schedules to confirm to the new limits
+    bool scheduleChanged = false;
+    for (int i = 0; i < NUM_SCHEDULE_TIMES; i++) {
+        Config::Schedule *schedule = &currSchedules_[i];
+        if (schedule->coolC < minCoolC) {
+            schedule->coolC = minCoolC;
+            if ((schedule->coolC - schedule->heatC) < MIN_HEAT_COOL_DELTA_C) {
+                schedule->heatC = schedule->coolC - MIN_HEAT_COOL_DELTA_C;
+            }
+            scheduleChanged = true;
+        }
+        if (schedule->heatC > maxHeatC) {
+            schedule->heatC = maxHeatC;
+            if ((schedule->coolC - schedule->heatC) < MIN_HEAT_COOL_DELTA_C) {
+                schedule->coolC = schedule->heatC + MIN_HEAT_COOL_DELTA_C;
+            }
+            scheduleChanged = true;
+        }
+    }
+    if (scheduleChanged) {
+        Event scheduleEvt{EventType::SetSchedule, EventPayload{.schedules = {
+                                                                   currSchedules_[0],
+                                                                   currSchedules_[1],
+                                                               }}};
+        eventCb_(scheduleEvt);
+    }
+}
+
+void UIManager::eSaveTempOffsets() {
+    inTempOffsetC_ = REL_F_TO_C(getTempOffsetF(ui_indoor_offset));
+    outTempOffsetC_ = REL_F_TO_C(getTempOffsetF(ui_fan_offset));
+
+    Event evt{
+        EventType::SetTempOffsets,
+        EventPayload{.tempOffsets =
+                         {
+                             .inTempOffsetC = inTempOffsetC_,
+                             .outTempOffsetC = outTempOffsetC_,
+                         }},
+    };
+    eventCb_(evt);
+}
+
+void UIManager::eEquipmentSettingsLoadStart() {
+    lv_dropdown_set_selected(ui_controller_type, static_cast<uint16_t>(equipment_.controllerType));
+    lv_dropdown_set_selected(ui_heat_type, static_cast<uint16_t>(equipment_.heatType));
+    lv_dropdown_set_selected(ui_cool_type, static_cast<uint16_t>(equipment_.coolType));
+    if (equipment_.hasMakeupDemand) {
+        lv_obj_add_state(ui_makeup_air_switch, LV_STATE_CHECKED);
+    } else {
+        lv_obj_clear_state(ui_makeup_air_switch, LV_STATE_CHECKED);
+    }
+}
+
+void UIManager::eTempLimitsLoadStart() {
+    lv_roller_set_selected(ui_heat_limit, maxHeatDeg_ - TEMP_LIMIT_ROLLER_START, LV_ANIM_OFF);
+    lv_roller_set_selected(ui_cool_limit, minCoolDeg_ - TEMP_LIMIT_ROLLER_START, LV_ANIM_OFF);
+}
+
+void UIManager::eTempOffsetsLoadStart() {
+    lv_roller_set_selected(ui_indoor_offset, tempOffsetRollerOpt(inTempOffsetC_), LV_ANIM_OFF);
+    lv_roller_set_selected(ui_fan_offset, tempOffsetRollerOpt(outTempOffsetC_), LV_ANIM_OFF);
+    eTempOffsetChanged(); // Trigger update of current temp values
+}
+
+void UIManager::eTempOffsetChanged() {
+    lv_label_set_text_fmt(ui_indoor_offset_label, "%.1f°",
+                          ABS_C_TO_F(currInTempC_) + getTempOffsetF(ui_indoor_offset), LV_ANIM_OFF);
+    lv_label_set_text_fmt(ui_fan_offset_label, "%.1f°",
+                          ABS_C_TO_F(currOutTempC_) + getTempOffsetF(ui_fan_offset), LV_ANIM_OFF);
+}
+
+// TODO: Fix message scrolling
 void UIManager::onMessageTimer() {
     // TODO(future): It'd be nicer to make this a circular scroll
 
@@ -228,10 +365,50 @@ void UIManager::onMessageTimer() {
     lv_obj_scroll_to_y(ui_Footer, newY, LV_ANIM_ON);
 }
 
+void UIManager::updateTempLimits(uint8_t maxHeatDeg, uint8_t minCoolDeg) {
+    maxHeatDeg_ = maxHeatDeg;
+    minCoolDeg_ = minCoolDeg;
+
+    setupTempRoller(ui_Heat_override_setpoint, MIN_HEAT_DEG, maxHeatDeg_);
+    setupTempRoller(ui_Cool_override_setpoint, minCoolDeg_, MAX_COOL_DEG);
+    setupTempRoller(ui_Day_heat_setpoint, MIN_HEAT_DEG, maxHeatDeg_);
+    setupTempRoller(ui_Day_cool_setpoint, minCoolDeg_, MAX_COOL_DEG);
+    setupTempRoller(ui_Night_heat_setpoint, MIN_HEAT_DEG, maxHeatDeg_);
+    setupTempRoller(ui_Night_cool_setpoint, minCoolDeg_, MAX_COOL_DEG);
+}
+
+void UIManager::updateUIForEquipment() {
+    // Hide AC buttons if we don't have active cooling
+    objSetFlag(equipment_.coolType == Config::HVACType::None, ui_ac_button_container,
+               LV_OBJ_FLAG_HIDDEN);
+
+    bool isSecondary = equipment_.controllerType == Config::ControllerType::Secondary;
+
+    // Disable some controls on the secondary controller to simplify communications
+    objSetVisibility(!isSecondary, ui_ac_button_container);
+    objSetVisibility(!isSecondary, ui_power_button_container);
+    objSetVisibility(!isSecondary, ui_fan_override_container);
+    objSetVisibility(
+        !isSecondary,
+        ui_comp_get_child(ui_fan_setting_header,
+                          UI_COMP_SETTING_HEADER_SETTING_ACCEPT_BUTTON_SETTING_ACCEPT_LABEL));
+    objSetVisibility(isSecondary, ui_fan_override_secondary_container);
+
+    // Settings
+    objSetVisibility(!isSecondary, ui_heat_type_container);
+    objSetVisibility(!isSecondary, ui_cool_type_container);
+    objSetVisibility(!isSecondary, ui_makeup_air_container);
+    objSetVisibility(!isSecondary, ui_fan_offset_container);
+    objSetVisibility(!isSecondary, ui_fan_offset_divider);
+}
+
 UIManager::UIManager(ControllerDomain::Config config, size_t nMsgIds, eventCb_t eventCb)
     : eventCb_(eventCb) {
     mutex_ = xSemaphoreCreateMutex();
 
+    inTempOffsetC_ = config.inTempOffsetC;
+    outTempOffsetC_ = config.outTempOffsetC;
+    equipment_ = config.equipment;
     co2Target_ = config.co2Target;
 
     ui_init();
@@ -239,34 +416,12 @@ UIManager::UIManager(ControllerDomain::Config config, size_t nMsgIds, eventCb_t 
     for (int i = 0; i < NUM_SCHEDULE_TIMES; i++) {
         currSchedules_[i] = config.schedules[i];
     }
-    maxHeatDeg_ = std::round(ABS_C_TO_F(config.maxHeatC));
-    minCoolDeg_ = std::round(ABS_C_TO_F(config.minCoolC));
-
-    setupTempRoller(ui_Heat_override_setpoint, minHeatDeg_, maxHeatDeg_);
-    setupTempRoller(ui_Cool_override_setpoint, minCoolDeg_, maxCoolDeg_);
-    setupTempRoller(ui_Day_heat_setpoint, minHeatDeg_, maxHeatDeg_);
-    setupTempRoller(ui_Day_cool_setpoint, minCoolDeg_, maxCoolDeg_);
-    setupTempRoller(ui_Night_heat_setpoint, minHeatDeg_, maxHeatDeg_);
-    setupTempRoller(ui_Night_cool_setpoint, minCoolDeg_, maxCoolDeg_);
+    updateTempLimits(std::round(ABS_C_TO_F(config.maxHeatC)),
+                     std::round(ABS_C_TO_F(config.minCoolC)));
 
     lv_label_set_text_fmt(ui_co2_target_value, "%u", config.co2Target);
 
-    // Hide AC buttons if we don't have active cooling
-    if (config.coolType == Config::HVACType::None) {
-        lv_obj_add_flag(ui_ac_button_container, LV_OBJ_FLAG_HIDDEN);
-    }
-
-    // Disable some controls on the secondary controller to simplify communications
-    if (config.controllerType == Config::ControllerType::Secondary) {
-        lv_obj_add_flag(ui_ac_button_container, LV_OBJ_FLAG_HIDDEN);
-        lv_obj_add_flag(ui_power_button_container, LV_OBJ_FLAG_HIDDEN);
-        lv_obj_add_flag(ui_fan_override_container, LV_OBJ_FLAG_HIDDEN);
-        lv_obj_add_flag(
-            ui_comp_get_child(ui_fan_setting_header,
-                              UI_COMP_SETTING_HEADER_SETTING_ACCEPT_BUTTON_SETTING_ACCEPT_LABEL),
-            LV_OBJ_FLAG_HIDDEN);
-        lv_obj_clear_flag(ui_fan_override_secondary_container, LV_OBJ_FLAG_HIDDEN);
-    }
+    updateUIForEquipment();
 
     // Delete the message container we created with Squareline for design purposes
     lv_obj_del(ui_message_container);
@@ -280,6 +435,7 @@ UIManager::UIManager(ControllerDomain::Config config, size_t nMsgIds, eventCb_t 
 
     msgHeight_ = messages_[0]->getHeight();
     msgTimer_ = lv_timer_create(messageTimerCb, MSG_SCROLL_MS, this);
+    restartTimer_ = lv_timer_create(restartCb, RESTART_DELAY_MS, NULL);
 
     lv_obj_add_event_cb(ui_Footer, pauseTimer, LV_EVENT_SCROLL_BEGIN, msgTimer_);
     lv_obj_add_event_cb(ui_Footer, resetAndResumeTimer, LV_EVENT_SCROLL_END, msgTimer_);
@@ -308,6 +464,7 @@ void UIManager::setCurrentFanSpeed(uint8_t speed) {
 
 void UIManager::setOutTempC(double tc) {
     xSemaphoreTake(mutex_, portMAX_DELAY);
+    currOutTempC_ = tc;
     if (std::isnan(tc)) {
         lv_label_set_text(ui_Out_temp_value, "--°");
     } else {
@@ -318,6 +475,7 @@ void UIManager::setOutTempC(double tc) {
 
 void UIManager::setInTempC(double tc) {
     xSemaphoreTake(mutex_, portMAX_DELAY);
+    currInTempC_ = tc;
     if (std::isnan(tc)) {
         lv_label_set_text(ui_Indoor_temp_value, "--°");
     } else {
@@ -347,8 +505,8 @@ void UIManager::setHVACState(ControllerDomain::HVACState state) {
 
     if (state == HVACState::ACCool) {
         // Hide "use AC", show "stop A/C"
-        lv_obj_add_flag(ui_use_ac_button, LV_OBJ_FLAG_HIDDEN);
-        lv_obj_clear_flag(ui_stop_ac_button, LV_OBJ_FLAG_HIDDEN);
+        objSetVisibility(false, ui_use_ac_button);
+        objSetVisibility(true, ui_stop_ac_button);
     }
     xSemaphoreGive(mutex_);
 }
@@ -376,8 +534,8 @@ void UIManager::setSystemPower(bool on) {
         lv_obj_set_style_opa(objs[i], opa, 0);
     }
 
-    lv_obj_add_flag(on ? ui_on_button : ui_off_button, LV_OBJ_FLAG_HIDDEN);
-    lv_obj_clear_flag(on ? ui_off_button : ui_on_button, LV_OBJ_FLAG_HIDDEN);
+    objSetVisibility(!on, ui_on_button);
+    objSetVisibility(on, ui_off_button);
     xSemaphoreGive(mutex_);
 }
 
@@ -455,12 +613,7 @@ void UIManager::MessageContainer::setVisibility(bool visible) {
         return;
     }
 
-    if (visible) {
-        lv_obj_clear_flag(container_, LV_OBJ_FLAG_HIDDEN);
-    } else {
-        lv_obj_add_flag(container_, LV_OBJ_FLAG_HIDDEN);
-    }
-
+    objSetVisibility(visible, container_);
     visible_ = visible;
 }
 
@@ -469,11 +622,7 @@ void UIManager::MessageContainer::setCancelable(bool cancelable) {
         return;
     }
 
-    if (cancelable) {
-        lv_obj_clear_flag(cancel_, LV_OBJ_FLAG_HIDDEN);
-    } else {
-        lv_obj_add_flag(cancel_, LV_OBJ_FLAG_HIDDEN);
-    }
+    objSetVisibility(cancelable, cancel_);
 
     cancelable_ = cancelable;
 }

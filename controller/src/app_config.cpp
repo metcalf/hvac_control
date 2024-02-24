@@ -32,6 +32,8 @@ Config default_config() {
         .co2Target = 1000,
         .maxHeatC = ABS_F_TO_C(74),
         .minCoolC = ABS_F_TO_C(66),
+        .inTempOffsetC = 0,
+        .outTempOffsetC = 0,
         .systemOn = true,
         .hasMakeupDemand = false,
         .controllerType = Config::ControllerType::Only,

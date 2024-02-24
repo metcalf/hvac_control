@@ -66,3 +66,39 @@ def thermostat_load_start(event_struct):
 def schedule_load_start(event_struct):
     return
 
+
+def save_wifi_settings(event_struct):
+    return
+
+
+def save_temp_offsets(event_struct):
+    return
+
+
+def save_temp_limits(event_struct):
+    return
+
+
+def save_equipment_settings(event_struct):
+    return
+
+
+def equipment_settings_load_start(event_struct):
+    return
+
+
+def temp_limits_load_start(event_struct):
+    return
+
+
+def temp_offsets_load_start(event_struct):
+    return
+
+
+def wifi_settings_load_start(event_struct):
+    return
+
+
+def temp_offset_changed(event_struct):
+    return
+

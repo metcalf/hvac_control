@@ -33,3 +33,23 @@ void co2_load_start(lv_event_t *e) { UIManager::eventsInst()->eCO2LoadStart(); }
 void thermostat_load_start(lv_event_t *e) { UIManager::eventsInst()->eThermostatLoadStart(); }
 
 void schedule_load_start(lv_event_t *e) { UIManager::eventsInst()->eScheduleLoadStart(); }
+
+void save_equipment_settings(lv_event_t *e) { UIManager::eventsInst()->eSaveEquipmentSettings(); }
+
+void save_temp_limits(lv_event_t *e) { UIManager::eventsInst()->eSaveTempLimits(); }
+
+void save_temp_offsets(lv_event_t *e) { UIManager::eventsInst()->eSaveTempOffsets(); }
+
+void save_wifi_settings(lv_event_t *e) { UIManager::eventsInst()->eSaveWifiSettings(); }
+
+void equipment_settings_load_start(lv_event_t *e) {
+    UIManager::eventsInst()->eEquipmentSettingsLoadStart();
+}
+
+void temp_limits_load_start(lv_event_t *e) { UIManager::eventsInst()->eTempLimitsLoadStart(); }
+
+void temp_offsets_load_start(lv_event_t *e) { UIManager::eventsInst()->eTempOffsetsLoadStart(); }
+
+void wifi_settings_load_start(lv_event_t *e) { UIManager::eventsInst()->eWifiSettingsLoadStart(); }
+
+void temp_offset_changed(lv_event_t *e) { UIManager::eventsInst()->eTempOffsetChanged(); }

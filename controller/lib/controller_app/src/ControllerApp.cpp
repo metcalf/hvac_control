@@ -159,21 +159,23 @@ FanSpeed ControllerApp::computeFanSpeed(DemandRequest *requests) {
         }
     }
 
-    std::chrono::steady_clock::time_point mdTime;
-    bool makeupDemand;
-    esp_err_t err = modbusController_->getMakeupDemand(&makeupDemand, &mdTime);
-    if (err == ESP_OK) {
-        clearMessage(MsgID::GetMakeupDemandErr);
+    if (config_.equipment.hasMakeupDemand) {
+        std::chrono::steady_clock::time_point mdTime;
+        bool makeupDemand;
+        esp_err_t err = modbusController_->getMakeupDemand(&makeupDemand, &mdTime);
+        if (err == ESP_OK) {
+            clearMessage(MsgID::GetMakeupDemandErr);
 
-        if (makeupDemand && now - mdTime < MAKEUP_MAX_AGE && fanSpeed < MAKEUP_FAN_SPEED) {
-            fanSpeedReason_ = "makeup_air";
-            fanSpeed = MAKEUP_FAN_SPEED;
+            if (makeupDemand && now - mdTime < MAKEUP_MAX_AGE && fanSpeed < MAKEUP_FAN_SPEED) {
+                fanSpeedReason_ = "makeup_air";
+                fanSpeed = MAKEUP_FAN_SPEED;
+            }
+        } else {
+            char errMsg[UI_MAX_MSG_LEN];
+            snprintf(errMsg, sizeof(errMsg), "Error getting makeup demand: %d", err);
+            setMessage(MsgID::GetMakeupDemandErr, false, errMsg);
+            ESP_LOGE(TAG, "%s", errMsg);
         }
-    } else {
-        char errMsg[UI_MAX_MSG_LEN];
-        snprintf(errMsg, sizeof(errMsg), "Error getting makeup demand: %d", err);
-        setMessage(MsgID::GetMakeupDemandErr, false, errMsg);
-        ESP_LOGE(TAG, "%s", errMsg);
     }
 
     return fanSpeed;
@@ -191,6 +193,8 @@ void ControllerApp::setFanSpeed(FanSpeed speed) {
 }
 
 bool ControllerApp::pollUIEvent(bool wait) {
+    using EventType = AbstractUIManager::EventType;
+
     AbstractUIManager::Event uiEvent;
     uint16_t waitMs = wait ? APP_LOOP_INTERVAL_SECS * 1000 : 0;
 
@@ -199,7 +203,7 @@ bool ControllerApp::pollUIEvent(bool wait) {
     }
 
     switch (uiEvent.type) {
-    case AbstractUIManager::EventType::SetSchedule: {
+    case EventType::SetSchedule: {
         ControllerDomain::Config::Schedule *schedules = uiEvent.payload.schedules;
         ESP_LOGI(
             TAG, "SetSchedule:\t%.1f/%.1f@%02d:%02d\t%.1f/%.1f@%02d:%02d",
@@ -218,12 +222,12 @@ bool ControllerApp::pollUIEvent(bool wait) {
         clearMessage(MsgID::TempOverride);
         break;
     }
-    case AbstractUIManager::EventType::SetCO2Target:
+    case EventType::SetCO2Target:
         ESP_LOGI(TAG, "SetCO2Target:\t%u", uiEvent.payload.co2Target);
         config_.co2Target = uiEvent.payload.co2Target;
         cfgUpdateCb_(config_);
         break;
-    case AbstractUIManager::EventType::SetSystemPower:
+    case EventType::SetSystemPower:
         ESP_LOGI(TAG, "SetSystemPower:\t%d", uiEvent.payload.systemPower);
         config_.systemOn = uiEvent.payload.systemPower;
         cfgUpdateCb_(config_);
@@ -236,7 +240,27 @@ bool ControllerApp::pollUIEvent(bool wait) {
             clearMessage(MsgID::TempOverride);
         }
         break;
-    case AbstractUIManager::EventType::FanOverride:
+    case EventType::SetTempLimits:
+        config_.maxHeatC = uiEvent.payload.tempLimits.maxHeatC;
+        config_.minCoolC = uiEvent.payload.tempLimits.minCoolC;
+        ESP_LOGI(TAG, "SetTempLimits:\tmaxHeatC: %.1fC\tminCoolC: %0.1fC", config_.maxHeatC,
+                 config_.minCoolC);
+        cfgUpdateCb_(config_);
+        break;
+    case EventType::SetTempOffsets:
+        config_.inTempOffsetC = uiEvent.payload.tempOffsets.inTempOffsetC;
+        config_.outTempOffsetC = uiEvent.payload.tempOffsets.outTempOffsetC;
+        ESP_LOGI(TAG, "SetTempOffsets:\tinTempC: %.1fC\toutTempC: %0.1fC", config_.inTempOffsetC,
+                 config_.outTempOffsetC);
+        cfgUpdateCb_(config_);
+        break;
+    case EventType::SetEquipment: {
+        // NB: We don't handle change of controller type, instead we reboot
+        config_.equipment = uiEvent.payload.equipment;
+        cfgUpdateCb_(config_);
+        break;
+    }
+    case EventType::FanOverride:
         fanOverrideSpeed_ = uiEvent.payload.fanOverride.speed;
         fanOverrideUntil_ =
             steadyNow() + std::chrono::minutes{uiEvent.payload.fanOverride.timeMins};
@@ -246,13 +270,13 @@ bool ControllerApp::pollUIEvent(bool wait) {
         setMessageF(MsgID::FanOverride, true, "Fan set to %u%%",
                     (uint8_t)(fanOverrideSpeed_ / 255.0 * 100));
         break;
-    case AbstractUIManager::EventType::TempOverride: {
+    case EventType::TempOverride: {
         ESP_LOGI(TAG, "TempOverride:\theat=%.1f\tcool=%.1f", uiEvent.payload.tempOverride.heatC,
                  uiEvent.payload.tempOverride.coolC);
         setTempOverride(uiEvent.payload.tempOverride);
         break;
     }
-    case AbstractUIManager::EventType::ACOverride:
+    case EventType::ACOverride:
         switch (uiEvent.payload.acOverride) {
         case AbstractUIManager::ACOverride::Normal:
             ESP_LOGI(TAG, "ACOverride: NORMAL");
@@ -272,7 +296,7 @@ bool ControllerApp::pollUIEvent(bool wait) {
             break;
         }
         break;
-    case AbstractUIManager::EventType::MsgCancel:
+    case EventType::MsgCancel:
         ESP_LOGI(TAG, "MsgCancel: %s", msgIDToS((MsgID)uiEvent.payload.msgID));
         handleCancelMessage((MsgID)uiEvent.payload.msgID);
         break;
@@ -342,9 +366,9 @@ void ControllerApp::setHVAC(DemandRequest *requests, HVACState *states) {
 
         Config::HVACType hvacType;
         if (cool) {
-            hvacType = config_.coolType;
+            hvacType = config_.equipment.coolType;
         } else {
-            hvacType = config_.heatType;
+            hvacType = config_.equipment.heatType;
         }
 
         switch (hvacType) {
@@ -405,23 +429,25 @@ void ControllerApp::logState(ControllerDomain::FreshAirState &freshAirState,
     if (freshAirState.pressurePa == 0) {
         ESP_LOG_LEVEL(statusLevel, TAG, "FreshAir: no data");
     } else {
-        ESP_LOG_LEVEL(
-            statusLevel, TAG,
-            "FreshAir:\traw_t=%.1f\tout_t=%.1f\th=%.1f\tp=%lu\trpm=%u\ttarget_speed=%u\treason=%s",
-            freshAirState.temp, outdoorTempC_, freshAirState.humidity, freshAirState.pressurePa,
-            fanSpeed, freshAirState.fanRpm, fanSpeedReason_);
+        ESP_LOG_LEVEL(statusLevel, TAG,
+                      "FreshAir:\traw_t=%.1f\tout_t=%.1f\tt_off=%0.1f\th=%.1f\tp=%lu\trpm=%"
+                      "u\ttarget_speed=%u\treason=%s",
+                      freshAirState.temp, outdoorTempC(), config_.outTempOffsetC,
+                      freshAirState.humidity, freshAirState.pressurePa, fanSpeed,
+                      freshAirState.fanRpm, fanSpeedReason_);
     }
     for (int i = 0; i < nControllers_; i++) {
         ESP_LOG_LEVEL(
             statusLevel, TAG,
             "ctrl(%d):"
-            "\tt=%0.1f\th=%0.1f\tp=%lu\tco2=%u"                                         // Sensors
+            "\tt=%0.1f\tt_off=%0.1f\th=%0.1f\tp=%lu\tco2=%u"                            // Sensors
             "\tset_h=%.1f\tset_c=%.1f\tset_co2=%u\tset_r=%s"                            // Setpoints
             "\tt_vent=%u\tt_cool=%u\tmax_cool=%u\tmax_vent=%u\tfc_speed=%s\tfc_cool=%d" // DemandRequest
             "\thvac=%s",                                                                // HVACState
             i,
             // Sensors
-            sensorData[i].temp, sensorData[i].humidity, sensorData[i].pressurePa, sensorData[i].co2,
+            sensorData[i].temp, config_.inTempOffsetC, sensorData[i].humidity,
+            sensorData[i].pressurePa, sensorData[i].co2,
             // Setpoints
             setpoints[i].heatTemp, setpoints[i].coolTemp, setpoints[i].co2, setpointReason_,
             // DemandRequest
@@ -570,9 +596,9 @@ void ControllerApp::handleFreshAirState(ControllerDomain::FreshAirState *freshAi
             if (fanLastStarted_ == std::chrono::steady_clock::time_point()) {
                 fanLastStarted_ = fasTime;
             } else if (now - fanLastStarted_ > OUTDOOR_TEMP_MIN_FAN_TIME) {
-                outdoorTempC_ = freshAirState->temp;
-                modbusController_->reportOutdoorTemp(outdoorTempC_);
-                uiManager_->setOutTempC(outdoorTempC_);
+                rawOutdoorTempC_ = freshAirState->temp;
+                modbusController_->reportOutdoorTemp(outdoorTempC());
+                uiManager_->setOutTempC(outdoorTempC());
                 lastOutdoorTempUpdate_ = fasTime;
             }
         } else {
@@ -587,9 +613,9 @@ void ControllerApp::handleFreshAirState(ControllerDomain::FreshAirState *freshAi
     }
 
     if (now - lastOutdoorTempUpdate_ > OUTDOOR_TEMP_MAX_AGE) {
-        outdoorTempC_ = std::nan("");
-        modbusController_->reportOutdoorTemp(outdoorTempC_);
-        uiManager_->setOutTempC(outdoorTempC_);
+        rawOutdoorTempC_ = std::nan("");
+        modbusController_->reportOutdoorTemp(outdoorTempC());
+        uiManager_->setOutTempC(outdoorTempC());
     }
 }
 
@@ -611,10 +637,9 @@ void ControllerApp::clearMessage(MsgID msgID) {
 }
 
 void ControllerApp::task(bool firstTime) {
-    // TODO: Add config repl, add a device name to config for remote logging
     // TODO: CO2 calibration
     // TODO: Vacation? Other status info from zone controller?
-    // TODO: Settings screen: temp offset, fresh air temp offset, wifi credentials
+    // TODO: Implement screen sleeping and return to home screen on sleep
     // Maybe support other settings here instead of repl?
     ControllerDomain::FreshAirState freshAirState{};
     handleFreshAirState(&freshAirState);
@@ -627,8 +652,9 @@ void ControllerApp::task(bool firstTime) {
     uiManager_->setCurrentSetpoints(setpoints[0].heatTemp, setpoints[0].coolTemp);
 
     sensorData[0] = sensors_->getLatest();
+    sensorData[0].temp += config_.inTempOffsetC;
     if (strlen(sensorData[0].errMsg) == 0) {
-        requests[0] = demandController_->update(sensorData[0], setpoints[0], outdoorTempC_);
+        requests[0] = demandController_->update(sensorData[0], setpoints[0], outdoorTempC());
         clearMessage(MsgID::SensorErr);
 
         uiManager_->setHumidity(sensorData[0].humidity);
@@ -652,7 +678,7 @@ void ControllerApp::task(bool firstTime) {
             ESP_LOGE(TAG, "%s", errMsg);
         }
 
-        requests[1] = demandController_->update(sensorData[1], setpoints[1], outdoorTempC_);
+        requests[1] = demandController_->update(sensorData[1], setpoints[1], outdoorTempC());
     }
 
     FanSpeed speed = computeFanSpeed(requests);

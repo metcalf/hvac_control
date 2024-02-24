@@ -24,6 +24,15 @@ void co2_load_start(lv_event_t * e);
 void set_target_co2(lv_event_t * e);
 void schedule_load_start(lv_event_t * e);
 void set_schedule(lv_event_t * e);
+void equipment_settings_load_start(lv_event_t * e);
+void save_equipment_settings(lv_event_t * e);
+void temp_limits_load_start(lv_event_t * e);
+void save_temp_limits(lv_event_t * e);
+void temp_offsets_load_start(lv_event_t * e);
+void save_temp_offsets(lv_event_t * e);
+void temp_offset_changed(lv_event_t * e);
+void wifi_settings_load_start(lv_event_t * e);
+void save_wifi_settings(lv_event_t * e);
 
 #ifdef __cplusplus
 } /*extern "C"*/

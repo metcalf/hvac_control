@@ -54,14 +54,19 @@ struct Config {
     };
     enum class HVACType { None, Fancoil, Valve };
     enum class ControllerType { Only, Primary, Secondary };
+    struct Equipment {
+        ControllerType controllerType;
+        HVACType heatType, coolType;
+        bool hasMakeupDemand;
+    };
+
+    Equipment equipment;
 
     Schedule schedules[NUM_SCHEDULE_TIMES]; // Must be in order starting from midnight
     uint16_t co2Target;
     double maxHeatC, minCoolC;
-    bool systemOn, hasMakeupDemand;
-    ControllerType controllerType;
-
-    HVACType heatType, coolType;
+    double inTempOffsetC, outTempOffsetC;
+    bool systemOn;
 };
 
 const char *fancoilSpeedToS(FancoilSpeed speed);

@@ -141,6 +141,7 @@ class ControllerApp {
                   ControllerDomain::DemandRequest[], ControllerDomain::Setpoints setpoints[],
                   ControllerDomain::HVACState[], FanSpeed fanSpeed);
     void checkWifiState();
+    double outdoorTempC() { return rawOutdoorTempC_ + config_.outTempOffsetC; }
 
     Config config_;
     AbstractUIManager *uiManager_;
@@ -158,7 +159,7 @@ class ControllerApp {
 
     ACMode acMode_;
 
-    double outdoorTempC_ = std::nan("");
+    double rawOutdoorTempC_ = std::nan("");
     std::chrono::steady_clock::time_point lastOutdoorTempUpdate_;
 
     bool fanIsOn_;
