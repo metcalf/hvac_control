@@ -150,7 +150,7 @@ static void register_makeup() {
     ESP_ERROR_CHECK(esp_console_cmd_register(&cmd));
 }
 
-static int set_fancoil_cmd(int argc, char **argv) {
+static int set_fancoil_cmd(bool primary, int argc, char **argv) {
     int nerrors = arg_parse(argc, argv, (void **)&set_fancoil_args);
     if (nerrors != 0) {
         arg_print_errors(stderr, set_fancoil_args.end, argv[0]);
@@ -169,7 +169,15 @@ static int set_fancoil_cmd(int argc, char **argv) {
         return 1;
     }
 
-    return set_fancoil(mode == 'c', (FancoilSpeed)(speed));
+    return set_fancoil(primary, mode == 'c', (FancoilSpeed)(speed));
+}
+
+static int set_primary_fancoil_cmd(int argc, char **argv) {
+    return set_fancoil_cmd(true, argc, argv);
+}
+
+static int set_secondary_fancoil_cmd(int argc, char **argv) {
+    return set_fancoil_cmd(false, argc, argv);
 }
 
 static void register_fancoil() {
@@ -177,11 +185,15 @@ static void register_fancoil() {
     set_fancoil_args.speed = arg_int1(NULL, NULL, "<0,1,2,3>", "speed");
     set_fancoil_args.end = arg_end(1);
 
-    const esp_console_cmd_t cmd = {.command = "fc",
-                                   .help = "Set fancoil",
-                                   .hint = NULL,
-                                   .func = &set_fancoil_cmd,
-                                   .argtable = &set_fancoil_args};
+    esp_console_cmd_t cmd = {.command = "fc",
+                             .help = "Set fancoil",
+                             .hint = NULL,
+                             .func = &set_primary_fancoil_cmd,
+                             .argtable = &set_fancoil_args};
+    ESP_ERROR_CHECK(esp_console_cmd_register(&cmd));
+
+    cmd.command = "fc2";
+    cmd.func = &set_secondary_fancoil_cmd;
     ESP_ERROR_CHECK(esp_console_cmd_register(&cmd));
 }
 

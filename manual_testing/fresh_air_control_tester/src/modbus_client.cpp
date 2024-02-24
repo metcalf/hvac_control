@@ -13,7 +13,8 @@
 #define MB_NAME_FAN_CONTROL_INPUTS "fan_control_inputs"
 #define MB_NAME_FAN_CONTROL_SPEED "fan_control_speed"
 #define MB_NAME_MAKEUP "makeup"
-#define MB_NAME_FANCOIL "fancoil"
+#define MB_NAME_PRIM_FANCOIL "prim_fancoil"
+#define MB_NAME_SEC_FANCOIL "sec_fancoil"
 
 static const char *TAG = "MBC";
 
@@ -21,7 +22,9 @@ static const char *TAG = "MBC";
 enum {
     FAC_DEVICE_ADDR =
         0x11, // Only one slave device used for the test (add other slave addresses here)
-    AUX_DEVICE_ADDR = 0x20,
+    PRIM_FC_ADDR = 0x20,
+    SEC_FC_ADDR = 0x21,
+    MAKEUP_ADDR = 0x22
 };
 
 // Enumeration of all supported CIDs for device (used in parameter definition table)
@@ -29,7 +32,8 @@ enum {
     CID_FAN_CONTROL_INPUTS = 0,
     CID_FAN_CONTROL_SPEED,
     CID_MAKEUP,
-    CID_FANCOIL,
+    CID_PRIM_FANCOIL,
+    CID_SEC_FANCOIL,
 };
 
 // NB: Units, Instance Offset, Data Type, Data Size, Parameter Options, Access Mode,  are just passed through to the application so are safe to ignore
@@ -76,7 +80,7 @@ const mb_parameter_descriptor_t device_parameters[] = {
         CID_MAKEUP,
         MB_NAME_MAKEUP,
         NULL, // Units (ignored)
-        AUX_DEVICE_ADDR,
+        MAKEUP_ADDR,
         MB_PARAM_INPUT,
         0x00,               // Start register address
         1,                  // Number of registers
@@ -87,10 +91,24 @@ const mb_parameter_descriptor_t device_parameters[] = {
         (mb_param_perms_t)0 // Ignored
     },
     {
-        CID_FANCOIL,
-        MB_NAME_FANCOIL,
+        CID_PRIM_FANCOIL,
+        MB_NAME_PRIM_FANCOIL,
         NULL, // Units (ignored)
-        AUX_DEVICE_ADDR,
+        PRIM_FC_ADDR,
+        MB_PARAM_HOLDING,
+        0x10,               // Start register address
+        1,                  // Number of registers
+        0,                  // Instance offset (ignored)
+        (mb_descr_type_t)0, // Ignored
+        (mb_descr_size_t)0, // Ignored
+        {},                 // Ignored
+        (mb_param_perms_t)0 // Ignored
+    },
+    {
+        CID_SEC_FANCOIL,
+        MB_NAME_SEC_FANCOIL,
+        NULL, // Units (ignored)
+        SEC_FC_ADDR,
         MB_PARAM_HOLDING,
         0x10,               // Start register address
         1,                  // Number of registers
@@ -122,19 +140,29 @@ esp_err_t read_makeup() {
     return err;
 }
 
-esp_err_t set_fancoil(bool cool, FancoilSpeed speed) {
+esp_err_t set_fancoil(bool primary, bool cool, FancoilSpeed speed) {
     esp_err_t err = ESP_OK;
     uint8_t type = 0; // throwaway
+    uint16_t cid;
+    char *name;
+
+    if (primary) {
+        cid = CID_PRIM_FANCOIL;
+        name = MB_NAME_PRIM_FANCOIL;
+    } else {
+        cid = CID_SEC_FANCOIL;
+        name = MB_NAME_SEC_FANCOIL;
+    }
 
     uint16_t v = (static_cast<uint16_t>(speed) << 1) | (cool && 0x01);
 
-    err = mbc_master_set_parameter(CID_FANCOIL, (char *)MB_NAME_FANCOIL, (uint8_t *)&v, &type);
+    err = mbc_master_set_parameter(cid, name, (uint8_t *)&v, &type);
 
     if (err == ESP_OK) {
         ESP_LOGI(TAG, "Fancoil set (%d/%d)", cool, static_cast<int>(speed));
     } else {
-        ESP_LOGE(TAG, "Characteristic #%u (%s) write fail, err = 0x%x (%s).", CID_FANCOIL,
-                 MB_NAME_FANCOIL, (int)err, (char *)esp_err_to_name(err));
+        ESP_LOGE(TAG, "Characteristic #%u (%s) write fail, err = 0x%x (%s).", cid, name, (int)err,
+                 (char *)esp_err_to_name(err));
     }
 
     return err;

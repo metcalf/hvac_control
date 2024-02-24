@@ -62,19 +62,19 @@ int main(void) {
     PORTC.PIN0CTRL |= (PORT_PULLUPEN_bm | PORT_INVEN_bm);
 
     // TODO: Read from EEPROM
-    uint8_t slave_id = 0x20;
-    uint8_t mode_bits = 0xff;
-    // uint8_t slave_id = USERROW_USERROW0;
-    // uint8_t mode_bits = USERROW_USERROW1;
+    uint8_t slave_id = USERROW_USERROW0;
+    uint8_t mode_bits = USERROW_USERROW1;
 
     bool mode_fancoil = mode_bits & 0x01;
-    bool mode_iso_input = mode_bits & (0x01 << 1);
+    bool mode_iso_input = mode_bits & 0x02;
 
     modbus_client_init(slave_id, MB_BAUD, mode_iso_input ? &iso_input_state_ : NULL,
                        mode_fancoil ? setFancoil : NULL);
 
     sei();
 
+    USART_DEBUG_SEND(slave_id);
+    USART_DEBUG_SEND(mode_bits);
     USART_DEBUG_SEND('s');
     while (1) {
         wdt_reset();
