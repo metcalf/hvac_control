@@ -121,7 +121,6 @@ extern "C" void controller_main() {
 
     // TODO: Setup OTA updates
     // TODO: Remote logging
-    // TODO: Use interrupt pin for touchscreen events? May not matter enough
     wifi_.init();
     wifi_.connect(config.wifi.ssid, config.wifi.password);
 

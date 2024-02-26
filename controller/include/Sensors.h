@@ -22,7 +22,7 @@ class Sensors : public AbstractSensors {
     SensorData getLatest() override;
 
   private:
-    SensorData lastData_;
+    SensorData lastData_ = {};
     SemaphoreHandle_t mutex_;
 
     bool pollInternal(SensorData &);

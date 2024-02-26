@@ -118,6 +118,8 @@ esp_err_t ModbusController::getFreshAirState(FreshAirState *state,
 esp_err_t ModbusController::getMakeupDemand(bool *demand,
                                             std::chrono::steady_clock::time_point *time) {
     if (!hasMakeupDemand_) {
+        *demand = false;
+        *time = std::chrono::steady_clock::now();
         return ESP_OK;
     }
 

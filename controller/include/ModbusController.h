@@ -66,19 +66,19 @@ class ModbusController : public AbstractModbusController {
     ControllerDomain::DemandRequest::FancoilRequest requestFancoil_;
     FanSpeed requestFreshAirSpeed_;
 
-    FreshAirState freshAirState_;
-    bool makeupDemand_;
+    FreshAirState freshAirState_ = {};
+    bool makeupDemand_ = false;
 
-    esp_err_t freshAirStateErr_, makeupDemandErr_, setFancoilErr_, freshAirSpeedErr_,
-        secondaryControllerErr_;
+    esp_err_t freshAirStateErr_ = ESP_OK, makeupDemandErr_ = ESP_OK, setFancoilErr_ = ESP_OK,
+              freshAirSpeedErr_ = ESP_OK, secondaryControllerErr_ = ESP_OK;
     std::chrono::steady_clock::time_point lastFreshAirState_, lastMakeupDemand_;
 
-    bool speedSet_, hvacStateSet_, outTempSet_, systemOnSet_;
+    bool speedSet_ = false, hvacStateSet_ = false, outTempSet_ = false, systemOnSet_ = false;
     HVACState hvacState_;
     bool systemOn_;
     double outTempC_;
-    SensorData secondarySensorData_;
-    Setpoints secondarySetpoints_;
+    SensorData secondarySensorData_ = {};
+    Setpoints secondarySetpoints_ = {};
 
     void makeRequest(RequestType request);
     EventBits_t requestBits(RequestType request);

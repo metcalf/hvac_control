@@ -29,12 +29,12 @@ DemandRequest DemandController::update(const SensorData &sensor_data, const Setp
         maxFanCooling = 0;
         maxFanVenting = UINT8_MAX;
     } else {
-        maxFanCooling = outdoor_temp_delta_cooling_range_.getSpeed(sensor_data.temp - outdoorTempC);
+        maxFanCooling = outdoor_temp_delta_cooling_range_.getSpeed(outdoorTempC - sensor_data.temp);
         maxFanVenting = computeVentLimit(setpoints, sensor_data.temp, outdoorTempC);
     }
 
     return DemandRequest{
-        .targetVent = co2_venting_range_.getSpeed(setpoints.co2 - sensor_data.co2),
+        .targetVent = co2_venting_range_.getSpeed(sensor_data.co2 - setpoints.co2),
         .targetFanCooling =
             indoor_temp_cooling_range_.getSpeed(setpoints.coolTemp - sensor_data.temp),
         .maxFanCooling = maxFanCooling,
@@ -54,8 +54,7 @@ FanSpeed DemandController::computeVentLimit(const Setpoints &setpoints, const do
     if (outdoor > indoor) {
         // Limit venting if it's too hot outside relative to cool setpoint
         return outdoor_limit_range.getSpeed(outdoor - setpoints.coolTemp);
-    }
-    {
+    } else {
         // Limit venting if it's too cool outside relative to heat setpoint
         return outdoor_limit_range.getSpeed(setpoints.heatTemp - outdoor);
     }

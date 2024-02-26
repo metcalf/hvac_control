@@ -157,12 +157,12 @@ class ControllerApp {
     AbstractUIManager::TempOverride tempOverride_;
     int tempOverrideUntilScheduleIdx_ = -1;
 
-    ACMode acMode_;
+    ACMode acMode_ = ACMode::Standby;
 
     double rawOutdoorTempC_ = std::nan("");
     std::chrono::steady_clock::time_point lastOutdoorTempUpdate_;
 
-    bool fanIsOn_;
+    bool fanIsOn_ = false;
     FanSpeed fanOverrideSpeed_;
     std::chrono::steady_clock::time_point fanOverrideUntil_, fanLastStarted_;
 

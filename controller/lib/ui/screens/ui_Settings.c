@@ -160,6 +160,7 @@ lv_obj_set_align( ui_Label23, LV_ALIGN_CENTER );
 lv_label_set_text(ui_Label23,"WIFI");
 lv_obj_set_style_text_font(ui_Label23, &lv_font_montserrat_18, LV_PART_MAIN| LV_STATE_DEFAULT);
 
+lv_obj_add_event_cb(ui_comp_get_child(ui_Setting_header1, UI_COMP_SETTING_HEADER_SETTING_BACK_BUTTON), ui_event_Setting_header1_Setting_back_button, LV_EVENT_ALL, NULL);
 lv_obj_add_event_cb(ui_equipment_button, ui_event_equipment_button, LV_EVENT_ALL, NULL);
 lv_obj_add_event_cb(ui_temp_limit_button, ui_event_temp_limit_button, LV_EVENT_ALL, NULL);
 lv_obj_add_event_cb(ui_equipment_button2, ui_event_equipment_button2, LV_EVENT_ALL, NULL);

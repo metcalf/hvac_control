@@ -28,7 +28,7 @@
 
 #define MAKEUP_FAN_SPEED (FanSpeed)80
 #define MIN_FAN_SPEED_VALUE (FanSpeed)10
-#define MIN_FAN_RUNNING_RPM 1000
+#define MIN_FAN_RUNNING_RPM 900
 
 static const char *TAG = "CTRL";
 
@@ -86,7 +86,7 @@ void ControllerApp::updateACMode(DemandRequest *requests) {
 }
 
 FanSpeed ControllerApp::computeFanSpeed(DemandRequest *requests) {
-    FanSpeed fanSpeed;
+    FanSpeed fanSpeed = 0;
 
     if (!config_.systemOn) {
         clearMessage(MsgID::FanOverride);
@@ -145,7 +145,8 @@ FanSpeed ControllerApp::computeFanSpeed(DemandRequest *requests) {
 
         if (fanSpeed < MIN_FAN_SPEED_VALUE &&
             AbstractDemandController::isFanCoolingTempLimited(requests, nControllers_) &&
-            (now - lastOutdoorTempUpdate_) > OUTDOOR_TEMP_UPDATE_INTERVAL) {
+            (std::isnan(rawOutdoorTempC_) ||
+             (now - lastOutdoorTempUpdate_) > OUTDOOR_TEMP_UPDATE_INTERVAL)) {
             // If we're waiting for the outdoor temperature to drop for cooling and
             // we haven't updated the outdoor temperature recently, run the fan until
             // we get an update.
@@ -153,7 +154,7 @@ FanSpeed ControllerApp::computeFanSpeed(DemandRequest *requests) {
             fanSpeedReason_ = "poll_temp";
         }
 
-        if (fanOverrideUntil_ > std::chrono::steady_clock::time_point()) {
+        if (fanOverrideUntil_ > std::chrono::steady_clock::time_point{}) {
             clearMessage(MsgID::FanOverride);
             fanOverrideUntil_ = {};
         }
@@ -369,18 +370,22 @@ void ControllerApp::setHVAC(DemandRequest *requests, HVACState *states) {
             modbusController_->reportHVACState(states[i]);
         }
 
-        Config::HVACType hvacType;
+        Config::HVACType hvacType, otherType;
         if (cool) {
             hvacType = config_.equipment.coolType;
+            otherType = config_.equipment.heatType;
         } else {
             hvacType = config_.equipment.heatType;
+            otherType = config_.equipment.coolType;
         }
 
         switch (hvacType) {
         case Config::HVACType::None:
+            valveCtrl_->setMode(!cool, false); // Make sure valves are off
             break;
         case Config::HVACType::Fancoil:
             modbusController_->setFancoil((FancoilID)i, DemandRequest::FancoilRequest{speed, cool});
+
             break;
         case Config::HVACType::Valve:
             if (i == 0) {
@@ -389,6 +394,17 @@ void ControllerApp::setHVAC(DemandRequest *requests, HVACState *states) {
                 ESP_LOGE(TAG, "Not implemented: valves on secondary controller");
             }
             break;
+        }
+
+        if (hvacType != Config::HVACType::Fancoil && otherType == Config::HVACType::Fancoil) {
+            // Turn off the fancoil if we didn't set it already and the other mode is a fancoil
+            modbusController_->setFancoil((FancoilID)i,
+                                          DemandRequest::FancoilRequest{FancoilSpeed::Off, false});
+        }
+
+        if (hvacType != Config::HVACType::Valve) {
+            // Turn off the valve if we didn't already.
+            valveCtrl_->setMode(!cool, false);
         }
     }
 }
@@ -431,16 +447,12 @@ void ControllerApp::logState(ControllerDomain::FreshAirState &freshAirState,
         statusLevel = ESP_LOG_DEBUG;
     }
 
-    if (freshAirState.pressurePa == 0) {
-        ESP_LOG_LEVEL(statusLevel, TAG, "FreshAir: no data");
-    } else {
-        ESP_LOG_LEVEL(statusLevel, TAG,
-                      "FreshAir:\traw_t=%.1f\tout_t=%.1f\tt_off=%0.1f\th=%.1f\tp=%lu\trpm=%"
-                      "u\ttarget_speed=%u\treason=%s",
-                      freshAirState.temp, outdoorTempC(), config_.outTempOffsetC,
-                      freshAirState.humidity, freshAirState.pressurePa, fanSpeed,
-                      freshAirState.fanRpm, fanSpeedReason_);
-    }
+    ESP_LOG_LEVEL(statusLevel, TAG,
+                  "FreshAir:\traw_t=%.1f\tout_t=%.1f\tt_off=%0.1f\th=%.1f\tp=%lu\trpm=%"
+                  "u\ttarget_speed=%u\treason=%s",
+                  freshAirState.temp, outdoorTempC(), config_.outTempOffsetC,
+                  freshAirState.humidity, freshAirState.pressurePa, freshAirState.fanRpm, fanSpeed,
+                  fanSpeedReason_);
     for (int i = 0; i < nControllers_; i++) {
         ESP_LOG_LEVEL(
             statusLevel, TAG,
@@ -498,8 +510,8 @@ int ControllerApp::getScheduleIdx(int offset) {
         return -1;
     }
 
-    int i;
-    for (i = 0; i < NUM_SCHEDULE_TIMES; i++) {
+    int i = 0;
+    for (; i < NUM_SCHEDULE_TIMES; i++) {
         Config::Schedule schedule = config_.schedules[i];
         if (localMinOfDay() < schedule.startMinOfDay()) {
             break;
@@ -508,7 +520,8 @@ int ControllerApp::getScheduleIdx(int offset) {
 
     // We search for the first schedule *after* the current time and then look to the
     // previous schedule.
-    return (i - 1 + offset) % NUM_SCHEDULE_TIMES;
+    int idx = ((i - 1 + offset) % NUM_SCHEDULE_TIMES);
+    return idx < 0 ? idx + NUM_SCHEDULE_TIMES : idx; // Ensure positive modulus
 }
 
 Setpoints ControllerApp::getCurrentSetpoints() {
@@ -529,8 +542,8 @@ Setpoints ControllerApp::getCurrentSetpoints() {
     // If we don't have valid time, pick the least active setpoints from the schedules
     if (idx == -1) {
         Setpoints setpoints{
-            .heatTemp = 72,
-            .coolTemp = 68,
+            .heatTemp = ABS_F_TO_C(72),
+            .coolTemp = ABS_C_TO_F(68),
             .co2 = config_.co2Target,
         };
         for (int i = 0; i < NUM_SCHEDULE_TIMES; i++) {
@@ -598,7 +611,7 @@ void ControllerApp::handleFreshAirState(ControllerDomain::FreshAirState *freshAi
     esp_err_t err = modbusController_->getFreshAirState(freshAirState, &fasTime);
     if (err == ESP_OK) {
         if (freshAirState->fanRpm > MIN_FAN_RUNNING_RPM) {
-            if (fanLastStarted_ == std::chrono::steady_clock::time_point()) {
+            if (fanLastStarted_ == std::chrono::steady_clock::time_point{}) {
                 fanLastStarted_ = fasTime;
             } else if (now - fanLastStarted_ > OUTDOOR_TEMP_MIN_FAN_TIME) {
                 rawOutdoorTempC_ = freshAirState->temp;
@@ -644,8 +657,6 @@ void ControllerApp::clearMessage(MsgID msgID) {
 void ControllerApp::task(bool firstTime) {
     // TODO: CO2 calibration
     // TODO: Vacation? Other status info from zone controller?
-    // TODO: Implement screen sleeping and return to home screen on sleep
-    // Maybe support other settings here instead of repl?
     ControllerDomain::FreshAirState freshAirState{};
     handleFreshAirState(&freshAirState);
 

@@ -185,6 +185,7 @@ lv_obj_t *ui_Label20;
 void ui_Settings_screen_init(void);
 lv_obj_t *ui_Settings;
 lv_obj_t *ui_Setting_header1;
+void ui_event_Setting_header1_Setting_back_button( lv_event_t * e);
 lv_obj_t *ui_Container3;
 lv_obj_t *ui_Settings_buttons_left;
 void ui_event_equipment_button( lv_event_t * e);
@@ -459,6 +460,12 @@ void ui_event_Schedule_header_Setting_accept_button( lv_event_t * e) {
     lv_event_code_t event_code = lv_event_get_code(e);lv_obj_t * target = lv_event_get_target(e);
 if ( event_code == LV_EVENT_CLICKED) {
       set_schedule( e );
+      _ui_screen_change( &ui_Home, LV_SCR_LOAD_ANIM_NONE, 0, 0, &ui_Home_screen_init);
+}
+}
+void ui_event_Setting_header1_Setting_back_button( lv_event_t * e) {
+    lv_event_code_t event_code = lv_event_get_code(e);lv_obj_t * target = lv_event_get_target(e);
+if ( event_code == LV_EVENT_CLICKED) {
       _ui_screen_change( &ui_Home, LV_SCR_LOAD_ANIM_NONE, 0, 0, &ui_Home_screen_init);
 }
 }

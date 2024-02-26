@@ -180,6 +180,7 @@ extern lv_obj_t *ui_Label20;
 void ui_Settings_screen_init(void);
 extern lv_obj_t *ui_Settings;
 extern lv_obj_t *ui_Setting_header1;
+void ui_event_Setting_header1_Setting_back_button( lv_event_t * e);
 extern lv_obj_t *ui_Container3;
 extern lv_obj_t *ui_Settings_buttons_left;
 void ui_event_equipment_button( lv_event_t * e);

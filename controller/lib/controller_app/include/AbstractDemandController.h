@@ -11,7 +11,7 @@ class AbstractDemandController {
 
     static bool isFanCoolingTempLimited(const ControllerDomain::DemandRequest *requests, size_t n) {
         for (int i = 0; i < n; i++) {
-            if (requests[i].maxFanCooling < UINT8_MAX) {
+            if (requests[i].targetFanCooling > 0 && requests[i].maxFanCooling < UINT8_MAX) {
                 return true;
             }
         }

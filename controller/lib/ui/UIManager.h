@@ -2,14 +2,14 @@
 
 #include <stdint.h>
 
-#include "AbstractUIManager.h"
-#include "ControllerDomain.h"
+#include "esp_lcd_backlight.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
+
+#include "AbstractUIManager.h"
+#include "ControllerDomain.h"
 #include "ui.h"
 #include "ui_events.h"
-
-#include "esp_log.h"
 
 class UIManager : public AbstractUIManager {
   public:
@@ -20,15 +20,12 @@ class UIManager : public AbstractUIManager {
             delete messages_[i];
         }
         delete messages_;
+        disp_backlight_delete(backlight_);
+        lv_obj_del(sleepScreen_);
         vSemaphoreDelete(mutex_);
     }
 
-    uint32_t handleTasks() {
-        xSemaphoreTake(mutex_, portMAX_DELAY);
-        auto rv = lv_timer_handler();
-        xSemaphoreGive(mutex_);
-        return rv;
-    }
+    uint32_t handleTasks();
 
     void setHumidity(double h) override;
     void setCurrentFanSpeed(uint8_t speed) override;
@@ -59,21 +56,23 @@ class UIManager : public AbstractUIManager {
     void eSystemOn();
     void eTargetCO2();
     void eSchedule();
+    void eSaveEquipmentSettings();
+    void eSaveTempLimits();
+    void eSaveTempOffsets();
+    void eSaveWifiSettings();
+    void eTempOffsetChanged();
+    void eWifiTextarea(lv_event_t *e);
+
     void eHomeLoadStart();
     void eHomeUnloadStart();
     void eCO2LoadStart();
     void eThermostatLoadStart();
     void eScheduleLoadStart();
-    void eSaveEquipmentSettings();
-    void eSaveTempLimits();
-    void eSaveTempOffsets();
-    void eSaveWifiSettings();
     void eEquipmentSettingsLoadStart();
     void eTempLimitsLoadStart();
     void eTempOffsetsLoadStart();
     void eWifiSettingsLoadStart();
-    void eTempOffsetChanged();
-    void eWifiTextarea(lv_event_t *e);
+    void eBootLoaded();
 
     static void setEventsInst(UIManager *inst) { eventsInst_ = inst; }
     static UIManager *eventsInst() { return eventsInst_; }
@@ -92,7 +91,10 @@ class UIManager : public AbstractUIManager {
         bool isFocused();
         uint32_t getIndex() { return lv_obj_get_index(container_); }
         void setIndex(uint32_t idx) { lv_obj_move_to_index(container_, idx); }
-        lv_coord_t getHeight() { return lv_obj_get_height(container_); }
+        lv_coord_t getHeight() {
+            lv_obj_update_layout(container_);
+            return lv_obj_get_height(container_);
+        }
 
       private:
         lv_obj_t *container_, *cancel_, *text_, *parent_;
@@ -110,6 +112,7 @@ class UIManager : public AbstractUIManager {
     MessageContainer *focusedMessage();
     void updateTempLimits(uint8_t maxHeatDeg, uint8_t minCoolDeg);
     void updateUIForEquipment();
+    void manageSleep();
 
     inline static UIManager *eventsInst_;
 
@@ -119,9 +122,12 @@ class UIManager : public AbstractUIManager {
     lv_timer_t *msgTimer_, *restartTimer_;
     lv_coord_t msgHeight_;
     eventCb_t eventCb_;
+    bool displayAwake_ = false, booted_ = false;
+    disp_backlight_h backlight_;
+    lv_obj_t *sleepScreen_;
 
     uint16_t co2Target_;
-    uint8_t maxHeatDeg_, minCoolDeg_, currHeatDeg_, currCoolDeg_;
+    uint8_t maxHeatDeg_, minCoolDeg_, currHeatDeg_ = 0, currCoolDeg_ = 0;
     double currInTempC_, currOutTempC_, inTempOffsetC_, outTempOffsetC_;
     ControllerDomain::Config::Schedule currSchedules_[NUM_SCHEDULE_TIMES];
     ControllerDomain::Config::Equipment equipment_;

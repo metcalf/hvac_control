@@ -156,6 +156,8 @@ lv_obj_set_style_pad_left(ui_Footer, 0, LV_PART_MAIN| LV_STATE_DEFAULT);
 lv_obj_set_style_pad_right(ui_Footer, 0, LV_PART_MAIN| LV_STATE_DEFAULT);
 lv_obj_set_style_pad_top(ui_Footer, 0, LV_PART_MAIN| LV_STATE_DEFAULT);
 lv_obj_set_style_pad_bottom(ui_Footer, 0, LV_PART_MAIN| LV_STATE_DEFAULT);
+lv_obj_set_style_pad_row(ui_Footer, 0, LV_PART_MAIN| LV_STATE_DEFAULT);
+lv_obj_set_style_pad_column(ui_Footer, 0, LV_PART_MAIN| LV_STATE_DEFAULT);
 
 ui_message_container = lv_obj_create(ui_Footer);
 lv_obj_remove_style_all(ui_message_container);

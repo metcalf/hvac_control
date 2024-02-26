@@ -72,8 +72,8 @@ class DemandController : public AbstractDemandController {
     };
 
     const LinearRange co2_venting_range_ = {
-        {REL_F_TO_C(-50), 0},
-        {REL_F_TO_C(400), 200},
+        {-50, 0},
+        {400, 200},
     };
 
     // Delta to indoor (outdoor - indoor)

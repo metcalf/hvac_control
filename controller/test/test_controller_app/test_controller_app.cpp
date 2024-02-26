@@ -3,7 +3,7 @@
 
 #include "ControllerApp.h"
 
-#include "FakeDemandController.h"
+#include "DemandController.h"
 #include "FakeModbusController.h"
 #include "FakeSensors.h"
 #include "FakeWifi.h"
@@ -14,23 +14,27 @@ using ::testing::_;
 using ::testing::AtMost;
 using ::testing::ExpectationSet;
 using ::testing::IsNan;
+using Config = ControllerDomain::Config;
 
-void configUpdateCb(ControllerDomain::Config &config) {}
+void configUpdateCb(Config &config) {}
 
 class TestControllerApp : public ControllerApp {
   public:
     using ControllerApp::ControllerApp;
 
-    void setSteadyNow(std::chrono::steady_clock::time_point t) { steadyNow_ = t; }
-    void setRealNow(std::chrono::system_clock::time_point t) { realNow_ = t; }
+    // It's important that these values not be zero since we sometimes use
+    // zero to flag a condition.
+    // It's better if these values aren't equal since that won't occur in real operation.
+    std::chrono::steady_clock::time_point steadyNow_ =
+        std::chrono::steady_clock::time_point(std::chrono::seconds(1));
+    std::chrono::system_clock::time_point realNow_ =
+        std::chrono::system_clock::time_point(std::chrono::hours(1));
 
   protected:
     std::chrono::steady_clock::time_point steadyNow() override { return steadyNow_; }
     std::chrono::system_clock::time_point realNow() override { return realNow_; }
 
   private:
-    std::chrono::steady_clock::time_point steadyNow_;
-    std::chrono::system_clock::time_point realNow_;
 };
 
 class ControllerAppTest : public testing::Test {
@@ -40,9 +44,10 @@ class ControllerAppTest : public testing::Test {
   protected:
     void SetUp() override {
         using namespace std::placeholders;
-        app_ = new TestControllerApp({}, &uiManager_, &modbusController_, &sensors_,
-                                     &demandController_, &valveCtrl_, &wifi_, configUpdateCb,
-                                     std::bind(&ControllerAppTest::uiEvtRcv, this, _1, _2));
+        app_ =
+            new TestControllerApp(default_test_config(), &uiManager_, &modbusController_, &sensors_,
+                                  &demandController_, &valveCtrl_, &wifi_, configUpdateCb,
+                                  std::bind(&ControllerAppTest::uiEvtRcv, this, _1, _2));
 
         setRealNow(std::tm{
             .tm_hour = 2,
@@ -55,42 +60,63 @@ class ControllerAppTest : public testing::Test {
     void TearDown() override { delete app_; }
 
     void setRealNow(std::tm tm) {
-        app_->setRealNow(std::chrono::system_clock::from_time_t(std::mktime(&tm)));
+        app_->realNow_ = std::chrono::system_clock::from_time_t(std::mktime(&tm));
+    }
+
+    // NB: We maintain this separately from the default in app_config so that changes
+    // to those defaults don't break tests
+    Config default_test_config() {
+        return Config{
+            .equipment =
+                {
+                    .controllerType = Config::ControllerType::Only,
+                    .heatType = Config::HVACType::Fancoil,
+                    .coolType = Config::HVACType::Fancoil,
+                    .hasMakeupDemand = false,
+                },
+            .wifi =
+                {
+                    .logName = "test_hvac_ctrl",
+                },
+            .schedules =
+                {
+                    {
+                        .heatC = 20,
+                        .coolC = 25,
+                        .startHr = 7,
+                        .startMin = 0,
+                    },
+                    {
+                        .heatC = 19,
+                        .coolC = 22,
+                        .startHr = 21,
+                        .startMin = 0,
+                    },
+                },
+            .co2Target = 1000,
+            .maxHeatC = 25,
+            .minCoolC = 15,
+            .inTempOffsetC = 0,
+            .outTempOffsetC = 0,
+            .systemOn = true,
+        };
     }
 
     TestControllerApp *app_;
-    FakeDemandController demandController_;
+    DemandController demandController_;
     FakeModbusController modbusController_;
     FakeSensors sensors_;
     MockUIManager uiManager_;
     MockValveCtrl valveCtrl_;
     FakeWifi wifi_;
 
-    ControllerDomain::Config savedConfig_;
+    Config savedConfig_;
 
   private:
 };
 
 TEST_F(ControllerAppTest, Boots) {
     ExpectationSet uiInits;
-    ControllerDomain::Config config = {
-        .schedules =
-            {
-                {
-                    .heatC = 1.0,
-                    .coolC = 2.0,
-                    .startHr = 1,
-                    .startMin = 0,
-                },
-                {
-                    .heatC = 3.0,
-                    .coolC = 4.0,
-                    .startHr = 12,
-                    .startMin = 0,
-                },
-            },
-    };
-    app_->setConfig(config);
 
     sensors_.setLatest({.temp = 1.0, .humidity = 2.0, .co2 = 456});
 
@@ -104,11 +130,43 @@ TEST_F(ControllerAppTest, Boots) {
     uiInits += EXPECT_CALL(uiManager_, setInTempC(1.0));
     uiInits += EXPECT_CALL(uiManager_, setInCO2(456));
     uiInits += EXPECT_CALL(uiManager_, setHVACState(ControllerDomain::HVACState::Off));
-    uiInits += EXPECT_CALL(uiManager_, setCurrentSetpoints(1.0, 2.0));
+    uiInits += EXPECT_CALL(uiManager_, setCurrentSetpoints(19.0, 22.0));
 
     EXPECT_CALL(uiManager_, bootDone()).After(uiInits);
 
     app_->task(true);
+}
+
+TEST_F(ControllerAppTest, CallsForVenting) {
+    sensors_.setLatest({.temp = 1.0, .humidity = 2.0, .co2 = 1100});
+
+    EXPECT_CALL(uiManager_, setCurrentFanSpeed(67));
+
+    app_->task(false);
+
+    EXPECT_EQ(67, modbusController_.getFreshAirSpeed());
+}
+
+TEST_F(ControllerAppTest, UsesFanForOutdoorTempUpdate) {
+    // Establish cooling demand to trigger fan for outdoor temp update
+    sensors_.setLatest({.temp = 25.0, .humidity = 2.0, .co2 = 500});
+    app_->task(false);
+    EXPECT_EQ(10, modbusController_.getFreshAirSpeed());
+
+    // Another iteration shows the fan running but shouldn't start cooling yet
+    modbusController_.setFreshAirState(ControllerDomain::FreshAirState{.temp = 23, .fanRpm = 1000},
+                                       app_->steadyNow_);
+    app_->task(false);
+    EXPECT_EQ(10, modbusController_.getFreshAirSpeed());
+
+    app_->steadyNow_ += std::chrono::seconds(61);
+
+    // After rolling time forward enough to measure the outdoor temperature, fan cooling
+    // should come on.
+    EXPECT_CALL(uiManager_, setOutTempC(23));
+    app_->task(false);
+    EXPECT_EQ(255, modbusController_.getFreshAirSpeed());
+    EXPECT_EQ(23, modbusController_.getOutTempC());
 }
 
 // TODO: Write lots more tests!!

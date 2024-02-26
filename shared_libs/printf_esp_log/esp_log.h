@@ -11,9 +11,13 @@ typedef enum {
     ESP_LOG_VERBOSE /*!< Bigger chunks of debugging information, or frequent messages which can potentially flood the output. */
 } esp_log_level_t;
 
-#define NATIVE_LOG(tag, format, ...) printf(format, ##__VA_ARGS__)
+#define NATIVE_LOG(tag, format, ...)                                                               \
+    printf(format, ##__VA_ARGS__);                                                                 \
+    printf("\n");
+
 #define ESP_LOGE(tag, format, ...) NATIVE_LOG(tag, format, ##__VA_ARGS__)
 #define ESP_LOGW(tag, format, ...) NATIVE_LOG(tag, format, ##__VA_ARGS__)
 #define ESP_LOGI(tag, format, ...) NATIVE_LOG(tag, format, ##__VA_ARGS__)
 #define ESP_LOGD(tag, format, ...) NATIVE_LOG(tag, format, ##__VA_ARGS__)
 #define ESP_LOGV(tag, format, ...) NATIVE_LOG(tag, format, ##__VA_ARGS__)
+#define ESP_LOG_LEVEL(_level, tag, format, ...) NATIVE_LOG(tag, format, ##__VA_ARGS__)

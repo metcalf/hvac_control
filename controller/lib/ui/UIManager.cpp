@@ -1,5 +1,6 @@
 #include "UIManager.h"
 
+#include "driver/gpio.h"
 #include "esp_log.h"
 #include <cmath>
 
@@ -8,6 +9,7 @@ using Config = ControllerDomain::Config;
 
 #define RESTART_DELAY_MS 1500
 #define MSG_SCROLL_MS 5 * 1000
+#define DISP_SLEEP_SECS 30
 #define TEMP_LIMIT_ROLLER_START 64
 #define MIN_HEAT_DEG 50
 #define MAX_COOL_DEG 99
@@ -16,11 +18,17 @@ using Config = ControllerDomain::Config;
 
 static const char *TAG = "UI";
 
-lv_obj_t *wifiTextareas[] = {
-    ui_wifi_ssid,
-    ui_wifi_password,
-    ui_log_name,
+lv_obj_t **wifiTextareas[] = {
+    &ui_wifi_ssid,
+    &ui_wifi_password,
+    &ui_log_name,
 };
+lv_obj_t **wifiContainers[] = {
+    &ui_ssid_container,
+    &ui_password_container,
+    &ui_log_name_container,
+};
+
 size_t nWifiTextareas = sizeof(wifiTextareas) / sizeof(wifiTextareas[0]);
 
 uint8_t getTempOffsetTenthDeg(lv_obj_t *roller) { return lv_roller_get_selected(roller) - 50; }
@@ -68,7 +76,9 @@ void objSetVisibility(bool visible, lv_obj_t *obj) {
 
 void UIManager::bootDone() {
     xSemaphoreTake(mutex_, portMAX_DELAY);
+    booted_ = true;
     _ui_screen_change(&ui_Home, LV_SCR_LOAD_ANIM_NONE, 0, 0, &ui_Home_screen_init);
+    lv_disp_trig_activity(NULL);
     xSemaphoreGive(mutex_);
 }
 
@@ -430,7 +440,7 @@ void UIManager::eWifiTextarea(lv_event_t *e) {
         objSetVisibility(true, ui_wifi_keyboard);
 
         for (int i = 0; i < nWifiTextareas; i++) {
-            objSetVisibility(ta == wifiTextareas[i], wifiTextareas[i]);
+            objSetVisibility(ta == *wifiTextareas[i], *wifiContainers[i]);
         }
     } else if (code == LV_EVENT_READY || code == LV_EVENT_CANCEL || code == LV_EVENT_DEFOCUSED) {
         if (code == LV_EVENT_DEFOCUSED) {
@@ -440,17 +450,15 @@ void UIManager::eWifiTextarea(lv_event_t *e) {
         objSetVisibility(false, ui_wifi_keyboard);
 
         for (int i = 0; i < nWifiTextareas; i++) {
-            objSetVisibility(true, wifiTextareas[i]);
+            objSetVisibility(true, *wifiContainers[i]);
         }
 
         lv_indev_reset(NULL, ta); /*To forget the last clicked object to make it focusable again*/
     }
 }
 
-// TODO: Fix message scrolling
 void UIManager::onMessageTimer() {
     // TODO(future): It'd be nicer to make this a circular scroll
-
     lv_coord_t currY = lv_obj_get_scroll_y(ui_Footer);
 
     int nVisible = 0;
@@ -502,6 +510,33 @@ void UIManager::updateUIForEquipment() {
     objSetVisibility(!isSecondary, ui_fan_offset_divider);
 }
 
+void UIManager::manageSleep() {
+    if (!booted_) {
+        if (!displayAwake_) {
+            disp_backlight_set(backlight_, 100);
+            displayAwake_ = true;
+        }
+        // Don't sleep on boot screen
+        return;
+    }
+
+    if (lv_disp_get_inactive_time(NULL) < (DISP_SLEEP_SECS * 1000)) {
+        if (!displayAwake_) {
+            // Go to homescreen
+            lv_indev_wait_release(lv_indev_get_act());
+            _ui_screen_change(&ui_Home, LV_SCR_LOAD_ANIM_NONE, 0, 0, &ui_Home_screen_init);
+            disp_backlight_set(backlight_, 100);
+            displayAwake_ = true;
+        }
+    } else {
+        if (displayAwake_) {
+            disp_backlight_set(backlight_, 0);
+            lv_scr_load_anim(sleepScreen_, LV_SCR_LOAD_ANIM_NONE, 0, 0, false);
+            displayAwake_ = false;
+        }
+    }
+}
+
 UIManager::UIManager(ControllerDomain::Config config, size_t nMsgIds, eventCb_t eventCb)
     : eventCb_(eventCb) {
     mutex_ = xSemaphoreCreateMutex();
@@ -512,10 +547,26 @@ UIManager::UIManager(ControllerDomain::Config config, size_t nMsgIds, eventCb_t 
     equipment_ = config.equipment;
     wifi_ = config.wifi;
 
+    const disp_backlight_config_t bckl_config = {
+        .pwm_control = true,
+        .output_invert = false, // Backlight on high
+        .gpio_num = GPIO_NUM_48,
+        .timer_idx = 0,
+        .channel_idx = 0,
+    };
+    backlight_ = disp_backlight_new(&bckl_config);
+    assert(backlight_);
+
+    sleepScreen_ = lv_obj_create(NULL);
+    ESP_LOGI(TAG, "created");
     ui_init();
+    ESP_LOGI(TAG, "ui init");
+
+    setInTempC(std::nan(""));
+    setOutTempC(std::nan(""));
 
     for (int i = 0; i < nWifiTextareas; i++) {
-        lv_obj_add_event_cb(wifiTextareas[i], wifiTextareaEventCb, LV_EVENT_ALL, this);
+        lv_obj_add_event_cb(*wifiTextareas[i], wifiTextareaEventCb, LV_EVENT_ALL, this);
     }
 
     for (int i = 0; i < NUM_SCHEDULE_TIMES; i++) {
@@ -538,12 +589,22 @@ UIManager::UIManager(ControllerDomain::Config config, size_t nMsgIds, eventCb_t 
         messages_[i] = new MessageContainer(ui_Footer);
     }
 
+    lv_obj_set_scroll_snap_y(ui_Footer, LV_SCROLL_SNAP_START);
     msgHeight_ = messages_[0]->getHeight();
     msgTimer_ = lv_timer_create(messageTimerCb, MSG_SCROLL_MS, this);
     restartTimer_ = lv_timer_create(restartCb, RESTART_DELAY_MS, NULL);
+    lv_timer_pause(restartTimer_);
 
     lv_obj_add_event_cb(ui_Footer, pauseTimer, LV_EVENT_SCROLL_BEGIN, msgTimer_);
     lv_obj_add_event_cb(ui_Footer, resetAndResumeTimer, LV_EVENT_SCROLL_END, msgTimer_);
+}
+
+uint32_t UIManager::handleTasks() {
+    xSemaphoreTake(mutex_, portMAX_DELAY);
+    manageSleep();
+    auto rv = lv_timer_handler();
+    xSemaphoreGive(mutex_);
+    return rv;
 }
 
 void UIManager::setHumidity(double h) {
@@ -582,7 +643,7 @@ void UIManager::setInTempC(double tc) {
     xSemaphoreTake(mutex_, portMAX_DELAY);
     currInTempC_ = tc;
     if (std::isnan(tc)) {
-        lv_label_set_text(ui_Indoor_temp_value, "--°");
+        lv_label_set_text(ui_Indoor_temp_value, "--");
     } else {
         lv_label_set_text_fmt(ui_Indoor_temp_value, "%u", (uint)std::round(ABS_C_TO_F(tc)));
     }
@@ -591,7 +652,12 @@ void UIManager::setInTempC(double tc) {
 
 void UIManager::setInCO2(uint16_t ppm) {
     xSemaphoreTake(mutex_, portMAX_DELAY);
-    lv_label_set_text_fmt(ui_co2_value, "%u", ppm);
+    if (ppm == 0) {
+        lv_label_set_text(ui_co2_value, "--");
+    } else {
+        lv_label_set_text_fmt(ui_co2_value, "%u", ppm);
+    }
+
     xSemaphoreGive(mutex_);
 }
 
