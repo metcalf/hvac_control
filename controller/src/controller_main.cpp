@@ -112,6 +112,7 @@ extern "C" void controller_main() {
     uiManager_ = new UIManager(config, ControllerApp::nMsgIds(), uiEvtCb);
     UIManager::setEventsInst(uiManager_);
     modbusController_ = new ModbusController(config.equipment.hasMakeupDemand);
+    valveCtrl_.init();
     app_ = new ControllerApp(config, uiManager_, modbusController_, &sensors_, &demandController_,
                              &valveCtrl_, &wifi_, app_config_save, uiEvtRcv);
     xTaskCreate(uiTask, "uiTask", UI_TASK_STACK_SIZE, uiManager_, UI_TASK_PRIO, NULL);
@@ -145,5 +146,11 @@ extern "C" void controller_main() {
                 NULL);
     xTaskCreate(modbusTask, "modbusTask", MODBUS_TASK_STACK_SIZE, modbusController_,
                 MODBUS_TASK_PRIO, NULL);
+
+    // Wait for sensors to have valid data
+    while (std::isnan(sensors_.getLatest().tempC)) {
+        vTaskDelay(pdMS_TO_TICKS(100));
+    }
+
     xTaskCreate(mainTask, "mainTask", MAIN_TASK_STACK_SIZE, app_, MAIN_TASK_PRIO, NULL);
 }

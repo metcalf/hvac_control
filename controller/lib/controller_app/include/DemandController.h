@@ -92,6 +92,8 @@ class DemandController : public AbstractDemandController {
         {REL_F_TO_C(0.2), 0},
     };
 
+    // Delta from setpoint in the direction we're aiming to correct
+    // e.g. when heating, the amount by which the indoor temp is below the setpoint
     static constexpr FancoilCutoff hvac_temp_cutoffs_[] = {
         FancoilCutoff{FancoilSpeed::Off, REL_F_TO_C(-0.5)},
         FancoilCutoff{FancoilSpeed::Low, REL_F_TO_C(0.5)},

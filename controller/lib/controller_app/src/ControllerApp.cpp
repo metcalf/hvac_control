@@ -450,23 +450,27 @@ void ControllerApp::logState(ControllerDomain::FreshAirState &freshAirState,
     ESP_LOG_LEVEL(statusLevel, TAG,
                   "FreshAir:\traw_t=%.1f\tout_t=%.1f\tt_off=%0.1f\th=%.1f\tp=%lu\trpm=%"
                   "u\ttarget_speed=%u\treason=%s",
-                  freshAirState.temp, outdoorTempC(), config_.outTempOffsetC,
+                  freshAirState.tempC, outdoorTempC(), config_.outTempOffsetC,
                   freshAirState.humidity, freshAirState.pressurePa, freshAirState.fanRpm, fanSpeed,
                   fanSpeedReason_);
     for (int i = 0; i < nControllers_; i++) {
         ESP_LOG_LEVEL(
             statusLevel, TAG,
             "ctrl(%d):"
-            "\tt=%0.1f\tt_off=%0.1f\th=%0.1f\tp=%lu\tco2=%u"                            // Sensors
-            "\tset_h=%.1f\tset_c=%.1f\tset_co2=%u\tset_r=%s"                            // Setpoints
-            "\tt_vent=%u\tt_cool=%u\tmax_cool=%u\tmax_vent=%u\tfc_speed=%s\tfc_cool=%d" // DemandRequest
-            "\thvac=%s",                                                                // HVACState
+            // Sensors
+            "\tt=%0.1f\tt_off=%0.1f\th=%0.1f\tp=%lu\tco2=%u"
+            // Setpoints
+            "\tset_h=%.1f\tset_c=%.1f\tset_co2=%u\tset_r=%s"
+            // DemandRequest
+            "\tt_vent=%u\tt_cool=%u\tmax_cool=%u\tmax_vent=%u\tt_fc_speed=%s\tt_fc_cool=%d"
+            // HVACState
+            "\thvac=%s",
             i,
             // Sensors
-            sensorData[i].temp, config_.inTempOffsetC, sensorData[i].humidity,
+            sensorData[i].tempC, config_.inTempOffsetC, sensorData[i].humidity,
             sensorData[i].pressurePa, sensorData[i].co2,
             // Setpoints
-            setpoints[i].heatTemp, setpoints[i].coolTemp, setpoints[i].co2, setpointReason_,
+            setpoints[i].heatTempC, setpoints[i].coolTempC, setpoints[i].co2, setpointReason_,
             // DemandRequest
             requests[i].targetVent, requests[i].targetFanCooling, requests[i].maxFanCooling,
             requests[i].maxFanVenting, ControllerDomain::fancoilSpeedToS(requests[i].fancoil.speed),
@@ -533,8 +537,8 @@ Setpoints ControllerApp::getCurrentSetpoints() {
     } else if (tempOverrideUntilScheduleIdx_ != -1) {
         setpointReason_ = "override";
         return Setpoints{
-            .heatTemp = tempOverride_.heatC,
-            .coolTemp = tempOverride_.coolC,
+            .heatTempC = tempOverride_.heatC,
+            .coolTempC = tempOverride_.coolC,
             .co2 = config_.co2Target,
         };
     }
@@ -542,13 +546,13 @@ Setpoints ControllerApp::getCurrentSetpoints() {
     // If we don't have valid time, pick the least active setpoints from the schedules
     if (idx == -1) {
         Setpoints setpoints{
-            .heatTemp = ABS_F_TO_C(72),
-            .coolTemp = ABS_C_TO_F(68),
+            .heatTempC = ABS_F_TO_C(72),
+            .coolTempC = ABS_C_TO_F(68),
             .co2 = config_.co2Target,
         };
         for (int i = 0; i < NUM_SCHEDULE_TIMES; i++) {
-            setpoints.heatTemp = std::min(setpoints.heatTemp, config_.schedules[i].heatC);
-            setpoints.coolTemp = std::max(setpoints.coolTemp, config_.schedules[i].coolC);
+            setpoints.heatTempC = std::min(setpoints.heatTempC, config_.schedules[i].heatC);
+            setpoints.coolTempC = std::max(setpoints.coolTempC, config_.schedules[i].coolC);
         }
         setpointReason_ = "no_time";
         return setpoints;
@@ -560,22 +564,22 @@ Setpoints ControllerApp::getCurrentSetpoints() {
     Config::Schedule nextSchedule = config_.schedules[getScheduleIdx(1)];
 
     Setpoints setpoints{
-        .heatTemp = schedule.heatC,
-        .coolTemp = schedule.coolC,
+        .heatTempC = schedule.heatC,
+        .coolTempC = schedule.coolC,
         .co2 = config_.co2Target,
     };
 
     // If the next scheduled time is at a lower temperature, we adjust the setpoint
     // to start cooling now.
-    if (config_.systemOn && setpoints.coolTemp > nextSchedule.coolC) {
+    if (config_.systemOn && setpoints.coolTempC > nextSchedule.coolC) {
         int minsUntilNext = (nextSchedule.startMinOfDay() - localMinOfDay()) % (60 * 24);
         if (minsUntilNext <= PRECOOL_MINS) {
             double precoolC = nextSchedule.coolC + minsUntilNext * PRECOOL_DEG_PER_MIN;
-            if (precoolC < setpoints.coolTemp) {
+            if (precoolC < setpoints.coolTempC) {
                 setpointReason_ = "precooling";
-                setpoints.coolTemp = precoolC;
+                setpoints.coolTempC = precoolC;
                 setMessageF(MsgID::Precooling, true, "Cooling to %d by %02d:%02d%c",
-                            ABS_C_TO_F(setpoints.coolTemp), SCHEDULE_TIME_STR_ARGS(nextSchedule));
+                            ABS_C_TO_F(setpoints.coolTempC), SCHEDULE_TIME_STR_ARGS(nextSchedule));
 
                 return setpoints;
             }
@@ -614,7 +618,7 @@ void ControllerApp::handleFreshAirState(ControllerDomain::FreshAirState *freshAi
             if (fanLastStarted_ == std::chrono::steady_clock::time_point{}) {
                 fanLastStarted_ = fasTime;
             } else if (now - fanLastStarted_ > OUTDOOR_TEMP_MIN_FAN_TIME) {
-                rawOutdoorTempC_ = freshAirState->temp;
+                rawOutdoorTempC_ = freshAirState->tempC;
                 modbusController_->reportOutdoorTemp(outdoorTempC());
                 uiManager_->setOutTempC(outdoorTempC());
                 lastOutdoorTempUpdate_ = fasTime;
@@ -665,16 +669,18 @@ void ControllerApp::task(bool firstTime) {
     SensorData sensorData[nControllers_];
 
     setpoints[0] = getCurrentSetpoints();
-    uiManager_->setCurrentSetpoints(setpoints[0].heatTemp, setpoints[0].coolTemp);
+    uiManager_->setCurrentSetpoints(setpoints[0].heatTempC, setpoints[0].coolTempC);
+
+
 
     sensorData[0] = sensors_->getLatest();
-    sensorData[0].temp += config_.inTempOffsetC;
+    sensorData[0].tempC += config_.inTempOffsetC;
     if (strlen(sensorData[0].errMsg) == 0) {
         requests[0] = demandController_->update(sensorData[0], setpoints[0], outdoorTempC());
         clearMessage(MsgID::SensorErr);
 
         uiManager_->setHumidity(sensorData[0].humidity);
-        uiManager_->setInTempC(sensorData[0].temp);
+        uiManager_->setInTempC(sensorData[0].tempC);
         uiManager_->setInCO2(sensorData[0].co2);
     } else {
         ESP_LOGE(TAG, "%s", sensorData[0].errMsg);

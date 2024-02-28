@@ -41,7 +41,7 @@ int8_t co2_init() {
     return 0;
 }
 
-int8_t co2_read(bool *read, uint16_t *co2) {
+int8_t co2_read(bool *read, uint16_t *co2, double *tc, double *h) {
     int16_t err = scd4x_get_data_ready_flag(read);
     if (err != 0) {
         ESP_LOGD(TAG, "error getting data ready flag");
@@ -51,8 +51,14 @@ int8_t co2_read(bool *read, uint16_t *co2) {
         return 0;
     }
 
-    int32_t t, h; // throwaway since we have a PHT sensor
-    return scd4x_read_measurement(co2, &t, &h);
+    int32_t mt, mh; // Milli deg C and milli % RH
+    int8_t res = scd4x_read_measurement(co2, &mt, &mh);
+    if (res == 0) {
+        *tc = mt / 1000.0;
+        *h = mt / 1000.0;
+    }
+
+    return res;
 }
 
 int8_t co2_set_pressure(uint16_t pressure_hpa) { return scd4x_set_ambient_pressure(pressure_hpa); }

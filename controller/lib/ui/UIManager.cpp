@@ -58,7 +58,7 @@ void heatRollerChangeCb(lv_event_t *e) {
 }
 
 void coolRollerChangeCb(lv_event_t *e) {
-    UIManager::eventsInst()->handleTempRollerChange(true, (lv_obj_t *)lv_event_get_user_data(e),
+    UIManager::eventsInst()->handleTempRollerChange(false, (lv_obj_t *)lv_event_get_user_data(e),
                                                     lv_event_get_target(e));
 }
 
@@ -486,6 +486,9 @@ void UIManager::updateTempLimits(uint8_t maxHeatDeg, uint8_t minCoolDeg) {
 }
 
 void UIManager::updateUIForEquipment() {
+    // TODO: Don't allow valve mode when primary is selected
+    // TODO: Don't show HVAC types/makeup when secondary is selected
+
     // Hide AC buttons if we don't have active cooling
     objSetFlag(equipment_.coolType == Config::HVACType::None, ui_ac_button_container,
                LV_OBJ_FLAG_HIDDEN);
@@ -674,11 +677,11 @@ void UIManager::setHVACState(ControllerDomain::HVACState state) {
         }
     }
 
-    if (state == HVACState::ACCool) {
-        // Hide "use AC", show "stop A/C"
-        objSetVisibility(false, ui_use_ac_button);
-        objSetVisibility(true, ui_stop_ac_button);
-    }
+    // TODO: This is a mess and doesn't work right with overrides
+    bool ac = state == HVACState::ACCool;
+    objSetVisibility(!ac, ui_use_ac_button);
+    objSetVisibility(ac, ui_stop_ac_button);
+
     xSemaphoreGive(mutex_);
 }
 

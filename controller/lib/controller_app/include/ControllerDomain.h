@@ -18,13 +18,13 @@ enum class FancoilSpeed { Off, Low, Med, High };
 enum class FancoilID { Prim, Sec };
 
 struct FreshAirState {
-    double temp, humidity;
+    double tempC, humidity;
     uint32_t pressurePa;
     uint16_t fanRpm;
 };
 
 struct SensorData {
-    double temp = std::nan(""), humidity = std::nan("");
+    double tempC = std::nan(""), humidity = std::nan("");
     uint32_t pressurePa;
     uint16_t co2;
     std::chrono::steady_clock::time_point updateTime;
@@ -32,7 +32,7 @@ struct SensorData {
 };
 
 struct Setpoints {
-    double heatTemp, coolTemp;
+    double heatTempC, coolTempC;
     uint16_t co2;
 };
 struct DemandRequest {

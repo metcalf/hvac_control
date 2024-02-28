@@ -12,6 +12,9 @@ static const char *TAG = "SNS";
 
 using SensorData = ControllerDomain::SensorData;
 
+#define SCD40_BASE_TEMP_OFFSET_C 0.0
+#define BME280_BASE_TEMP_OFFSET_C -3.0
+
 uint16_t paToHpa(uint32_t pa) { return (pa + 100 / 2) / 100; }
 
 bool Sensors::init() {
@@ -41,23 +44,20 @@ bool Sensors::init() {
 bool Sensors::pollInternal(SensorData &prevData) {
     int8_t err;
 
-    double temp, humidity;
+    double phtTempC, phtHumidity;
     uint32_t pressurePa;
 
     uint16_t lastHpa = paToHpa(prevData.pressurePa);
 
-    err = bme280_get_latest(&temp, &humidity, &pressurePa);
+    err = bme280_get_latest(&phtTempC, &phtHumidity, &pressurePa);
     if (err != 0) {
         snprintf(prevData.errMsg, sizeof(prevData.errMsg), "PHT poll error %d", err);
         return false;
     }
 
-    prevData.temp = temp;
-    prevData.humidity = humidity;
     prevData.pressurePa = pressurePa;
 
-    ESP_LOGD(TAG, "PHT updated: %.1f %.1f %lu", prevData.temp, prevData.humidity,
-             prevData.pressurePa);
+    ESP_LOGD(TAG, "PHT updated: t=%.1f h=%.1f p=%lu", phtTempC, phtHumidity, pressurePa);
 
     uint16_t hpa = paToHpa(prevData.pressurePa);
 
@@ -71,22 +71,33 @@ bool Sensors::pollInternal(SensorData &prevData) {
 
     bool co2_updated;
     uint16_t co2;
-    err = co2_read(&co2_updated, &co2);
+    double co2TempC, co2Humidity;
+    err = co2_read(&co2_updated, &co2, &co2TempC, &co2Humidity);
     if (err != 0) {
         snprintf(prevData.errMsg, sizeof(prevData.errMsg), "CO2 read error %d", err);
         return false;
     }
     if (co2_updated) {
         prevData.co2 = co2;
-        ESP_LOGD(TAG, "CO2 updated: %u", prevData.co2);
+        ESP_LOGD(TAG, "CO2 updated: ppm=%u t=%0.1f h=%0.1f", co2, co2TempC, co2Humidity);
     } else {
         ESP_LOGD(TAG, "CO2 not ready");
+        return false;
     }
+
+    // Both of our sensors suffer from significant self-heating issues, but they behave
+    // differently on startup the BME280 slowly warms up over ~1m to its stable value. The
+    // SCD40 heats up when it first starts but settles down to its stable value over ~2m.
+    // Averaging the values should get us a somewhat more stable reading on startup and
+    // hopefully help compenstate for some drift over time.
+    prevData.tempC =
+        ((phtTempC + BME280_BASE_TEMP_OFFSET_C) + (co2TempC + SCD40_BASE_TEMP_OFFSET_C)) / 2;
+    prevData.humidity = (phtHumidity + co2Humidity) / 2;
 
     prevData.updateTime = std::chrono::steady_clock::now();
     prevData.errMsg[0] = 0;
 
-    return co2_updated;
+    return true;
 }
 
 bool Sensors::poll() {

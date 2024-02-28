@@ -29,17 +29,18 @@ DemandRequest DemandController::update(const SensorData &sensor_data, const Setp
         maxFanCooling = 0;
         maxFanVenting = UINT8_MAX;
     } else {
-        maxFanCooling = outdoor_temp_delta_cooling_range_.getSpeed(outdoorTempC - sensor_data.temp);
-        maxFanVenting = computeVentLimit(setpoints, sensor_data.temp, outdoorTempC);
+        maxFanCooling =
+            outdoor_temp_delta_cooling_range_.getSpeed(outdoorTempC - sensor_data.tempC);
+        maxFanVenting = computeVentLimit(setpoints, sensor_data.tempC, outdoorTempC);
     }
 
     return DemandRequest{
         .targetVent = co2_venting_range_.getSpeed(sensor_data.co2 - setpoints.co2),
         .targetFanCooling =
-            indoor_temp_cooling_range_.getSpeed(setpoints.coolTemp - sensor_data.temp),
+            indoor_temp_cooling_range_.getSpeed(setpoints.coolTempC - sensor_data.tempC),
         .maxFanCooling = maxFanCooling,
         .maxFanVenting = maxFanVenting,
-        .fancoil = computeFancoil(setpoints, sensor_data.temp),
+        .fancoil = computeFancoil(setpoints, sensor_data.tempC),
     };
 }
 
@@ -53,10 +54,10 @@ FanSpeed DemandController::computeVentLimit(const Setpoints &setpoints, const do
                                             const LinearRange outdoor_limit_range) {
     if (outdoor > indoor) {
         // Limit venting if it's too hot outside relative to cool setpoint
-        return outdoor_limit_range.getSpeed(outdoor - setpoints.coolTemp);
+        return outdoor_limit_range.getSpeed(outdoor - setpoints.coolTempC);
     } else {
         // Limit venting if it's too cool outside relative to heat setpoint
-        return outdoor_limit_range.getSpeed(setpoints.heatTemp - outdoor);
+        return outdoor_limit_range.getSpeed(setpoints.heatTempC - outdoor);
     }
 }
 
@@ -68,8 +69,8 @@ DemandRequest::FancoilRequest DemandController::computeFancoil(const Setpoints &
                                                                const double indoor,
                                                                FancoilSetpointHandler hvac_temp) {
 
-    double heat_delta = abs(setpoints.heatTemp - indoor);
-    double cool_delta = abs(setpoints.coolTemp - indoor);
+    double heat_delta = abs(setpoints.heatTempC - indoor);
+    double cool_delta = abs(setpoints.coolTempC - indoor);
 
     DemandRequest::FancoilRequest request;
 
@@ -80,9 +81,9 @@ DemandRequest::FancoilRequest DemandController::computeFancoil(const Setpoints &
 
     double delta;
     if (request.cool) {
-        delta = (setpoints.coolTemp + FANCOIL_COOL_OFFSET) - indoor;
+        delta = indoor - (setpoints.coolTempC + FANCOIL_COOL_OFFSET);
     } else {
-        delta = indoor - setpoints.heatTemp;
+        delta = setpoints.heatTempC - indoor;
     }
 
     request.speed = hvac_temp_.update(0, delta);

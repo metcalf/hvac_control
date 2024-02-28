@@ -128,7 +128,8 @@
       "iomanip": "cpp",
       "lv_timer.h": "c",
       "lvgl_spi_conf.h": "c",
-      "touch_driver.h": "c"
+      "touch_driver.h": "c",
+      "controller_main.h": "c"
     }
   }
 }

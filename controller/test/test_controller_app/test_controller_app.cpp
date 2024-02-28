@@ -13,6 +13,7 @@
 using ::testing::_;
 using ::testing::AtMost;
 using ::testing::ExpectationSet;
+using ::testing::InSequence;
 using ::testing::IsNan;
 using Config = ControllerDomain::Config;
 
@@ -118,7 +119,7 @@ class ControllerAppTest : public testing::Test {
 TEST_F(ControllerAppTest, Boots) {
     ExpectationSet uiInits;
 
-    sensors_.setLatest({.temp = 1.0, .humidity = 2.0, .co2 = 456});
+    sensors_.setLatest({.tempC = 20.0, .humidity = 2.0, .co2 = 456});
 
     // AtMost is somewhat arbitrary, just making sure it's not crazy high
     EXPECT_CALL(uiManager_, clearMessage(_)).Times(AtMost(10));
@@ -127,7 +128,7 @@ TEST_F(ControllerAppTest, Boots) {
 
     uiInits += EXPECT_CALL(uiManager_, setHumidity(2.0));
     uiInits += EXPECT_CALL(uiManager_, setCurrentFanSpeed(0));
-    uiInits += EXPECT_CALL(uiManager_, setInTempC(1.0));
+    uiInits += EXPECT_CALL(uiManager_, setInTempC(20.0));
     uiInits += EXPECT_CALL(uiManager_, setInCO2(456));
     uiInits += EXPECT_CALL(uiManager_, setHVACState(ControllerDomain::HVACState::Off));
     uiInits += EXPECT_CALL(uiManager_, setCurrentSetpoints(19.0, 22.0));
@@ -138,7 +139,7 @@ TEST_F(ControllerAppTest, Boots) {
 }
 
 TEST_F(ControllerAppTest, CallsForVenting) {
-    sensors_.setLatest({.temp = 1.0, .humidity = 2.0, .co2 = 1100});
+    sensors_.setLatest({.tempC = 1.0, .humidity = 2.0, .co2 = 1100});
 
     EXPECT_CALL(uiManager_, setCurrentFanSpeed(67));
 
@@ -147,14 +148,14 @@ TEST_F(ControllerAppTest, CallsForVenting) {
     EXPECT_EQ(67, modbusController_.getFreshAirSpeed());
 }
 
-TEST_F(ControllerAppTest, UsesFanForOutdoorTempUpdate) {
+TEST_F(ControllerAppTest, UsesFanCoolingWhenOutdoorTempAllows) {
     // Establish cooling demand to trigger fan for outdoor temp update
-    sensors_.setLatest({.temp = 25.0, .humidity = 2.0, .co2 = 500});
+    sensors_.setLatest({.tempC = 25.0, .humidity = 2.0, .co2 = 500});
     app_->task(false);
     EXPECT_EQ(10, modbusController_.getFreshAirSpeed());
 
     // Another iteration shows the fan running but shouldn't start cooling yet
-    modbusController_.setFreshAirState(ControllerDomain::FreshAirState{.temp = 23, .fanRpm = 1000},
+    modbusController_.setFreshAirState(ControllerDomain::FreshAirState{.tempC = 23, .fanRpm = 1000},
                                        app_->steadyNow_);
     app_->task(false);
     EXPECT_EQ(10, modbusController_.getFreshAirSpeed());
@@ -167,6 +168,44 @@ TEST_F(ControllerAppTest, UsesFanForOutdoorTempUpdate) {
     app_->task(false);
     EXPECT_EQ(255, modbusController_.getFreshAirSpeed());
     EXPECT_EQ(23, modbusController_.getOutTempC());
+
+    // If the outdoor temp gets too high, the fan should turn off
+    modbusController_.setFreshAirState(ControllerDomain::FreshAirState{.tempC = 30, .fanRpm = 1000},
+                                       app_->steadyNow_);
+    EXPECT_CALL(uiManager_, setOutTempC(30));
+    app_->task(false);
+    EXPECT_EQ(0, modbusController_.getFreshAirSpeed());
+    EXPECT_EQ(30, modbusController_.getOutTempC());
+}
+
+TEST_F(ControllerAppTest, CallsForValveHVAC) {
+    auto cfg = default_test_config();
+    cfg.equipment.coolType = Config::HVACType::Valve;
+    cfg.equipment.heatType = Config::HVACType::Valve;
+    app_->setConfig(cfg);
+
+    // Expect heating, then cooling
+    {
+        InSequence seq;
+
+        EXPECT_CALL(valveCtrl_, setMode(false, true)); // Heat
+        EXPECT_CALL(valveCtrl_, setMode(true, true));  // Cool
+    }
+    {
+        InSequence seq;
+
+        EXPECT_CALL(uiManager_, setHVACState(ControllerDomain::HVACState::Heat));
+        EXPECT_CALL(uiManager_, setHVACState(ControllerDomain::HVACState::ACCool));
+    }
+
+    // Establish heating demand
+    sensors_.setLatest({.tempC = 15.0, .humidity = 2.0, .co2 = 500});
+    app_->task(false);
+
+    // Establish cooling demand and expect cooling valve on
+    // NB: Demand must be high enough to trigger the "ac on" threshold
+    sensors_.setLatest({.tempC = 25.0, .humidity = 2.0, .co2 = 500});
+    app_->task(false);
 }
 
 // TODO: Write lots more tests!!

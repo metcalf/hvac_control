@@ -160,7 +160,7 @@ esp_err_t ModbusClient::getFreshAirState(FreshAirState *state) {
     esp_err_t err = getParam(CID::FreshAirState, (uint8_t *)&data);
 
     if (err == ESP_OK) {
-        state->temp = (double)data[0] / 100.0;
+        state->tempC = (double)data[0] / 100.0;
         state->humidity = (double)data[1] / 512.0; // 2^9 for a 9 bit shift of the decimal point
         state->pressurePa = data[2] + 87000;
         state->fanRpm = data[3];
