@@ -14,7 +14,7 @@ static const char *TAG = "CO2";
 int8_t co2_init() {
     int8_t err;
 
-    TickType_t ticks = (xTaskGetTickCount() * portTICK_PERIOD_MS);
+    TickType_t ticks = xTaskGetTickCount();
     if (BOOT_TIME_TICKS > ticks) {
         ESP_LOGI(TAG, "Waiting for sensor to boot");
         vTaskDelay(BOOT_TIME_TICKS - ticks);

@@ -1,7 +1,10 @@
 #include "controller_main.h"
 
+#include <time.h>
+
 #include "esp_freertos_hooks.h"
 #include "esp_log.h"
+#include "esp_sntp.h"
 #include "esp_task.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/queue.h"
@@ -16,6 +19,7 @@
 #include "UIManager.h"
 #include "ValveCtrl.h"
 #include "app_config.h"
+#include "rtc-rx8111.h"
 
 #define INIT_ERR_RESTART_DELAY_TICKS pdMS_TO_TICKS(10 * 1000)
 
@@ -33,6 +37,7 @@
 #define SENSOR_UPDATE_INTERVAL_SECS 30
 #define CLOCK_POLL_PERIOD_MS 100
 #define CLOCK_WAIT_MS 10 * 1000
+#define RTC_BOOT_TIME_TICKS pdMS_TO_TICKS(40)
 
 #define POSIX_TZ_STR "PST8PDT,M3.2.0/2:00:00,M11.1.0/2:00:00"
 
@@ -95,8 +100,58 @@ bool uiEvtRcv(UIManager::Event *evt, uint waitMs) {
     return xQueueReceive(uiEvtQueue_, evt, pdMS_TO_TICKS(waitMs)) == pdTRUE;
 }
 
-extern "C" void controller_main() {
+void setRTC(struct timeval *tv) {
+    struct tm dt;
+    gmtime_r(&tv->tv_sec, &dt);
+    esp_err_t err = rtc_rx8111_set_time(&dt);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Error setting RTC time: %d", err);
+    }
+}
+
+esp_err_t setupRTC() {
+    bool hasTime = false;
+
+    TickType_t ticks = xTaskGetTickCount();
+    if (RTC_BOOT_TIME_TICKS > ticks) {
+        ESP_LOGI(TAG, "Waiting for RTC to start");
+        vTaskDelay(RTC_BOOT_TIME_TICKS - ticks);
+    }
+
+    esp_err_t err = rtc_rx8111_init_client(&hasTime);
+    if (err != ESP_OK) {
+        return err;
+    }
+
+    if (hasTime) {
+        struct tm dt;
+        err = rtc_rx8111_get_time(&dt);
+        if (err != ESP_OK) {
+            ESP_LOGD(TAG, "Error retrieving time from RTC");
+            return err;
+        }
+    }
+
+    esp_sntp_set_time_sync_notification_cb(setRTC);
+
+    return ESP_OK;
+}
+
+void __attribute__((format(printf, 1, 2))) bootErr(const char *fmt, ...) {
     char bootErrMsg[UI_MAX_MSG_LEN];
+
+    va_list args;
+    va_start(args, fmt);
+    vsnprintf(bootErrMsg, sizeof(bootErrMsg), fmt, args);
+    va_end(args);
+
+    app_->bootErr(bootErrMsg);
+    vTaskDelay(INIT_ERR_RESTART_DELAY_TICKS);
+    esp_restart();
+}
+
+extern "C" void controller_main() {
+    esp_err_t err;
 
     // Initialize NVS
     esp_err_t ret = nvs_flash_init();
@@ -120,25 +175,24 @@ extern "C" void controller_main() {
     setenv("TZ", POSIX_TZ_STR, 1);
     tzset();
 
+    err = setupRTC(); // Do this before starting wifi to avoid races with NTP
+    if (err != ESP_OK) {
+        bootErr("RTC init error: %d", err);
+    }
+
     // TODO: Setup OTA updates
     // TODO: Remote logging
     wifi_.init();
     wifi_.connect(config.wifi.ssid, config.wifi.password);
 
     if (!sensors_.init()) {
-        snprintf(bootErrMsg, sizeof(bootErrMsg), "Sensor init error");
-        app_->bootErr(bootErrMsg);
-        vTaskDelay(INIT_ERR_RESTART_DELAY_TICKS);
-        esp_restart();
+        bootErr("Sensor init error");
     }
     ESP_LOGI(TAG, "sensors initialized");
 
-    esp_err_t err = modbusController_->init();
+    err = modbusController_->init();
     if (err != ESP_OK) {
-        snprintf(bootErrMsg, sizeof(bootErrMsg), "Modbus init error: %d", err);
-        app_->bootErr(bootErrMsg);
-        vTaskDelay(INIT_ERR_RESTART_DELAY_TICKS);
-        esp_restart();
+        bootErr("Modbus init error: %d", err);
     }
     ESP_LOGI(TAG, "modbus initialized");
 
