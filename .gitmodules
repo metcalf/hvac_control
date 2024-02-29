@@ -21,3 +21,6 @@
 [submodule "controller/lib/date"]
 	path = controller/lib/date
 	url = https://github.com/HowardHinnant/date
+[submodule "shared_libs/embedded-sts"]
+	path = shared_libs/embedded-sts
+	url = git@github.com:metcalf/sensirion-embedded-sts.git

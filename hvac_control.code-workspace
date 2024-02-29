@@ -129,7 +129,9 @@
       "lv_timer.h": "c",
       "lvgl_spi_conf.h": "c",
       "touch_driver.h": "c",
-      "controller_main.h": "c"
+      "controller_main.h": "c",
+      "sensirion_common.h": "c",
+      "sensirion_config.h": "c"
     }
   }
 }

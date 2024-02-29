@@ -4,100 +4,78 @@
 
 #include "esp_err.h"
 #include "esp_log.h"
+#include "sts3x.h"
 
-#include "bme280_client.h"
 #include "co2_client.h"
 
 static const char *TAG = "SNS";
 
 using SensorData = ControllerDomain::SensorData;
 
-#define SCD40_BASE_TEMP_OFFSET_C 0.0
-#define BME280_BASE_TEMP_OFFSET_C -3.0
-
 uint16_t paToHpa(uint32_t pa) { return (pa + 100 / 2) / 100; }
 
 bool Sensors::init() {
-    bool ok = true;
     int8_t err;
 
-    err = bme280_init();
+    err = sts3x_probe();
     if (err != 0) {
-        ESP_LOGE(TAG, "PHT init error %d", err);
-        ok = false;
-        return ok;
-    } else {
-        ESP_LOGD(TAG, "PHT init successful");
+        vTaskDelay(pdMS_TO_TICKS(2));
+        err = sts3x_probe();
+        if (err != 0) {
+            ESP_LOGE(TAG, "STS init error %d", err);
+            return false;
+        }
     }
+    ESP_LOGD(TAG, "STS init successful");
 
     err = co2_init();
     if (err != 0) {
         ESP_LOGE(TAG, "CO2 init error %d", err);
-        ok = false;
-    } else {
-        ESP_LOGD(TAG, "CO2 init successful");
+        return false;
     }
+    ESP_LOGD(TAG, "CO2 init successful");
 
-    return ok;
+    return true;
 }
 
 bool Sensors::pollInternal(SensorData &prevData) {
-    int8_t err;
+    bool co2Updated = false, tempUpdated = false;
+    prevData.errMsg[0] = 0;
+    int16_t err;
 
-    double phtTempC, phtHumidity;
-    uint32_t pressurePa;
-
-    uint16_t lastHpa = paToHpa(prevData.pressurePa);
-
-    err = bme280_get_latest(&phtTempC, &phtHumidity, &pressurePa);
+    err = sts3x_measure();
     if (err != 0) {
-        snprintf(prevData.errMsg, sizeof(prevData.errMsg), "PHT poll error %d", err);
+        snprintf(prevData.errMsg, sizeof(prevData.errMsg), "Temp measure error %d", err);
         return false;
     }
+    TickType_t start = xTaskGetTickCount();
+    ESP_LOGD(TAG, "STS measurement started");
 
-    prevData.pressurePa = pressurePa;
-
-    ESP_LOGD(TAG, "PHT updated: t=%.1f h=%.1f p=%lu", phtTempC, phtHumidity, pressurePa);
-
-    uint16_t hpa = paToHpa(prevData.pressurePa);
-
-    if (hpa != lastHpa) {
-        err = co2_set_pressure(hpa);
-        if (err != 0) {
-            snprintf(prevData.errMsg, sizeof(prevData.errMsg), "CO2 set pressure error %d", err);
-            return false;
-        }
-    }
-
-    bool co2_updated;
-    uint16_t co2;
+    // Attempt to read CO2 sensor while we wait for the STS to read
+    uint16_t co2ppm;
     double co2TempC, co2Humidity;
-    err = co2_read(&co2_updated, &co2, &co2TempC, &co2Humidity);
+    err = co2_read(&co2Updated, &co2ppm, &co2TempC, &co2Humidity);
     if (err != 0) {
         snprintf(prevData.errMsg, sizeof(prevData.errMsg), "CO2 read error %d", err);
-        return false;
-    }
-    if (co2_updated) {
-        prevData.co2 = co2;
-        ESP_LOGD(TAG, "CO2 updated: ppm=%u t=%0.1f h=%0.1f", co2, co2TempC, co2Humidity);
+    } else if (co2Updated) {
+        prevData.co2 = co2ppm;
+        prevData.humidity = co2Humidity;
+        ESP_LOGD(TAG, "CO2 updated: ppm=%u t=%0.1f h=%0.1f", co2ppm, co2TempC, co2Humidity);
     } else {
         ESP_LOGD(TAG, "CO2 not ready");
-        return false;
     }
 
-    // Both of our sensors suffer from significant self-heating issues, but they behave
-    // differently on startup the BME280 slowly warms up over ~1m to its stable value. The
-    // SCD40 heats up when it first starts but settles down to its stable value over ~2m.
-    // Averaging the values should get us a somewhat more stable reading on startup and
-    // hopefully help compenstate for some drift over time.
-    prevData.tempC =
-        ((phtTempC + BME280_BASE_TEMP_OFFSET_C) + (co2TempC + SCD40_BASE_TEMP_OFFSET_C)) / 2;
-    prevData.humidity = (phtHumidity + co2Humidity) / 2;
+    int32_t stsTempMC;
+    err = sts3x_read(&stsTempMC);
+    if (err == 0) {
+        prevData.tempC = stsTempMC / 1000.0;
+        ESP_LOGD(TAG, "Temp updated: t=%.1f", prevData.tempC);
+        tempUpdated = true;
+    } else {
+        snprintf(prevData.errMsg, sizeof(prevData.errMsg), "Temp read error %d", err);
+    }
 
-    prevData.updateTime = std::chrono::steady_clock::now();
-    prevData.errMsg[0] = 0;
-
-    return true;
+    return co2Updated && tempUpdated;
 }
 
 bool Sensors::poll() {
