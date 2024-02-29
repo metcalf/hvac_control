@@ -32,6 +32,26 @@ lv_obj_set_style_pad_right(ui_Header, 0, LV_PART_MAIN| LV_STATE_DEFAULT);
 lv_obj_set_style_pad_top(ui_Header, 0, LV_PART_MAIN| LV_STATE_DEFAULT);
 lv_obj_set_style_pad_bottom(ui_Header, 0, LV_PART_MAIN| LV_STATE_DEFAULT);
 
+ui_Clock_container = lv_obj_create(ui_Header);
+lv_obj_remove_style_all(ui_Clock_container);
+lv_obj_set_width( ui_Clock_container, 67);
+lv_obj_set_height( ui_Clock_container, 35);
+lv_obj_set_x( ui_Clock_container, 0 );
+lv_obj_set_y( ui_Clock_container, -6 );
+lv_obj_set_align( ui_Clock_container, LV_ALIGN_CENTER );
+lv_obj_clear_flag( ui_Clock_container, LV_OBJ_FLAG_SCROLLABLE );    /// Flags
+lv_obj_set_style_pad_left(ui_Clock_container, 5, LV_PART_MAIN| LV_STATE_DEFAULT);
+lv_obj_set_style_pad_right(ui_Clock_container, 5, LV_PART_MAIN| LV_STATE_DEFAULT);
+lv_obj_set_style_pad_top(ui_Clock_container, 0, LV_PART_MAIN| LV_STATE_DEFAULT);
+lv_obj_set_style_pad_bottom(ui_Clock_container, 0, LV_PART_MAIN| LV_STATE_DEFAULT);
+
+ui_clock_value = lv_label_create(ui_Clock_container);
+lv_obj_set_width( ui_clock_value, LV_SIZE_CONTENT);  /// 1
+lv_obj_set_height( ui_clock_value, LV_SIZE_CONTENT);   /// 1
+lv_obj_set_align( ui_clock_value, LV_ALIGN_CENTER );
+lv_label_set_text(ui_clock_value,"11:88A");
+lv_obj_set_style_text_font(ui_clock_value, &lv_font_montserrat_18, LV_PART_MAIN| LV_STATE_DEFAULT);
+
 ui_Humidity = lv_obj_create(ui_Header);
 lv_obj_remove_style_all(ui_Humidity);
 lv_obj_set_width( ui_Humidity, 67);
@@ -94,7 +114,7 @@ lv_obj_set_style_pad_bottom(ui_Fan_value, 0, LV_PART_MAIN| LV_STATE_DEFAULT);
 
 ui_out_temp = lv_obj_create(ui_Header);
 lv_obj_remove_style_all(ui_out_temp);
-lv_obj_set_width( ui_out_temp, 67);
+lv_obj_set_width( ui_out_temp, 60);
 lv_obj_set_height( ui_out_temp, 35);
 lv_obj_set_x( ui_out_temp, 0 );
 lv_obj_set_y( ui_out_temp, -6 );

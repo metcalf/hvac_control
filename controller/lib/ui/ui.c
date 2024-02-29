@@ -24,6 +24,8 @@ void ui_Home_screen_init(void);
 void ui_event_Home( lv_event_t * e);
 lv_obj_t *ui_Home;
 lv_obj_t *ui_Header;
+lv_obj_t *ui_Clock_container;
+lv_obj_t *ui_clock_value;
 lv_obj_t *ui_Humidity;
 lv_obj_t *ui_Humidity_symbol;
 lv_obj_t *ui_Humidity_value;

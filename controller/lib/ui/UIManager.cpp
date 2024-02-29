@@ -1,8 +1,10 @@
 #include "UIManager.h"
 
+#include <chrono>
+#include <cmath>
+
 #include "driver/gpio.h"
 #include "esp_log.h"
-#include <cmath>
 
 using HVACState = ControllerDomain::HVACState;
 using Config = ControllerDomain::Config;
@@ -38,6 +40,8 @@ double getTempOffsetF(lv_obj_t *roller) { return ((double)getTempOffsetTenthDeg(
 uint16_t tempOffsetRollerOpt(double tempOffsetC) { return REL_C_TO_F(tempOffsetC) * 10 + 50; }
 
 void messageTimerCb(lv_timer_t *timer) { ((UIManager *)timer->user_data)->onMessageTimer(); }
+
+void updateClkCb(lv_timer_t *timer) { ((UIManager *)timer->user_data)->updateClk(); }
 
 void restartCb(lv_timer_t *) { esp_restart(); }
 
@@ -540,6 +544,24 @@ void UIManager::manageSleep() {
     }
 }
 
+void UIManager::updateClk() {
+    struct tm dt;
+    time_t nowUTC = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
+    localtime_r(&nowUTC, &dt);
+
+    if (dt.tm_year < 120) {
+        // Before 2020--time must be invalid
+        lv_label_set_text(ui_clock_value, "--:-- ");
+    } else {
+        int hr = dt.tm_hour % 12;
+        if (hr == 0) {
+            hr = 12;
+        }
+        lv_label_set_text_fmt(ui_clock_value, "%02d:%02d%c", hr, dt.tm_min,
+                              dt.tm_hour > 11 ? 'P' : 'A');
+    }
+}
+
 UIManager::UIManager(ControllerDomain::Config config, size_t nMsgIds, eventCb_t eventCb)
     : eventCb_(eventCb) {
     mutex_ = xSemaphoreCreateMutex();
@@ -595,8 +617,12 @@ UIManager::UIManager(ControllerDomain::Config config, size_t nMsgIds, eventCb_t 
     lv_obj_set_scroll_snap_y(ui_Footer, LV_SCROLL_SNAP_START);
     msgHeight_ = messages_[0]->getHeight();
     msgTimer_ = lv_timer_create(messageTimerCb, MSG_SCROLL_MS, this);
+
     restartTimer_ = lv_timer_create(restartCb, RESTART_DELAY_MS, NULL);
     lv_timer_pause(restartTimer_);
+
+    clkTimer_ = lv_timer_create(updateClkCb, 1000, this);
+    updateClk();
 
     lv_obj_add_event_cb(ui_Footer, pauseTimer, LV_EVENT_SCROLL_BEGIN, msgTimer_);
     lv_obj_add_event_cb(ui_Footer, resetAndResumeTimer, LV_EVENT_SCROLL_END, msgTimer_);

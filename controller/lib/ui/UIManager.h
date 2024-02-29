@@ -16,6 +16,8 @@ class UIManager : public AbstractUIManager {
     UIManager(ControllerDomain::Config config, size_t nMsgIds, eventCb_t eventCb);
     ~UIManager() {
         lv_timer_del(msgTimer_);
+        lv_timer_del(restartTimer_);
+        lv_timer_del(clkTimer_);
         for (int i = 0; i < nMsgIds_; i++) {
             delete messages_[i];
         }
@@ -113,13 +115,14 @@ class UIManager : public AbstractUIManager {
     void updateTempLimits(uint8_t maxHeatDeg, uint8_t minCoolDeg);
     void updateUIForEquipment();
     void manageSleep();
+    void updateClk();
 
     inline static UIManager *eventsInst_;
 
     SemaphoreHandle_t mutex_;
     MessageContainer **messages_;
     size_t nMsgIds_;
-    lv_timer_t *msgTimer_, *restartTimer_;
+    lv_timer_t *msgTimer_, *restartTimer_, *clkTimer_;
     lv_coord_t msgHeight_;
     eventCb_t eventCb_;
     bool displayAwake_ = false, booted_ = false;
