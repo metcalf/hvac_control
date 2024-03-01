@@ -53,3 +53,7 @@ void temp_offsets_load_start(lv_event_t *e) { UIManager::eventsInst()->eTempOffs
 void wifi_settings_load_start(lv_event_t *e) { UIManager::eventsInst()->eWifiSettingsLoadStart(); }
 
 void temp_offset_changed(lv_event_t *e) { UIManager::eventsInst()->eTempOffsetChanged(); }
+
+void controller_type_selection_changed(lv_event_t *e) {
+    UIManager::eventsInst()->eControllerTypeSelectionChanged();
+}

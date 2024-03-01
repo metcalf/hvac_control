@@ -1725,7 +1725,7 @@
                       {
                         "nid": -706690158,
                         "strtype": "LABEL/Text",
-                        "strval": "11:88A",
+                        "strval": "11:88 ",
                         "InheritedType": 10
                       },
                       {
@@ -60267,6 +60267,71 @@
                         "strtype": "DROPDOWN/Style_list_selected",
                         "strval": "{\"python\":\"{0}.get_list()\",\"c\":\"lv_dropdown_get_list({0})\"} lv.PART.SELECTED, Text, Rectangle",
                         "InheritedType": 11
+                      },
+                      {
+                        "disabled": false,
+                        "nid": -230466196,
+                        "strtype": "DROPDOWN/EventHandler",
+                        "strval": "VALUE_CHANGED",
+                        "childs": [
+                          {
+                            "nid": 363668227,
+                            "strtype": "_custom/name",
+                            "strval": "Event17",
+                            "InheritedType": 10
+                          },
+                          {
+                            "nid": 1544827531,
+                            "strtype": "_custom/condition_C",
+                            "strval": "",
+                            "InheritedType": 10
+                          },
+                          {
+                            "nid": 475127611,
+                            "strtype": "_custom/condition_P",
+                            "strval": "",
+                            "InheritedType": 10
+                          },
+                          {
+                            "nid": -327714322,
+                            "strtype": "_custom/action",
+                            "strval": "CALL FUNCTION",
+                            "childs": [
+                              {
+                                "nid": 2122655798,
+                                "strtype": "CALL FUNCTION/Name",
+                                "strval": "CALL FUNCTION",
+                                "InheritedType": 10
+                              },
+                              {
+                                "nid": -355328784,
+                                "strtype": "CALL FUNCTION/Call",
+                                "strval": "<{Function_name}>( event_struct )",
+                                "InheritedType": 10
+                              },
+                              {
+                                "nid": 1564128046,
+                                "strtype": "CALL FUNCTION/CallC",
+                                "strval": "<{Function_name}>( e );",
+                                "InheritedType": 10
+                              },
+                              {
+                                "nid": -1913826119,
+                                "strtype": "CALL FUNCTION/Function_name",
+                                "strval": "controller_type_selection_changed",
+                                "InheritedType": 10
+                              },
+                              {
+                                "nid": -227357920,
+                                "strtype": "CALL FUNCTION/Dont_export_function",
+                                "strval": "False",
+                                "InheritedType": 2
+                              }
+                            ],
+                            "InheritedType": 10
+                          }
+                        ],
+                        "InheritedType": 4
                       }
                     ],
                     "saved_objtypeKey": "DROPDOWN",
@@ -83644,7 +83709,7 @@
     "theme_color2": 0,
     "uiExportFolderPath": "/Users/andrew/code/hvac_control/controller/lib/ui",
     "projectExportFolderPath": "",
-    "backup_cnt": 2996,
+    "backup_cnt": 3022,
     "autosave_cnt": 0,
     "lvgl_version": "8.3.6",
     "callfuncsexport": "CPP_FILE",

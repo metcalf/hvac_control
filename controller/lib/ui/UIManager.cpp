@@ -18,6 +18,10 @@ using Config = ControllerDomain::Config;
 #define MIN_HEAT_COOL_DELTA_DEG 2
 #define MIN_HEAT_COOL_DELTA_C ABS_F_TO_C(MIN_HEAT_COOL_DELTA_DEG)
 
+// Support for controlling valves on the secondary isn't implemented
+#define STANDALONE_HVAC_TYPE_OPTIONS "NONE\nFANCOIL\nVALVE"
+#define PRIMARY_HVAC_TYPE_OPTIONS "NONE\nFANCOIL"
+
 static const char *TAG = "UI";
 
 lv_obj_t **wifiTextareas[] = {
@@ -39,9 +43,27 @@ double getTempOffsetF(lv_obj_t *roller) { return ((double)getTempOffsetTenthDeg(
 
 uint16_t tempOffsetRollerOpt(double tempOffsetC) { return REL_C_TO_F(tempOffsetC) * 10 + 50; }
 
+void updateClk() {
+    struct tm dt;
+    time_t nowUTC = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
+    localtime_r(&nowUTC, &dt);
+
+    if (dt.tm_year < 120) {
+        // Before 2020--time must be invalid
+        lv_label_set_text(ui_clock_value, "--:-- ");
+    } else {
+        int hr = dt.tm_hour % 12;
+        if (hr == 0) {
+            hr = 12;
+        }
+        lv_label_set_text_fmt(ui_clock_value, "%02d:%02d%c", hr, dt.tm_min,
+                              dt.tm_hour > 11 ? 'P' : 'A');
+    }
+}
+
 void messageTimerCb(lv_timer_t *timer) { ((UIManager *)timer->user_data)->onMessageTimer(); }
 
-void updateClkCb(lv_timer_t *timer) { ((UIManager *)timer->user_data)->updateClk(); }
+void updateClkCb(lv_timer_t *timer) { updateClk(); }
 
 void restartCb(lv_timer_t *) { esp_restart(); }
 
@@ -410,6 +432,8 @@ void UIManager::eEquipmentSettingsLoadStart() {
     } else {
         lv_obj_clear_state(ui_makeup_air_switch, LV_STATE_CHECKED);
     }
+
+    eControllerTypeSelectionChanged(); // Simulate event to update UI
 }
 
 void UIManager::eTempLimitsLoadStart() {
@@ -461,6 +485,34 @@ void UIManager::eWifiTextarea(lv_event_t *e) {
     }
 }
 
+void configureHvacTypeDropdown(lv_obj_t *dropdown, bool isPrimary) {
+    const char *options = isPrimary ? PRIMARY_HVAC_TYPE_OPTIONS : STANDALONE_HVAC_TYPE_OPTIONS;
+
+    uint16_t selected = lv_dropdown_get_selected(dropdown);
+
+    lv_dropdown_set_options_static(dropdown, options);
+    if (lv_dropdown_get_option_cnt(dropdown) <= selected) {
+        selected = 0; // Reset to `NONE` if `VALVE` had been selected
+    };
+    lv_dropdown_set_selected(dropdown, selected);
+}
+
+void UIManager::eControllerTypeSelectionChanged() {
+    Config::ControllerType type =
+        Config::ControllerType(lv_dropdown_get_selected(ui_controller_type));
+
+    bool isPrimary = type == Config::ControllerType::Primary;
+    bool isSecondary = type == Config::ControllerType::Secondary;
+
+    configureHvacTypeDropdown(ui_heat_type, isPrimary);
+    configureHvacTypeDropdown(ui_cool_type, isPrimary);
+
+    // Don't show HVAC types/makeup when secondary is selected, managed by the primary
+    objSetVisibility(!isSecondary, ui_heat_type_container);
+    objSetVisibility(!isSecondary, ui_cool_type_container);
+    objSetVisibility(!isSecondary, ui_makeup_air_container);
+}
+
 void UIManager::onMessageTimer() {
     // TODO(future): It'd be nicer to make this a circular scroll
     lv_coord_t currY = lv_obj_get_scroll_y(ui_Footer);
@@ -490,9 +542,6 @@ void UIManager::updateTempLimits(uint8_t maxHeatDeg, uint8_t minCoolDeg) {
 }
 
 void UIManager::updateUIForEquipment() {
-    // TODO: Don't allow valve mode when primary is selected
-    // TODO: Don't show HVAC types/makeup when secondary is selected
-
     // Hide AC buttons if we don't have active cooling
     objSetFlag(equipment_.coolType == Config::HVACType::None, ui_ac_button_container,
                LV_OBJ_FLAG_HIDDEN);
@@ -541,24 +590,6 @@ void UIManager::manageSleep() {
             lv_scr_load_anim(sleepScreen_, LV_SCR_LOAD_ANIM_NONE, 0, 0, false);
             displayAwake_ = false;
         }
-    }
-}
-
-void UIManager::updateClk() {
-    struct tm dt;
-    time_t nowUTC = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
-    localtime_r(&nowUTC, &dt);
-
-    if (dt.tm_year < 120) {
-        // Before 2020--time must be invalid
-        lv_label_set_text(ui_clock_value, "--:-- ");
-    } else {
-        int hr = dt.tm_hour % 12;
-        if (hr == 0) {
-            hr = 12;
-        }
-        lv_label_set_text_fmt(ui_clock_value, "%02d:%02d%c", hr, dt.tm_min,
-                              dt.tm_hour > 11 ? 'P' : 'A');
     }
 }
 

@@ -26,6 +26,7 @@ void schedule_load_start(lv_event_t * e);
 void set_schedule(lv_event_t * e);
 void equipment_settings_load_start(lv_event_t * e);
 void save_equipment_settings(lv_event_t * e);
+void controller_type_selection_changed(lv_event_t * e);
 void temp_limits_load_start(lv_event_t * e);
 void save_temp_limits(lv_event_t * e);
 void temp_offsets_load_start(lv_event_t * e);

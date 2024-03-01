@@ -6,13 +6,22 @@
 #include "esp_log.h"
 #include "sts3x.h"
 
+#include "NVSConfigStore.h"
 #include "co2_client.h"
 
 static const char *TAG = "SNS";
 
+static NVSConfigStore<CO2Calibration::State> co2CalibrationStore =
+    NVSConfigStore<CO2Calibration::State>(CO2_STATE_VERSION, CO2_STATE_NAMESPACE);
+
 using SensorData = ControllerDomain::SensorData;
 
 uint16_t paToHpa(uint32_t pa) { return (pa + 100 / 2) / 100; }
+
+Sensors::Sensors() {
+    mutex_ = xSemaphoreCreateMutex();
+    co2Calibration_ = new CO2Calibration(&co2CalibrationStore);
+}
 
 bool Sensors::init() {
     int8_t err;
@@ -58,12 +67,17 @@ bool Sensors::pollInternal(SensorData &prevData) {
     if (err != 0) {
         snprintf(prevData.errMsg, sizeof(prevData.errMsg), "CO2 read error %d", err);
     } else if (co2Updated) {
+        co2ppm += co2Calibration_->update(co2ppm);
         prevData.co2 = co2ppm;
         prevData.humidity = co2Humidity;
         ESP_LOGD(TAG, "CO2 updated: ppm=%u t=%0.1f h=%0.1f", co2ppm, co2TempC, co2Humidity);
+
     } else {
         ESP_LOGD(TAG, "CO2 not ready");
     }
+
+    // Delay until STS is ready
+    xTaskDelayUntil(&start, pdMS_TO_TICKS(STS3X_MEASUREMENT_DURATION_USEC + 500 / 1000));
 
     int32_t stsTempMC;
     err = sts3x_read(&stsTempMC);

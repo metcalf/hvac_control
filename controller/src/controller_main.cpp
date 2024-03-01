@@ -11,6 +11,7 @@
 #include "freertos/task.h"
 #include "nvs_flash.h"
 
+#include "AppConfigStore.h"
 #include "ControllerApp.h"
 #include "DemandController.h"
 #include "ESPWifi.h"
@@ -18,7 +19,6 @@
 #include "Sensors.h"
 #include "UIManager.h"
 #include "ValveCtrl.h"
-#include "app_config.h"
 #include "rtc-rx8111.h"
 
 #define INIT_ERR_RESTART_DELAY_TICKS pdMS_TO_TICKS(10 * 1000)
@@ -53,6 +53,7 @@ static Sensors sensors_;
 static DemandController demandController_;
 static QueueHandle_t uiEvtQueue_;
 static ESPWifi wifi_;
+static AppConfigStore appConfigStore_;
 
 void sensorTask(void *sensors) {
     while (1) {
@@ -163,13 +164,13 @@ extern "C" void controller_main() {
 
     uiEvtQueue_ = xQueueCreate(10, sizeof(UIManager::Event));
 
-    Config config = app_config_load();
+    Config config = appConfigStore_.load();
     uiManager_ = new UIManager(config, ControllerApp::nMsgIds(), uiEvtCb);
     UIManager::setEventsInst(uiManager_);
     modbusController_ = new ModbusController(config.equipment.hasMakeupDemand);
     valveCtrl_.init();
     app_ = new ControllerApp(config, uiManager_, modbusController_, &sensors_, &demandController_,
-                             &valveCtrl_, &wifi_, app_config_save, uiEvtRcv);
+                             &valveCtrl_, &wifi_, &appConfigStore_, uiEvtRcv);
     xTaskCreate(uiTask, "uiTask", UI_TASK_STACK_SIZE, uiManager_, UI_TASK_PRIO, NULL);
 
     setenv("TZ", POSIX_TZ_STR, 1);

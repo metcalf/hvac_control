@@ -5,7 +5,7 @@
 #define RTC_ADDR 0x32
 
 /* Bug fixed in 2021/APR/6 */
-/* Insert and Defined ALARM_AE *
+/* Insert and Defined ALARM_AE */
 /* Basic time and calendar register */
 #define RX8111_SEC 0x10
 #define RX8111_MIN 0x11
@@ -107,15 +107,29 @@
 /* Insert and Defined ALARM_AE */
 #define RX8111_ALARM_AE BIT(7)
 
+/*!
+      @brief  Convert a binary coded decimal value to binary. RTC stores
+    time/date values as BCD.
+      @param val BCD value
+      @return Binary value
+  */
+static uint8_t bcd2bin(uint8_t val) { return val - 6 * (val >> 4); }
+/*!
+      @brief  Convert a binary value to BCD format for the RTC registers
+      @param val Binary value
+      @return BCD value
+  */
+static uint8_t bin2bcd(uint8_t val) { return val + 6 * (val / 10); }
+
 static esp_err_t rtc_rx8111_i2c_read(uint32_t reg, uint8_t *buffer, uint16_t size) {
     return i2c_manager_read(I2C_NUM_0, RTC_ADDR, reg, buffer, size);
 }
 static esp_err_t rtc_rx8111_i2c_write(uint32_t reg, const uint8_t *buffer, uint16_t size) {
-    i2c_manager_write(I2C_NUM_0, RTC_ADDR, reg, buffer, size);
+    return i2c_manager_write(I2C_NUM_0, RTC_ADDR, reg, buffer, size);
 }
 
 static esp_err_t rtc_rx8111_i2c_write_reg(uint32_t reg, const uint8_t value) {
-    i2c_manager_write(I2C_NUM_0, RTC_ADDR, reg, &value, 1);
+    return i2c_manager_write(I2C_NUM_0, RTC_ADDR, reg, &value, 1);
 }
 
 //----------------------------------------------------------------------
@@ -136,9 +150,9 @@ esp_err_t rtc_rx8111_get_time(struct tm *dt) {
     dt->tm_mday = bcd2bin(date[RX8111_DAY - RX8111_SEC] & 0x3f);
     dt->tm_mon = bcd2bin(date[RX8111_MONTH - RX8111_SEC] & 0x1f) - 1;
     dt->tm_year = bcd2bin(date[RX8111_YEAR - RX8111_SEC]) + 100;
-    dt->tm_wday = ffs(date[RX8111_WEEK - RX8111_SEC] & 0x7f);
+    dt->tm_wday = __builtin_ffs(date[RX8111_WEEK - RX8111_SEC] & 0x7f);
 
-    return rtc_valid_tm(dt);
+    return ESP_OK;
 }
 
 //----------------------------------------------------------------------

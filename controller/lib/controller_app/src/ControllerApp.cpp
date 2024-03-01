@@ -213,7 +213,7 @@ bool ControllerApp::pollUIEvent(bool wait) {
         for (int i = 0; i < sizeof(schedules); i++) {
             config_.schedules[i] = schedules[i];
         }
-        cfgUpdateCb_(config_);
+        cfgStore_->store(config_);
 
         // Clear the temp override when we set a new schedule to avoid having
         // to think about how these interact.
@@ -224,12 +224,12 @@ bool ControllerApp::pollUIEvent(bool wait) {
     case EventType::SetCO2Target:
         ESP_LOGI(TAG, "SetCO2Target:\t%u", uiEvent.payload.co2Target);
         config_.co2Target = uiEvent.payload.co2Target;
-        cfgUpdateCb_(config_);
+        cfgStore_->store(config_);
         break;
     case EventType::SetSystemPower:
         ESP_LOGI(TAG, "SetSystemPower:\t%d", uiEvent.payload.systemPower);
         config_.systemOn = uiEvent.payload.systemPower;
-        cfgUpdateCb_(config_);
+        cfgStore_->store(config_);
         if (config_.systemOn) {
             clearMessage(MsgID::SystemOff);
         } else {
@@ -244,25 +244,25 @@ bool ControllerApp::pollUIEvent(bool wait) {
         config_.minCoolC = uiEvent.payload.tempLimits.minCoolC;
         ESP_LOGI(TAG, "SetTempLimits:\tmaxHeatC: %.1fC\tminCoolC: %0.1fC", config_.maxHeatC,
                  config_.minCoolC);
-        cfgUpdateCb_(config_);
+        cfgStore_->store(config_);
         break;
     case EventType::SetTempOffsets:
         config_.inTempOffsetC = uiEvent.payload.tempOffsets.inTempOffsetC;
         config_.outTempOffsetC = uiEvent.payload.tempOffsets.outTempOffsetC;
         ESP_LOGI(TAG, "SetTempOffsets:\tinTempC: %.1fC\toutTempC: %0.1fC", config_.inTempOffsetC,
                  config_.outTempOffsetC);
-        cfgUpdateCb_(config_);
+        cfgStore_->store(config_);
         break;
     case EventType::SetEquipment: {
         // NB: We don't handle change of controller type, instead we reboot from the UIManager
         config_.equipment = uiEvent.payload.equipment;
-        cfgUpdateCb_(config_);
+        cfgStore_->store(config_);
         modbusController_->setHasMakeupDemand(config_.equipment.hasMakeupDemand);
         break;
     }
     case EventType::SetWifi:
         config_.wifi = uiEvent.payload.wifi;
-        cfgUpdateCb_(config_);
+        cfgStore_->store(config_);
         wifi_->updateSTA(config_.wifi.ssid, config_.wifi.password);
         // TODO: Update remote logger with name when we have it
         break;
@@ -316,7 +316,7 @@ void ControllerApp::handleCancelMessage(MsgID id) {
     case MsgID::SystemOff:
         config_.systemOn = true;
         uiManager_->setSystemPower(true);
-        cfgUpdateCb_(config_);
+        cfgStore_->store(config_);
         break;
     case MsgID::FanOverride:
         // Don't set to zero, computeFanSpeed will handle that
@@ -659,7 +659,6 @@ void ControllerApp::clearMessage(MsgID msgID) {
 }
 
 void ControllerApp::task(bool firstTime) {
-    // TODO: CO2 calibration
     // TODO: Vacation? Other status info from zone controller?
     ControllerDomain::FreshAirState freshAirState{};
     handleFreshAirState(&freshAirState);
@@ -670,8 +669,6 @@ void ControllerApp::task(bool firstTime) {
 
     setpoints[0] = getCurrentSetpoints();
     uiManager_->setCurrentSetpoints(setpoints[0].heatTempC, setpoints[0].coolTempC);
-
-
 
     sensorData[0] = sensors_->getLatest();
     sensorData[0].tempC += config_.inTempOffsetC;

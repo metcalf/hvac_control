@@ -209,6 +209,7 @@ void ui_event_Setting_header2_Setting_accept_button( lv_event_t * e);
 extern lv_obj_t *ui_Container4;
 extern lv_obj_t *ui_controller_type_container;
 extern lv_obj_t *ui_Label35;
+void ui_event_controller_type( lv_event_t * e);
 extern lv_obj_t *ui_controller_type;
 extern lv_obj_t *ui_heat_type_container;
 extern lv_obj_t *ui_Label36;

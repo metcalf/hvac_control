@@ -216,6 +216,7 @@ void ui_event_Setting_header2_Setting_accept_button( lv_event_t * e);
 lv_obj_t *ui_Container4;
 lv_obj_t *ui_controller_type_container;
 lv_obj_t *ui_Label35;
+void ui_event_controller_type( lv_event_t * e);
 lv_obj_t *ui_controller_type;
 lv_obj_t *ui_heat_type_container;
 lv_obj_t *ui_Label36;
@@ -511,6 +512,12 @@ void ui_event_Setting_header2_Setting_accept_button( lv_event_t * e) {
     lv_event_code_t event_code = lv_event_get_code(e);lv_obj_t * target = lv_event_get_target(e);
 if ( event_code == LV_EVENT_CLICKED) {
       save_equipment_settings( e );
+}
+}
+void ui_event_controller_type( lv_event_t * e) {
+    lv_event_code_t event_code = lv_event_get_code(e);lv_obj_t * target = lv_event_get_target(e);
+if ( event_code == LV_EVENT_VALUE_CHANGED) {
+      controller_type_selection_changed( e );
 }
 }
 void ui_event_Temp_limits( lv_event_t * e) {

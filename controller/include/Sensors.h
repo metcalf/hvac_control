@@ -8,13 +8,14 @@
 #include "freertos/semphr.h"
 
 #include "AbstractSensors.h"
+#include "CO2Calibration.h"
 #include "ControllerDomain.h"
 
 class Sensors : public AbstractSensors {
   public:
     using SensorData = ControllerDomain::SensorData;
 
-    Sensors() { mutex_ = xSemaphoreCreateMutex(); }
+    Sensors();
     ~Sensors() { vSemaphoreDelete(mutex_); }
 
     bool init();
@@ -24,6 +25,7 @@ class Sensors : public AbstractSensors {
   private:
     SensorData lastData_ = {};
     SemaphoreHandle_t mutex_;
+    CO2Calibration *co2Calibration_;
 
     bool pollInternal(SensorData &);
 };

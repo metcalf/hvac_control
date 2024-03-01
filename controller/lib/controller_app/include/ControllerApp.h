@@ -3,6 +3,7 @@
 #include <cmath>
 #include <functional>
 
+#include "AbstractConfigStore.h"
 #include "AbstractDemandController.h"
 #include "AbstractModbusController.h"
 #include "AbstractSensors.h"
@@ -20,10 +21,11 @@ class ControllerApp {
     ControllerApp(ControllerDomain::Config config, AbstractUIManager *uiManager,
                   AbstractModbusController *modbusController, AbstractSensors *sensors,
                   AbstractDemandController *demandController, AbstractValveCtrl *valveCtrl,
-                  AbstractWifi *wifi, cfgUpdateCb_t cfgUpdateCb, const uiEvtRcv_t &uiEvtRcv)
+                  AbstractWifi *wifi, AbstractConfigStore<ControllerDomain::Config> *cfgStore,
+                  const uiEvtRcv_t &uiEvtRcv)
         : uiManager_(uiManager), modbusController_(modbusController), sensors_(sensors),
           demandController_(demandController), valveCtrl_(valveCtrl), wifi_(wifi),
-          cfgUpdateCb_(cfgUpdateCb), uiEvtRcv_(uiEvtRcv) {
+          cfgStore_(cfgStore), uiEvtRcv_(uiEvtRcv) {
         setConfig(config);
     }
     void setConfig(ControllerDomain::Config config) {
@@ -151,7 +153,7 @@ class ControllerApp {
     AbstractValveCtrl *valveCtrl_;
     AbstractWifi *wifi_;
     uint8_t nControllers_;
-    cfgUpdateCb_t cfgUpdateCb_;
+    AbstractConfigStore<ControllerDomain::Config> *cfgStore_;
     uiEvtRcv_t uiEvtRcv_;
 
     AbstractUIManager::TempOverride tempOverride_;

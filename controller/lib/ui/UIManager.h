@@ -64,6 +64,7 @@ class UIManager : public AbstractUIManager {
     void eSaveWifiSettings();
     void eTempOffsetChanged();
     void eWifiTextarea(lv_event_t *e);
+    void eControllerTypeSelectionChanged();
 
     void eHomeLoadStart();
     void eHomeUnloadStart();
@@ -115,7 +116,6 @@ class UIManager : public AbstractUIManager {
     void updateTempLimits(uint8_t maxHeatDeg, uint8_t minCoolDeg);
     void updateUIForEquipment();
     void manageSleep();
-    void updateClk();
 
     inline static UIManager *eventsInst_;
 

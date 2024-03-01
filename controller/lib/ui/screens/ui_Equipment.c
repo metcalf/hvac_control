@@ -142,6 +142,7 @@ lv_obj_set_align( ui_makeup_air_switch, LV_ALIGN_LEFT_MID );
 
 lv_obj_add_event_cb(ui_comp_get_child(ui_Setting_header2, UI_COMP_SETTING_HEADER_SETTING_BACK_BUTTON), ui_event_Setting_header2_Setting_back_button, LV_EVENT_ALL, NULL);
 lv_obj_add_event_cb(ui_comp_get_child(ui_Setting_header2, UI_COMP_SETTING_HEADER_SETTING_ACCEPT_BUTTON), ui_event_Setting_header2_Setting_accept_button, LV_EVENT_ALL, NULL);
+lv_obj_add_event_cb(ui_controller_type, ui_event_controller_type, LV_EVENT_ALL, NULL);
 lv_obj_add_event_cb(ui_Equipment, ui_event_Equipment, LV_EVENT_ALL, NULL);
 
 }

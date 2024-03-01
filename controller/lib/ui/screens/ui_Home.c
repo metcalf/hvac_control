@@ -49,7 +49,7 @@ ui_clock_value = lv_label_create(ui_Clock_container);
 lv_obj_set_width( ui_clock_value, LV_SIZE_CONTENT);  /// 1
 lv_obj_set_height( ui_clock_value, LV_SIZE_CONTENT);   /// 1
 lv_obj_set_align( ui_clock_value, LV_ALIGN_CENTER );
-lv_label_set_text(ui_clock_value,"11:88A");
+lv_label_set_text(ui_clock_value,"11:88 ");
 lv_obj_set_style_text_font(ui_clock_value, &lv_font_montserrat_18, LV_PART_MAIN| LV_STATE_DEFAULT);
 
 ui_Humidity = lv_obj_create(ui_Header);
