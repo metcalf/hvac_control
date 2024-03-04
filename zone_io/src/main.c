@@ -11,7 +11,7 @@
 #define UART_BAUD 9600
 #define SEND_INTERVAL_MS 450
 
-volatile uint16_t vlv_sw_period_;
+volatile uint16_t vlv12_sw_period_, vlv34_sw_period_;
 
 volatile uint8_t tx_pos_;
 char tx_buffer_[3];
@@ -38,14 +38,13 @@ const uint8_t tx_map_[3][6] = {
     {
         // PORTC
         PIN0_bm, // TS3_W
-        PIN1_bm, // TS3_Y
-        PIN2_bm, // TS4_W
+        PIN1_bm, // TS4_W
     },
 };
 
-uint8_t getVlvState() {
+uint8_t getVlvState(uint16_t *g_period) {
     uint16_t period;
-    ATOMIC_BLOCK(ATOMIC_FORCEON) { period = vlv_sw_period_; }
+    ATOMIC_BLOCK(ATOMIC_FORCEON) { period = *g_period; }
 
     if (period == 0) {
         return 0;
@@ -79,7 +78,7 @@ void startTx(uint8_t *port_states) {
     }
 
     for (int i = 0; i < 3; i++) {
-        int lim = i < 2 ? 6 : 3;
+        int lim = i < 2 ? 6 : 2;
         tx_buffer_[i] = i << 6; // Set payload ID in last 2 bits
         for (int j = 0; j < lim; j++) {
             if (port_states[i] & tx_map_[i][j]) {
@@ -88,7 +87,7 @@ void startTx(uint8_t *port_states) {
         }
     }
 
-    tx_buffer_[2] |= (getVlvState() << 4);
+    tx_buffer_[2] |= (getVlvState(&vlv12_sw_period_) << 2) | (getVlvState(&vlv34_sw_period_) << 4);
 
     USART1.CTRLA |= USART_DREIE_bm;
 }
@@ -110,16 +109,26 @@ void setupInputPins() {
     }
 }
 
-void setupVlvTimer() {
-    // Configure TCB0 on PC3 for frequency measurement for VLV_SW_IO
-    PORTC.PIN3CTRL = PORT_PULLUPEN_bm;
-    EVSYS.CHANNEL2 = EVSYS_CHANNEL2_PORTC_PIN3_gc; // Route pin PC3
-    EVSYS.USERTCB0CAPT = EVSYS_USER_CHANNEL2_gc;   // to TCB0
-    TCB0.CTRLB = TCB_CNTMODE_FRQ_gc;               // Frequency count mode
-    TCB0.EVCTRL = TCB_CAPTEI_bm | TCB_EDGE_bm;     // Measure frequency between falling edge events
-    TCB0.INTCTRL = TCB_CAPT_bm;
-    TCB0.CTRLA =
+void setupTCBn(TCB_t tcb) {
+    tcb.CTRLB = TCB_CNTMODE_FRQ_gc;           // Frequency count mode
+    tcb.EVCTRL = TCB_CAPTEI_bm | TCB_EDGE_bm; // Measure frequency between falling edge events
+    tcb.INTCTRL = TCB_CAPT_bm;
+    tcb.CTRLA =
         TCB_ENABLE_bm | TCB_CLKSEL_DIV2_gc; // Configure tach frequency measurement @ ~156khz
+}
+
+void setupVlvTimer() {
+    // Configure TCB0 on PC2 for frequency measurement for VLV1/2_SW_IO
+    PORTC.PIN2CTRL = PORT_PULLUPEN_bm;
+    EVSYS.CHANNEL2 = EVSYS_CHANNEL2_PORTC_PIN2_gc; // Route pin PC2
+    EVSYS.USERTCB0CAPT = EVSYS_USER_CHANNEL2_gc;   // to TCB0
+    setupTCBn(TCB0);
+
+    // Configure TCB1 on PC3 for frequency measurement for VLV3/4_SW_IO
+    PORTC.PIN3CTRL = PORT_PULLUPEN_bm;
+    EVSYS.CHANNEL3 = EVSYS_CHANNEL2_PORTC_PIN3_gc; // Route pin PC3
+    EVSYS.USERTCB1CAPT = EVSYS_USER_CHANNEL3_gc;   // to TCB1
+    setupTCBn(TCB1);
 }
 
 int main(void) {
@@ -157,16 +166,19 @@ int main(void) {
     }
 }
 
-ISR(TCB0_INT_vect) {
-    if (TCB0.INTFLAGS & TCB_OVF_bm) {
+uint16_t handleVlvInt(TCB_t tcb) {
+    if (tcb.INTFLAGS & TCB_OVF_bm) {
         // If we overflowed, clear both flags and set an invalid period
-        TCB0.INTFLAGS |= TCB_OVF_bm;
-        TCB0.INTFLAGS |= TCB_CAPT_bm;
-        vlv_sw_period_ = 0;
+        tcb.INTFLAGS |= TCB_OVF_bm;
+        tcb.INTFLAGS |= TCB_CAPT_bm;
+        return 0;
     } else {
-        vlv_sw_period_ = TCB0.CCMP; // reading CCMP clears interrupt flag
+        return tcb.CCMP; // reading CCMP clears interrupt flag
     }
 }
+
+ISR(TCB0_INT_vect) { vlv12_sw_period_ = handleVlvInt(TCB0); }
+ISR(TCB1_INT_vect) { vlv34_sw_period_ = handleVlvInt(TCB1); }
 
 ISR(USART1_DRE_vect) {
     USART1_TXDATAL = tx_buffer_[tx_pos_];
