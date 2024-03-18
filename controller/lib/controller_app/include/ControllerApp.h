@@ -33,7 +33,7 @@ class ControllerApp {
         nControllers_ = config.equipment.controllerType == Config::ControllerType::Primary ? 2 : 1;
     }
 
-    void task(bool firstTime);
+    void task(bool firstTime = false);
     void bootErr(const char *msg);
 
     static size_t nMsgIds() { return static_cast<size_t>(ControllerApp::MsgID::_Last); }

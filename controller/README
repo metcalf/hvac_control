@@ -1,3 +1,24 @@
 fonttools varLib.mutator -o controller/squareline/assets/MaterialSymbolsOutlined.ttf controller/squareline/assets/MaterialSymbolsOutlined\[FILL\,GRAD\,opsz\,wght\].ttf wdth=400 GRAD=0 opsz=24
 
 https://espressif-docs.readthedocs-hosted.com/projects/esp-faq/en/latest/software-framework/peripherals/lcd.html
+
+Add to launch.json for test debugging (note need to switch platformio default env to native):
+
+```
+{
+            "name": "(lldb) Launch",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/.pio/build/native/program",
+            "args": [],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}",
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "lldb",
+            "preLaunchTask": {
+                "type": "PlatformIO",
+                "task": "Pre-Debug (native)"
+            }
+        },
+```
