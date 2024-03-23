@@ -102,3 +102,7 @@ def wifi_settings_load_start(event_struct):
 def temp_offset_changed(event_struct):
     return
 
+
+def controller_type_selection_changed(event_struct):
+    return
+

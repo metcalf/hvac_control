@@ -579,17 +579,18 @@ void UIManager::manageSleep() {
     if (lv_disp_get_inactive_time(NULL) < (DISP_SLEEP_SECS * 1000)) {
         if (!displayAwake_) {
             // Go to homescreen
-            // TODO: This seems to have an issue with not stopping events while screen is waking
-            lv_indev_wait_release(lv_indev_get_act());
-            _ui_screen_change(&ui_Home, LV_SCR_LOAD_ANIM_NONE, 0, 0, &ui_Home_screen_init);
+            lv_indev_wait_release(lv_indev_get_next(NULL));
+            lv_scr_load_anim(ui_Home, LV_SCR_LOAD_ANIM_FADE_IN, 250, 0, false);
             disp_backlight_set(backlight_, 100);
             displayAwake_ = true;
+            ESP_LOGD(TAG, "waking up");
         }
     } else {
         if (displayAwake_) {
             disp_backlight_set(backlight_, 0);
             lv_scr_load_anim(sleepScreen_, LV_SCR_LOAD_ANIM_NONE, 0, 0, false);
             displayAwake_ = false;
+            ESP_LOGD(TAG, "going to sleep");
         }
     }
 }
@@ -615,9 +616,7 @@ UIManager::UIManager(ControllerDomain::Config config, size_t nMsgIds, eventCb_t 
     assert(backlight_);
 
     sleepScreen_ = lv_obj_create(NULL);
-    ESP_LOGI(TAG, "created");
     ui_init();
-    ESP_LOGI(TAG, "ui init");
 
     setInTempC(std::nan(""));
     setOutTempC(std::nan(""));
