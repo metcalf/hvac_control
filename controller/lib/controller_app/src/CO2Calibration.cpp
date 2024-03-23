@@ -15,8 +15,11 @@
 
 // TODO: This very much needs tests
 int16_t CO2Calibration::update(uint16_t ppm, uint8_t month, uint16_t year) {
-    if (state_.lastMonthYearWritten == 0) {
-        state_ = store_->load();
+    loadState();
+
+    // If ppm is absurdly low, assume it's some kind of error and don't update state
+    if (ppm < 200) {
+        return getCurrentOffset();
     }
 
     bool changed = false;
@@ -77,4 +80,15 @@ int16_t CO2Calibration::update(uint16_t ppm) {
     gmtime_r(&nowUTC, &dt);
 
     return update(ppm, dt.tm_mon, dt.tm_year);
+}
+
+int16_t CO2Calibration::getCurrentOffset() {
+    loadState();
+    return state_.lastValidOffsetPpm;
+}
+
+void CO2Calibration::loadState() {
+    if (state_.lastMonthYearWritten == 0) {
+        state_ = store_->load();
+    }
 }

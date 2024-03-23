@@ -9,6 +9,8 @@
 #include "NVSConfigStore.h"
 #include "co2_client.h"
 
+#define CO2_MIN_CALIBRATION_UPTIME_MS 5 * 60 * 1000
+
 static const char *TAG = "SNS";
 
 static NVSConfigStore<CO2Calibration::State> co2CalibrationStore =
@@ -67,7 +69,15 @@ bool Sensors::pollInternal(SensorData &prevData) {
     if (err != 0) {
         snprintf(prevData.errMsg, sizeof(prevData.errMsg), "CO2 read error %d", err);
     } else if (co2Updated) {
-        int16_t co2offset = co2Calibration_->update(co2ppm);
+        // If the device hasn't been on long enough to stablize, don't update any calibration
+        // data, just read it out.
+        int16_t co2offset;
+        if (pdTICKS_TO_MS(xTaskGetTickCount()) < CO2_MIN_CALIBRATION_UPTIME_MS) {
+            co2offset = co2Calibration_->getCurrentOffset();
+        } else {
+            co2offset = co2Calibration_->update(co2ppm);
+        }
+
         co2ppm += co2offset;
         prevData.co2 = co2ppm;
         prevData.humidity = co2Humidity;

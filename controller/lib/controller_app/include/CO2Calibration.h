@@ -23,7 +23,11 @@ class CO2Calibration {
     int16_t update(uint16_t ppm, uint8_t month, uint16_t year);
     int16_t update(uint16_t ppm);
 
+    int16_t getCurrentOffset();
+
   private:
     State state_;
     AbstractConfigStore<State> *store_;
+
+    void loadState();
 };
