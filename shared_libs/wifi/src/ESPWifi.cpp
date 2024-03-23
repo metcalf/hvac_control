@@ -20,20 +20,6 @@
 
 const static char *TAG = "wifi";
 
-void esp_sntp_sync_time(struct timeval *tv) {
-    struct timeval old;
-    gettimeofday(&old, NULL);
-
-    settimeofday(tv, NULL);
-    esp_sntp_set_sync_status(SNTP_SYNC_STATUS_COMPLETED);
-
-    if (old.tv_sec < 16e8) { // Before ~2020
-        ESP_LOGI(TAG, "time initialized");
-    } else {
-        ESP_LOGI(TAG, "time updated, offset: %lld", old.tv_sec - tv->tv_sec);
-    }
-}
-
 void eventHandler(void *arg, esp_event_base_t eventBase, int32_t eventId, void *eventData) {
     if (eventBase == WIFI_EVENT) {
         ((ESPWifi *)arg)->onWifiEvent(eventId, eventData);

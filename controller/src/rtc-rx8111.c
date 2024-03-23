@@ -1,5 +1,8 @@
 #include "rtc-rx8111.h"
 
+#include "esp_log.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 #include "i2c_manager.h"
 
 #define RTC_ADDR 0x32
@@ -107,19 +110,21 @@
 /* Insert and Defined ALARM_AE */
 #define RX8111_ALARM_AE BIT(7)
 
+static const char *TAG = "RTC";
+
 /*!
       @brief  Convert a binary coded decimal value to binary. RTC stores
     time/date values as BCD.
       @param val BCD value
       @return Binary value
   */
-static uint8_t bcd2bin(uint8_t val) { return val - 6 * (val >> 4); }
+static uint8_t bcd2bin(uint8_t val) { return (val & 0x0f) + (val >> 4) * 10; }
 /*!
       @brief  Convert a binary value to BCD format for the RTC registers
       @param val Binary value
       @return BCD value
   */
-static uint8_t bin2bcd(uint8_t val) { return val + 6 * (val / 10); }
+static uint8_t bin2bcd(uint8_t val) { return ((val / 10) << 4) + val % 10; }
 
 static esp_err_t rtc_rx8111_i2c_read(uint32_t reg, uint8_t *buffer, uint16_t size) {
     return i2c_manager_read(I2C_NUM_0, RTC_ADDR, reg, buffer, size);
@@ -189,7 +194,7 @@ esp_err_t rtc_rx8111_set_time(struct tm *dt) {
     date[RX8111_YEAR - RX8111_SEC] = bin2bcd(dt->tm_year - 100);
     date[RX8111_WEEK - RX8111_SEC] = bin2bcd(1 << dt->tm_wday);
 
-    err = rtc_rx8111_i2c_write(RX8111_CTRLREG, date, sizeof(date));
+    err = rtc_rx8111_i2c_write(RX8111_SEC, date, sizeof(date));
     if (err != ESP_OK) {
         return err;
     }
@@ -202,6 +207,37 @@ esp_err_t rtc_rx8111_set_time(struct tm *dt) {
 
     return 0;
 }
+
+// Clear VLF flag (and others)
+static int rx8111_try_clear_flags() {
+    esp_err_t err;
+
+    for (int i = 0; i < 300; i++) {
+        err = rtc_rx8111_i2c_write_reg(RX8111_FLAGREG, 0x00);
+        if (err != ESP_OK) {
+            return err;
+        }
+
+        uint8_t flag;
+        err = rtc_rx8111_i2c_read(RX8111_FLAGREG, &flag, 1);
+        if (err != ESP_OK) {
+            return err;
+        }
+
+        if (!(flag & RX8111_FLAG_VLF)) {
+            return ESP_OK; // VLF flag is zero indicating ready to init
+        }
+
+        ESP_LOGD(TAG, "Flags: %02d", flag);
+
+        vTaskDelay(pdMS_TO_TICKS(1));
+    }
+
+    ESP_LOGE(TAG, "Timeout clearing VLF flag");
+
+    return ESP_FAIL;
+}
+
 esp_err_t rtc_rx8111_init_client(bool *hasTime) {
     esp_err_t err;
 
@@ -211,16 +247,20 @@ esp_err_t rtc_rx8111_init_client(bool *hasTime) {
         return err;
     }
 
-    if (!(flag | RX8111_FLAG_VLF)) {
+    if ((flag & RX8111_FLAG_VLF)) {
+        // Before continuing, wait for the oscillator to stabilize (indicated by
+        // successfully clearing the VLF flag)
+        *hasTime = false;
+        err = rx8111_try_clear_flags();
+        if (err != ESP_OK) {
+            return err;
+        }
+    } else {
         // If the VLF flag is zero, this indicates the RTC returned from battery backup
         // normally. We could skip the rest of the initialization at this point but I
         // could see that resulting in edge cases when we change the init sequence without
         // removing the battery.
         *hasTime = true;
-    } else {
-        *hasTime = false;
-        // Clear VLF flag (and others)
-        rtc_rx8111_i2c_write_reg(RX8111_FLAGREG, 0x00);
     }
 
     err =

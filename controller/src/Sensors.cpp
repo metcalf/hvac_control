@@ -67,17 +67,18 @@ bool Sensors::pollInternal(SensorData &prevData) {
     if (err != 0) {
         snprintf(prevData.errMsg, sizeof(prevData.errMsg), "CO2 read error %d", err);
     } else if (co2Updated) {
-        co2ppm += co2Calibration_->update(co2ppm);
+        int16_t co2offset = co2Calibration_->update(co2ppm);
+        co2ppm += co2offset;
         prevData.co2 = co2ppm;
         prevData.humidity = co2Humidity;
-        ESP_LOGD(TAG, "CO2 updated: ppm=%u t=%0.1f h=%0.1f", co2ppm, co2TempC, co2Humidity);
-
+        ESP_LOGD(TAG, "CO2 updated: ppm=%u offset=%d t=%0.1f h=%0.1f", co2ppm, co2offset, co2TempC,
+                 co2Humidity);
     } else {
         ESP_LOGD(TAG, "CO2 not ready");
     }
 
     // Delay until STS is ready
-    xTaskDelayUntil(&start, pdMS_TO_TICKS(STS3X_MEASUREMENT_DURATION_USEC + 500 / 1000));
+    xTaskDelayUntil(&start, pdMS_TO_TICKS((STS3X_MEASUREMENT_DURATION_USEC + 500) / 1000));
 
     int32_t stsTempMC;
     err = sts3x_read(&stsTempMC);

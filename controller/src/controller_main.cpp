@@ -107,6 +107,9 @@ void setRTC(struct timeval *tv) {
     esp_err_t err = rtc_rx8111_set_time(&dt);
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "Error setting RTC time: %d", err);
+    } else {
+        ESP_LOGD(TAG, "Set RTC time(%04d-%02d-%02d %02d:%02d:%02d)", dt.tm_year + 1900,
+                 dt.tm_mon + 1, dt.tm_mday, dt.tm_hour, dt.tm_min, dt.tm_sec);
     }
 }
 
@@ -131,6 +134,14 @@ esp_err_t setupRTC() {
             ESP_LOGD(TAG, "Error retrieving time from RTC");
             return err;
         }
+        ESP_LOGI(TAG, "Loaded time from RTC (%04d-%02d-%02d %02d:%02d:%02d)", dt.tm_year + 1900,
+                 dt.tm_mon + 1, dt.tm_mday, dt.tm_hour, dt.tm_min, dt.tm_sec);
+
+        timeval tv;
+        tv.tv_sec = mktime(&dt);
+        settimeofday(&tv, NULL);
+    } else {
+        ESP_LOGI(TAG, "RTC doesn't have valid time");
     }
 
     esp_sntp_set_time_sync_notification_cb(setRTC);

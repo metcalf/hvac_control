@@ -579,6 +579,7 @@ void UIManager::manageSleep() {
     if (lv_disp_get_inactive_time(NULL) < (DISP_SLEEP_SECS * 1000)) {
         if (!displayAwake_) {
             // Go to homescreen
+            // TODO: This seems to have an issue with not stopping events while screen is waking
             lv_indev_wait_release(lv_indev_get_act());
             _ui_screen_change(&ui_Home, LV_SCR_LOAD_ANIM_NONE, 0, 0, &ui_Home_screen_init);
             disp_backlight_set(backlight_, 100);

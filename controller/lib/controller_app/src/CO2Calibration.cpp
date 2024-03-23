@@ -15,6 +15,10 @@
 
 // TODO: This very much needs tests
 int16_t CO2Calibration::update(uint16_t ppm, uint8_t month, uint16_t year) {
+    if (state_.lastMonthYearWritten == 0) {
+        state_ = store_->load();
+    }
+
     bool changed = false;
     uint16_t monthYear = year * 12 + month;
 

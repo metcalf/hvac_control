@@ -252,6 +252,16 @@ TEST_F(ControllerAppTest, CallsForFancoilHVAC) {
 }
 
 // TODO: Write lots more tests!!
+// Fan override
+// Temp override
+// Schedules
+// AC override
+// Multi-controller fan-speed logic
+// Multi-controller HVAC logic
+// Makeup demand
+// Indoor and outdoor temp offsets?
+// Setpoints with invalid time?
+// Precooling
 
 #if defined(ESP_PLATFORM)
 #include "esp_log.h"

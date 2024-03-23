@@ -15,7 +15,7 @@ class CO2Calibration {
         int16_t lastValidOffsetPpm;
     };
 
-    CO2Calibration(AbstractConfigStore<State> *store) : store_(store) { state_ = store_->load(); };
+    CO2Calibration(AbstractConfigStore<State> *store) : store_(store){};
     virtual ~CO2Calibration(){};
 
     // Month and year interpreted as with std::tm (zero-indexed, year since 1900)
