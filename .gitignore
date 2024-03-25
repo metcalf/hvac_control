@@ -60,3 +60,7 @@ dkms.conf
 # Squareline
 **/squareline/autosave
 **/squareline/backup
+
+# Eagle CAD backups
+*.s#[0-9]
+*.b#[0-9]
