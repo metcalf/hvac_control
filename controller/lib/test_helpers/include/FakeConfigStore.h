@@ -8,15 +8,15 @@ class FakeConfigStore : public AbstractConfigStore<T> {
     T load() override;
 
   private:
-    T cfg;
+    T cfg_{};
 };
 
 template <typename T>
 inline void FakeConfigStore<T>::store(T &config) {
-    cfg = config;
+    cfg_ = config;
 }
 
 template <typename T>
 inline T FakeConfigStore<T>::load() {
-    return cfg;
+    return cfg_;
 }

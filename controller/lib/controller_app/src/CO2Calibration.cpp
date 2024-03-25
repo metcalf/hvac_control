@@ -1,5 +1,6 @@
 #include "CO2Calibration.h"
 
+#include <cassert>
 #include <chrono>
 
 // Note that these constants effectively represent a range from N -> N-1 months because at
@@ -7,11 +8,8 @@
 #define LOOKBACK_MONTHS 6 // Look back this number of months for data
 #define REQUIRE_MONTHS 5 // Require at least this many valid months of data to perform a calibration
 
-// Adjust for continued CO2 emissions, probably won't make a material difference but w/e
+// This changes over time but slowly enough that the inaccuracy shouldn't matter much
 #define BASELINE_PPM 421
-#define BASELINE_YEAR 123 // 2023 (years since 1900)
-#define ANNUAL_GROWTH_RATE_PPM                                                                     \
-    2 // Let's pretend we'll start killing the planet less instead of more
 
 // TODO: This very much needs tests
 int16_t CO2Calibration::update(uint16_t ppm, uint8_t month, uint16_t year) {
@@ -48,6 +46,7 @@ int16_t CO2Calibration::update(uint16_t ppm, uint8_t month, uint16_t year) {
     uint16_t minPpm = UINT16_MAX;
     int validPoints = 0;
     // NB: We iterate using monthYear to avoid modulo negative numbers
+    assert(monthYear > LOOKBACK_MONTHS);
     for (uint16_t i = monthYear; i > monthYear - LOOKBACK_MONTHS; i--) {
         uint16_t ppm = state_.monthMinimums[i % 12];
         if (ppm > 0) {
@@ -56,9 +55,14 @@ int16_t CO2Calibration::update(uint16_t ppm, uint8_t month, uint16_t year) {
         }
     }
 
-    int16_t offset;
-    if (validPoints >= REQUIRE_MONTHS) {
-        offset = BASELINE_PPM + (BASELINE_YEAR - year) * ANNUAL_GROWTH_RATE_PPM - minPpm;
+    int16_t offset = BASELINE_PPM - minPpm;
+    // If we're applying a positive calibration, we know it should be impossible to see
+    // CO2 levels *below* outdoor except due to sensor drift so we don't need months of data
+    // If the offset is less negative (smaller absolute offset) than the last valid value,
+    // we can also use the new value immediately.
+    // Otherwise we're applying a more negative calibration so we need to make sure we've
+    // seen enough months to be confident we've had outdoor CO2 levels at least once.
+    if (offset > 0 || offset > state_.lastValidOffsetPpm || validPoints >= REQUIRE_MONTHS) {
         if (offset != state_.lastValidOffsetPpm) {
             state_.lastValidOffsetPpm = offset;
             changed = true;
