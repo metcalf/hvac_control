@@ -215,12 +215,14 @@ static int rx8111_try_clear_flags() {
     for (int i = 0; i < 300; i++) {
         err = rtc_rx8111_i2c_write_reg(RX8111_FLAGREG, 0x00);
         if (err != ESP_OK) {
+            ESP_LOGE(TAG, "Error clearing flags");
             return err;
         }
 
         uint8_t flag;
         err = rtc_rx8111_i2c_read(RX8111_FLAGREG, &flag, 1);
         if (err != ESP_OK) {
+            ESP_LOGE(TAG, "Error reading flags");
             return err;
         }
 
@@ -244,6 +246,7 @@ esp_err_t rtc_rx8111_init_client(bool *hasTime) {
     uint8_t flag;
     err = rtc_rx8111_i2c_read(RX8111_FLAGREG, &flag, 1);
     if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Error reading flags");
         return err;
     }
 
@@ -271,6 +274,7 @@ esp_err_t rtc_rx8111_init_client(bool *hasTime) {
                                      // Enable non-rechargeable backup battery operation
                                      RX8111_PSC_SMP_INIEN); //0x32, bit2 = 1
     if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Error setting pwr ctrl");
         return err;
     }
 
@@ -284,6 +288,7 @@ esp_err_t rtc_rx8111_init_client(bool *hasTime) {
             // other relevant bits should be zero per datasheet.
             RX8111_EXT_TSEL1);
     if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Error setting exten");
         return err;
     }
 

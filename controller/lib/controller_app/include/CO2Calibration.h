@@ -26,7 +26,7 @@ class CO2Calibration {
     int16_t getCurrentOffset();
 
   private:
-    State state_;
+    State state_{};
     AbstractConfigStore<State> *store_;
 
     void loadState();
