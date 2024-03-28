@@ -13,15 +13,15 @@
 
 #define MAX_CONCURRENT_OPENING 2
 // Require 6 hours after last heating call before cooling
-#define HEAT_TO_COOL_LOCKOUT_TICKS 6 * 60 * 60 * 1000 / portTICK_RATE_MS
+#define HEAT_TO_COOL_LOCKOUT_TICKS pdMS_TO_TICKS(6 * 60 * 60 * 1000)
 // Require 1 hour after last cooling call before heating
-#define COOL_TO_HEAT_LOCKOUT_TICKS 1 * 60 * 60 * 1000 / portTICK_RATE_MS
+#define COOL_TO_HEAT_LOCKOUT_TICKS pdMS_TO_TICKS(1 * 60 * 60 * 1000)
 // Transition to standby mode 1 hour after the last call
-#define STANDBY_DELAY_TICKS 1 * 60 * 60 * 1000 / portTICK_RATE_MS
+#define STANDBY_DELAY_TICKS pdMS_TO_TICKS(1 * 60 * 60 * 1000)
 // Check the CX status every minute to see if it differs from what we expect
-#define CHECK_CX_STATUS_INTERVAL_TICKS 60 * 1000 / portTICK_RATE_MS
+#define CHECK_CX_STATUS_INTERVAL_TICKS pdMS_TO_TICKS(60 * 1000)
 // Only track 7 days of last event times to avoid overflows
-#define EVENT_MAX_TICKS 7 * 24 * 60 * 60 * 1000 / portTICK_RATE_MS
+#define EVENT_MAX_TICKS pdMS_TO_TICKS(7 * 24 * 60 * 60 * 1000)
 
 static_assert(NUM_VALVES == ZONE_IO_NUM_TS,
               "Expect to have the same number of valves as thermostats");

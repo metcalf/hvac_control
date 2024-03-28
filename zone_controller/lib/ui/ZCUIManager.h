@@ -10,6 +10,8 @@
 #include "ui.h"
 #include "ui_events.h"
 
+#define UI_MAX_MSG_LEN 18 * 2
+
 class ZCUIManager {
   public:
     enum class EventType {

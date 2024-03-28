@@ -78,7 +78,7 @@ lv_style_value_t _ui_style_value_convert (lv_style_prop_t property, ui_style_var
         Style_Value.color = lv_color_hex(value);
     }
     else if (property==LV_STYLE_BG_GRAD || property==LV_STYLE_BG_IMG_SRC || property==LV_STYLE_ARC_IMG_SRC || property==LV_STYLE_TEXT_FONT
-             || property==LV_STYLE_COLOR_FILTER_DSC && property==LV_STYLE_ANIM && property==LV_STYLE_TRANSITION) {
+             || (property==LV_STYLE_COLOR_FILTER_DSC && property==LV_STYLE_ANIM && property==LV_STYLE_TRANSITION)) {
         Style_Value.ptr = (void*) value;
     }
     else Style_Value.num = value;
@@ -95,7 +95,7 @@ _ui_local_style_t* _ui_local_style_create (const ui_style_variable_t* style_vari
         if (_ui_local_styles[i].style_variable_p == style_variable_p) return &_ui_local_styles[i];
     }
     //If not found, create new local style
-    _ui_local_styles = lv_mem_realloc( _ui_local_styles, (_ui_local_style_count + 1) * sizeof(_ui_local_style_t) );
+    _ui_local_styles = (_ui_local_style_t*)lv_mem_realloc( _ui_local_styles, (_ui_local_style_count + 1) * sizeof(_ui_local_style_t) );
     LV_ASSERT_MALLOC( _ui_local_styles );
     if (_ui_local_styles == NULL) return NULL;
     //Reset new local style
@@ -136,7 +136,7 @@ _ui_local_style_property_setting_t* _ui_local_style_property_setting_create
     }
     //If not found, create new local style-property (can be inside the array at freed-up places of deleted objects too)
     if (FoundEmptyPosition < 0) {
-        local_style_p->style_property_settings = lv_mem_realloc (
+        local_style_p->style_property_settings = (_ui_local_style_property_setting_t*)lv_mem_realloc (
          local_style_p->style_property_settings,
          (local_style_p->style_property_setting_count + 1) * sizeof(_ui_local_style_property_setting_t)
         );

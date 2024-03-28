@@ -108,8 +108,8 @@ void ZCUIManager::updateState(SystemState state) {
 }
 
 void ZCUIManager::updateCall(lv_obj_t *icon, Call call) {
-    const ui_theme_variable_t *color;
-    const char *txt;
+    const ui_theme_variable_t *color = NULL;
+    const char *txt = NULL;
 
     switch (call) {
     case Call::None:
@@ -128,7 +128,7 @@ void ZCUIManager::updateCall(lv_obj_t *icon, Call call) {
 
     lv_label_set_text_static(icon, txt);
     ui_object_set_themeable_style_property(ui_tstat_state_2, LV_PART_MAIN | LV_STATE_DEFAULT,
-                                           LV_STYLE_TEXT_COLOR, _ui_theme_color_heat);
+                                           LV_STYLE_TEXT_COLOR, color);
 }
 
 void ZCUIManager::updatePump(lv_obj_t *pmp, bool on) { lv_label_set_text(pmp, on ? "ON" : "OFF"); }
