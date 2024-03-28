@@ -1,0 +1,17 @@
+{
+  "codename": "MaterialSymbols36",
+  "ttf_path": "/assets/MaterialSymbolsOutlined[FILL,GRAD,opsz,wght].ttf",
+  "bin_path": "/assets/ui_font_MaterialSymbols36.bin",
+  "c_path": "/assets/ui_font_MaterialSymbols36.c",
+  "cfg_path": "/assets/ui_font_MaterialSymbols36.fcfg",
+  "size": 36,
+  "bpp": 4,
+  "letters": 0,
+  "ranges": [
+    "0xec18",
+    "0xf10e"
+  ],
+  "symbols": "",
+  "customparams": "--no-compress --no-prefilter",
+  "uploaded": false
+}
