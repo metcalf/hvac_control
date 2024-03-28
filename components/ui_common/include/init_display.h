@@ -26,19 +26,7 @@ void init_touch() {
     assert(lv_indev_drv_register(&indev_drv) != NULL);
 }
 
-void init_display(gpio_num_t csPin) {
-    // Drive chip-select pin low. We'll need to make this dynamic if we ever want to use
-    // the sdcard. For some reason using the ESP32 host-based chip-select isn't working.
-    gpio_config_t io_conf = {
-        .pin_bit_mask = 1ULL << csPin,
-        .mode = GPIO_MODE_OUTPUT,
-        .pull_up_en = GPIO_PULLUP_DISABLE,
-        .pull_down_en = GPIO_PULLDOWN_DISABLE,
-        .intr_type = GPIO_INTR_DISABLE,
-    };
-    ESP_ERROR_CHECK(gpio_config(&io_conf));
-    ESP_ERROR_CHECK(gpio_set_level(csPin, 0));
-
+void init_display() {
     lv_log_register_print_cb(esp_lvgl_log_cb);
     lv_init();
     lvgl_driver_init();

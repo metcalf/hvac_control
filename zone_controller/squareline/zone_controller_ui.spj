@@ -6152,8 +6152,7 @@
                     "InheritedType": 11
                   }
                 ],
-                "saved_objtypeKey": "CONTAINER",
-                "tree_closed": true
+                "saved_objtypeKey": "CONTAINER"
               },
               {
                 "guid": "GUID85940282-450324S16188387",
@@ -8388,8 +8387,7 @@
                     "InheritedType": 11
                   }
                 ],
-                "saved_objtypeKey": "CONTAINER",
-                "tree_closed": true
+                "saved_objtypeKey": "CONTAINER"
               }
             ],
             "locked": false,
@@ -19211,7 +19209,7 @@
           {
             "nid": -1274700564,
             "strtype": "OBJECT/Name",
-            "strval": "Screen1",
+            "strval": "Home",
             "InheritedType": 10
           },
           {
@@ -19474,22 +19472,22 @@
     "theme_dark": true,
     "theme_color1": 5,
     "theme_color2": 0,
-    "uiExportFolderPath": "",
+    "uiExportFolderPath": "/Users/andrew/code/hvac_control/zone_controller/lib/ui",
     "projectExportFolderPath": "",
-    "backup_cnt": 20,
+    "backup_cnt": 58,
     "autosave_cnt": 0,
     "lvgl_version": "8.3.11",
-    "callfuncsexport": "C_FILE",
+    "callfuncsexport": "CPP_FILE",
     "imageexport": "SOURCE",
-    "lvgl_include_path": null,
-    "drive_stdio": null,
-    "drive_stdio_path": null,
-    "drive_posix": null,
-    "drive_posix_path": null,
-    "drive_win32": null,
-    "drive_win32_path": null,
-    "drive_fatfs": null,
-    "drive_fatfs_path": null,
+    "lvgl_include_path": "",
+    "drive_stdio": "-",
+    "drive_stdio_path": "",
+    "drive_posix": "-",
+    "drive_posix_path": "",
+    "drive_win32": "-",
+    "drive_win32_path": "",
+    "drive_fatfs": "-",
+    "drive_fatfs_path": "",
     "naming": "Name",
     "naming_force_lowercase": false,
     "BitDepth": 16,

@@ -1,4 +1,4 @@
-SET(SOURCES screens/ui_Screen1.c
+SET(SOURCES screens/ui_Home.c
     ui_theme_manager.cpp
     ui_themes.cpp
     ui.c

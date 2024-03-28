@@ -9,9 +9,9 @@
 ///////////////////// VARIABLES ////////////////////
 
 
-// SCREEN: ui_Screen1
-void ui_Screen1_screen_init(void);
-lv_obj_t *ui_Screen1;
+// SCREEN: ui_Home
+void ui_Home_screen_init(void);
+lv_obj_t *ui_Home;
 lv_obj_t *ui_test_mode_header;
 lv_obj_t *ui_heat_pump_state1;
 lv_obj_t *ui_normal_mode_header;
@@ -35,7 +35,7 @@ lv_obj_t *ui_tstat_state_3;
 lv_obj_t *ui_vlv_state_3;
 lv_obj_t *ui_zone_container_4;
 lv_obj_t *ui_zone_label_4;
-lv_obj_t *ui_tstat_state_8;
+lv_obj_t *ui_tstat_state_4;
 lv_obj_t *ui_vlv_state_4;
 lv_obj_t *ui_zone_pump_container;
 lv_obj_t *ui_zone_pump_label;
@@ -56,7 +56,7 @@ lv_obj_t *ui_fc_label_4;
 lv_obj_t *ui_fc_state_4;
 lv_obj_t *ui_fc_pump_container;
 lv_obj_t *ui_zone_label_8;
-lv_obj_t *ui_vlv_state_8;
+lv_obj_t *ui_fc_pump_state;
 lv_obj_t *ui_normal_mode_footer;
 lv_obj_t *ui_test_mode_footer;
 void ui_event_exit_test_mode_button( lv_event_t * e);
@@ -69,8 +69,10 @@ void ui_event_test_mode_button( lv_event_t * e);
 lv_obj_t *ui_test_mode_button;
 lv_obj_t *ui_Label3;
 lv_obj_t *ui_system_power_container;
+void ui_event_system_off_button( lv_event_t * e);
 lv_obj_t *ui_system_off_button;
 lv_obj_t *ui_Label4;
+void ui_event_system_on_button( lv_event_t * e);
 lv_obj_t *ui_system_on_button;
 lv_obj_t *ui_Label5;
 lv_obj_t *ui_end_lockout_button;
@@ -115,6 +117,20 @@ if ( event_code == LV_EVENT_CLICKED) {
       _ui_flag_modify( ui_normal_mode_footer, LV_OBJ_FLAG_HIDDEN, _UI_MODIFY_FLAG_ADD);
 }
 }
+void ui_event_system_off_button( lv_event_t * e) {
+    lv_event_code_t event_code = lv_event_get_code(e);lv_obj_t * target = lv_event_get_target(e);
+if ( event_code == LV_EVENT_CLICKED) {
+      _ui_flag_modify( ui_system_on_button, LV_OBJ_FLAG_HIDDEN, _UI_MODIFY_FLAG_REMOVE);
+      _ui_flag_modify( ui_system_off_button, LV_OBJ_FLAG_HIDDEN, _UI_MODIFY_FLAG_ADD);
+}
+}
+void ui_event_system_on_button( lv_event_t * e) {
+    lv_event_code_t event_code = lv_event_get_code(e);lv_obj_t * target = lv_event_get_target(e);
+if ( event_code == LV_EVENT_CLICKED) {
+      _ui_flag_modify( ui_system_off_button, LV_OBJ_FLAG_HIDDEN, _UI_MODIFY_FLAG_REMOVE);
+      _ui_flag_modify( ui_system_on_button, LV_OBJ_FLAG_HIDDEN, _UI_MODIFY_FLAG_ADD);
+}
+}
 
 ///////////////////// SCREENS ////////////////////
 
@@ -123,7 +139,7 @@ void ui_init( void )
 lv_disp_t *dispp = lv_disp_get_default();
 lv_theme_t *theme = lv_theme_default_init(dispp, lv_palette_main(LV_PALETTE_BLUE), lv_palette_main(LV_PALETTE_RED), true, LV_FONT_DEFAULT);
 lv_disp_set_theme(dispp, theme);
-ui_Screen1_screen_init();
+ui_Home_screen_init();
 ui____initial_actions0 = lv_obj_create(NULL);
-lv_disp_load_scr( ui_Screen1);
+lv_disp_load_scr( ui_Home);
 }

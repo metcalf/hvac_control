@@ -17,9 +17,9 @@ extern "C" {
 #include "ui_theme_manager.h"
 #include "ui_themes.h"
 
-// SCREEN: ui_Screen1
-void ui_Screen1_screen_init(void);
-extern lv_obj_t *ui_Screen1;
+// SCREEN: ui_Home
+void ui_Home_screen_init(void);
+extern lv_obj_t *ui_Home;
 extern lv_obj_t *ui_test_mode_header;
 extern lv_obj_t *ui_heat_pump_state1;
 extern lv_obj_t *ui_normal_mode_header;
@@ -43,7 +43,7 @@ extern lv_obj_t *ui_tstat_state_3;
 extern lv_obj_t *ui_vlv_state_3;
 extern lv_obj_t *ui_zone_container_4;
 extern lv_obj_t *ui_zone_label_4;
-extern lv_obj_t *ui_tstat_state_8;
+extern lv_obj_t *ui_tstat_state_4;
 extern lv_obj_t *ui_vlv_state_4;
 extern lv_obj_t *ui_zone_pump_container;
 extern lv_obj_t *ui_zone_pump_label;
@@ -64,7 +64,7 @@ extern lv_obj_t *ui_fc_label_4;
 extern lv_obj_t *ui_fc_state_4;
 extern lv_obj_t *ui_fc_pump_container;
 extern lv_obj_t *ui_zone_label_8;
-extern lv_obj_t *ui_vlv_state_8;
+extern lv_obj_t *ui_fc_pump_state;
 extern lv_obj_t *ui_normal_mode_footer;
 extern lv_obj_t *ui_test_mode_footer;
 void ui_event_exit_test_mode_button( lv_event_t * e);
@@ -77,8 +77,10 @@ void ui_event_test_mode_button( lv_event_t * e);
 extern lv_obj_t *ui_test_mode_button;
 extern lv_obj_t *ui_Label3;
 extern lv_obj_t *ui_system_power_container;
+void ui_event_system_off_button( lv_event_t * e);
 extern lv_obj_t *ui_system_off_button;
 extern lv_obj_t *ui_Label4;
+void ui_event_system_on_button( lv_event_t * e);
 extern lv_obj_t *ui_system_on_button;
 extern lv_obj_t *ui_Label5;
 extern lv_obj_t *ui_end_lockout_button;

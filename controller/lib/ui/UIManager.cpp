@@ -5,13 +5,12 @@
 
 #include "driver/gpio.h"
 #include "esp_log.h"
+#include "ui_utils.h"
 
 using HVACState = ControllerDomain::HVACState;
 using Config = ControllerDomain::Config;
 
 #define RESTART_DELAY_MS 1500
-#define MSG_SCROLL_MS 5 * 1000
-#define DISP_SLEEP_SECS 30
 #define TEMP_LIMIT_ROLLER_START 64
 #define MIN_HEAT_DEG 50
 #define MAX_COOL_DEG 99
@@ -61,18 +60,9 @@ void updateClk() {
     }
 }
 
-void messageTimerCb(lv_timer_t *timer) { ((UIManager *)timer->user_data)->onMessageTimer(); }
-
 void updateClkCb(lv_timer_t *timer) { updateClk(); }
 
 void restartCb(lv_timer_t *) { esp_restart(); }
-
-void pauseTimer(lv_event_t *e) { lv_timer_pause((lv_timer_t *)e->user_data); }
-
-void resetAndResumeTimer(lv_event_t *e) {
-    lv_timer_reset((lv_timer_t *)e->user_data);
-    lv_timer_resume((lv_timer_t *)e->user_data);
-}
 
 void wifiTextareaEventCb(lv_event_t *e) {
     ((UIManager *)lv_event_get_user_data(e))->eWifiTextarea(e);
@@ -86,18 +76,6 @@ void heatRollerChangeCb(lv_event_t *e) {
 void coolRollerChangeCb(lv_event_t *e) {
     UIManager::eventsInst()->handleTempRollerChange(false, (lv_obj_t *)lv_event_get_user_data(e),
                                                     lv_event_get_target(e));
-}
-
-void objSetFlag(bool on, lv_obj_t *obj, lv_obj_flag_t f) {
-    if (on) {
-        lv_obj_add_flag(obj, f);
-    } else {
-        lv_obj_clear_flag(obj, f);
-    }
-}
-
-void objSetVisibility(bool visible, lv_obj_t *obj) {
-    objSetFlag(!visible, obj, LV_OBJ_FLAG_HIDDEN);
 }
 
 void UIManager::bootDone() {
@@ -181,16 +159,6 @@ void UIManager::setupTempRoller(lv_obj_t *roller, uint8_t minDeg, uint8_t maxDeg
     sprintf(opts + pos, "%u", maxDeg); // No trailing newline on the last element
 
     lv_roller_set_options(roller, opts, LV_ROLLER_MODE_NORMAL);
-}
-
-UIManager::MessageContainer *UIManager::focusedMessage() {
-    for (int i = 0; i < nMsgIds_; i++) {
-        if (messages_[i]->isFocused()) {
-            return messages_[i];
-        }
-    }
-
-    return nullptr;
 }
 
 void UIManager::eFanOverride() {
@@ -281,13 +249,12 @@ void UIManager::eSchedule() {
 
 void UIManager::eHomeLoadStart() {
     ESP_LOGD(TAG, "homeLoadStart");
-    lv_timer_reset(msgTimer_);
-    lv_timer_resume(msgTimer_);
+    msgMgr_->startScrollTimer();
 }
 
 void UIManager::eHomeUnloadStart() {
     ESP_LOGD(TAG, "homeUnloadStart");
-    lv_timer_pause(msgTimer_);
+    msgMgr_->pauseScrollTimer();
 }
 
 void UIManager::eCO2LoadStart() {
@@ -513,25 +480,6 @@ void UIManager::eControllerTypeSelectionChanged() {
     objSetVisibility(!isSecondary, ui_makeup_air_container);
 }
 
-void UIManager::onMessageTimer() {
-    // TODO(future): It'd be nicer to make this a circular scroll
-    lv_coord_t currY = lv_obj_get_scroll_y(ui_Footer);
-
-    int nVisible = 0;
-    for (int i = 0; i < nMsgIds_; i++) {
-        if (messages_[i]->isVisible()) {
-            nVisible++;
-        }
-    }
-
-    lv_coord_t newY = currY + msgHeight_;
-    if (newY > (nVisible - 1) * msgHeight_) {
-        newY = 0;
-    }
-
-    lv_obj_scroll_to_y(ui_Footer, newY, LV_ANIM_ON);
-}
-
 void UIManager::updateTempLimits(uint8_t maxHeatDeg, uint8_t minCoolDeg) {
     maxHeatDeg_ = maxHeatDeg;
     minCoolDeg_ = minCoolDeg;
@@ -566,35 +514,6 @@ void UIManager::updateUIForEquipment() {
     objSetVisibility(!isSecondary, ui_fan_offset_divider);
 }
 
-void UIManager::manageSleep() {
-    if (!booted_) {
-        if (!displayAwake_) {
-            disp_backlight_set(backlight_, 100);
-            displayAwake_ = true;
-        }
-        // Don't sleep on boot screen
-        return;
-    }
-
-    if (lv_disp_get_inactive_time(NULL) < (DISP_SLEEP_SECS * 1000)) {
-        if (!displayAwake_) {
-            // Go to homescreen
-            lv_indev_wait_release(lv_indev_get_next(NULL));
-            lv_scr_load_anim(ui_Home, LV_SCR_LOAD_ANIM_FADE_IN, 250, 0, false);
-            disp_backlight_set(backlight_, 100);
-            displayAwake_ = true;
-            ESP_LOGD(TAG, "waking up");
-        }
-    } else {
-        if (displayAwake_) {
-            disp_backlight_set(backlight_, 0);
-            lv_scr_load_anim(sleepScreen_, LV_SCR_LOAD_ANIM_NONE, 0, 0, false);
-            displayAwake_ = false;
-            ESP_LOGD(TAG, "going to sleep");
-        }
-    }
-}
-
 UIManager::UIManager(ControllerDomain::Config config, size_t nMsgIds, eventCb_t eventCb)
     : eventCb_(eventCb) {
     mutex_ = xSemaphoreCreateMutex();
@@ -605,18 +524,9 @@ UIManager::UIManager(ControllerDomain::Config config, size_t nMsgIds, eventCb_t 
     equipment_ = config.equipment;
     wifi_ = config.wifi;
 
-    const disp_backlight_config_t bckl_config = {
-        .pwm_control = true,
-        .output_invert = false, // Backlight on high
-        .gpio_num = GPIO_NUM_48,
-        .timer_idx = 0,
-        .channel_idx = 0,
-    };
-    backlight_ = disp_backlight_new(&bckl_config);
-    assert(backlight_);
-
-    sleepScreen_ = lv_obj_create(NULL);
     ui_init();
+
+    sleepMgr_ = new SleepManager(ui_Home, GPIO_NUM_48);
 
     setInTempC(std::nan(""));
     setOutTempC(std::nan(""));
@@ -635,33 +545,23 @@ UIManager::UIManager(ControllerDomain::Config config, size_t nMsgIds, eventCb_t 
 
     updateUIForEquipment();
 
-    // Delete the message container we created with Squareline for design purposes
-    lv_obj_del(ui_message_container);
-
-    nMsgIds_ = nMsgIds;
-    messages_ = new MessageContainer *[nMsgIds];
-
-    for (int i = 0; i < nMsgIds; i++) {
-        messages_[i] = new MessageContainer(ui_Footer);
-    }
-
-    lv_obj_set_scroll_snap_y(ui_Footer, LV_SCROLL_SNAP_START);
-    msgHeight_ = messages_[0]->getHeight();
-    msgTimer_ = lv_timer_create(messageTimerCb, MSG_SCROLL_MS, this);
+    lv_obj_del(
+        ui_message_container); // Delete the message container we created with Squareline for design purposes
+    msgMgr_ = new MessageManager(nMsgIds, ui_Footer, &ui_font_MaterialSymbols24);
 
     restartTimer_ = lv_timer_create(restartCb, RESTART_DELAY_MS, NULL);
     lv_timer_pause(restartTimer_);
 
     clkTimer_ = lv_timer_create(updateClkCb, 1000, this);
     updateClk();
-
-    lv_obj_add_event_cb(ui_Footer, pauseTimer, LV_EVENT_SCROLL_BEGIN, msgTimer_);
-    lv_obj_add_event_cb(ui_Footer, resetAndResumeTimer, LV_EVENT_SCROLL_END, msgTimer_);
 }
 
 uint32_t UIManager::handleTasks() {
     xSemaphoreTake(mutex_, portMAX_DELAY);
-    manageSleep();
+
+    if (booted_) {
+        sleepMgr_->update();
+    }
     auto rv = lv_timer_handler();
     xSemaphoreGive(mutex_);
     return rv;
@@ -768,109 +668,4 @@ void UIManager::setSystemPower(bool on) {
     objSetVisibility(!on, ui_on_button);
     objSetVisibility(on, ui_off_button);
     xSemaphoreGive(mutex_);
-}
-
-void UIManager::setMessage(uint8_t msgID, bool allowCancel, const char *msg) {
-    xSemaphoreTake(mutex_, portMAX_DELAY);
-    MessageContainer *msgContainer = messages_[msgID];
-
-    msgContainer->setText(msg);
-    msgContainer->setCancelable(allowCancel);
-
-    MessageContainer *focused = focusedMessage();
-    if (focused == nullptr) {
-        // Either there was no message or we're in the middle of scrolling
-        // so just add to the end.
-        msgContainer->setIndex(-1);
-    } else if (msgContainer != focused) {
-        msgContainer->setIndex(focused->getIndex() + 1);
-    }
-
-    msgContainer->setVisibility(true);
-    xSemaphoreGive(mutex_);
-}
-
-void UIManager::clearMessage(uint8_t msgID) {
-    xSemaphoreTake(mutex_, portMAX_DELAY);
-    messages_[msgID]->setVisibility(false);
-    xSemaphoreGive(mutex_);
-}
-
-UIManager::MessageContainer::MessageContainer(lv_obj_t *parent) {
-    lv_obj_t *ui_message_container, *ui_message_close, *ui_message_text;
-    lv_obj_t *ui_Footer = parent; // Gross but allows for copy-paste
-
-    // BEGIN copy-paste from ui_Home.c
-    ui_message_container = lv_obj_create(ui_Footer);
-    lv_obj_remove_style_all(ui_message_container);
-    lv_obj_set_width(ui_message_container, lv_pct(100));
-    lv_obj_set_height(ui_message_container, lv_pct(100));
-    lv_obj_set_align(ui_message_container, LV_ALIGN_CENTER);
-    lv_obj_set_flex_flow(ui_message_container, LV_FLEX_FLOW_ROW);
-    lv_obj_set_flex_align(ui_message_container, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER,
-                          LV_FLEX_ALIGN_CENTER);
-    lv_obj_clear_flag(ui_message_container, LV_OBJ_FLAG_SCROLLABLE); /// Flags
-
-    ui_message_close = lv_label_create(ui_message_container);
-    lv_obj_set_width(ui_message_close, LV_SIZE_CONTENT);  /// 1
-    lv_obj_set_height(ui_message_close, LV_SIZE_CONTENT); /// 1
-    lv_obj_set_align(ui_message_close, LV_ALIGN_CENTER);
-    lv_label_set_text(ui_message_close, "");
-    lv_obj_set_style_text_font(ui_message_close, &ui_font_MaterialSymbols24,
-                               LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_pad_left(ui_message_close, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_pad_right(ui_message_close, 3, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_pad_top(ui_message_close, 1, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_pad_bottom(ui_message_close, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
-
-    ui_message_text = lv_label_create(ui_message_container);
-    lv_obj_set_width(ui_message_text, LV_SIZE_CONTENT);  /// 1
-    lv_obj_set_height(ui_message_text, LV_SIZE_CONTENT); /// 100
-    lv_obj_set_align(ui_message_text, LV_ALIGN_CENTER);
-    lv_label_set_text(ui_message_text, "MESSAGE");
-    // END copy-paste from ui_Home.c
-
-    // NB: This is a bit awkard but allows directly copy-pasting from the Squareline generated code
-    container_ = ui_message_container;
-    cancel_ = ui_message_close;
-    text_ = ui_message_text;
-    parent_ = parent;
-
-    setVisibility(false);
-}
-
-void UIManager::MessageContainer::setVisibility(bool visible) {
-    if (visible_ == visible) {
-        return;
-    }
-
-    objSetVisibility(visible, container_);
-    visible_ = visible;
-}
-
-void UIManager::MessageContainer::setCancelable(bool cancelable) {
-    if (cancelable_ == cancelable) {
-        return;
-    }
-
-    objSetVisibility(cancelable, cancel_);
-
-    cancelable_ = cancelable;
-}
-
-void UIManager::MessageContainer::setText(const char *str) {
-    if (strncmp(str, lv_label_get_text(text_), UI_MAX_MSG_LEN) == 0) {
-        // Strings are the same, don't cause an invalidation
-        return;
-    }
-
-    lv_label_set_text(text_, str);
-}
-
-bool UIManager::MessageContainer::isFocused() {
-    if (!visible_) {
-        return false;
-    }
-
-    return lv_obj_get_scroll_y(parent_) == lv_obj_get_y(container_);
 }
