@@ -3,7 +3,7 @@
 #include "driver/gpio.h"
 
 #define LOOP_PUMP_GPIO GPIO_NUM_42
-#define FC_PUMP_GPIO GPIO_NUM_44
+#define FC_PUMP_GPIO GPIO_NUM_44 // RXD0
 
 static gpio_num_t valve_gpios_[NUM_VALVES] = {GPIO_NUM_40, GPIO_NUM_39, GPIO_NUM_38, GPIO_NUM_37};
 

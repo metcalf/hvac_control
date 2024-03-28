@@ -51,7 +51,7 @@ extern "C" void app_main() {
 
     // TODO:
     // * Wifi for NTP, logging, polling Ecobee vacation API (or maybe home assistant)
-    // * UI (use PSRAM?)
+    // * UI
 
     xTaskCreate(zone_io_task, "zone_io_task", ZONE_IO_TASK_STACK_SIZE, NULL, ZONE_IO_TASK_PRIORITY,
                 NULL);
