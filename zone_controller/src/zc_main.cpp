@@ -56,7 +56,7 @@ CxOpMode lastCxOpMode_ = CxOpMode::Unknown;
 std::chrono::steady_clock::time_point lastCheckedCxOpMode_;
 
 void inputEvtCb() {
-    ZCUIManager::Event evt{ZCUIManager::EventType::InputUpdate};
+    ZCUIManager::Event evt{ZCUIManager::EventType::InputUpdate, 0};
     xQueueSend(uiEvtQueue_, &evt, portMAX_DELAY);
 }
 

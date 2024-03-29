@@ -9,4 +9,6 @@ bool ZCDomain::callForMode(Call call, HeatPumpMode hpMode) {
     case Call::None:
         return false;
     }
+
+    return false;
 }
