@@ -23,7 +23,7 @@ void ESPOutIO::init() {
     ESP_ERROR_CHECK(gpio_config(&io_conf));
 }
 
-void ESPOutIO::setLoopPump(bool on) { ESP_ERROR_CHECK(gpio_set_level(LOOP_PUMP_GPIO, on)); }
+void ESPOutIO::setZonePump(bool on) { ESP_ERROR_CHECK(gpio_set_level(LOOP_PUMP_GPIO, on)); }
 
 void ESPOutIO::setFancoilPump(bool on) { ESP_ERROR_CHECK(gpio_set_level(FC_PUMP_GPIO, on)); }
 

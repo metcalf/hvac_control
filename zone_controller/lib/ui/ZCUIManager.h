@@ -7,6 +7,7 @@
 
 #include "MessageManager.h"
 #include "SleepManager.h"
+#include "ZCDomain.h"
 #include "ui.h"
 #include "ui_events.h"
 
@@ -15,6 +16,7 @@
 class ZCUIManager {
   public:
     enum class EventType {
+        InputUpdate, // Used by zc_main
         SetSystemPower,
         ResetHVACLockout,
         SetTestMode,
@@ -36,19 +38,7 @@ class ZCUIManager {
     };
     typedef void (*eventCb_t)(Event &);
 
-    enum class Call { None, Heat, Cool };
-    enum class ValveState { Closed, Closing, Open, Opening, Error };
-    enum class HeatPumpState { Off, Heat, Cool, Standby, Vacation };
-    struct SystemState {
-        Call thermostats[4];
-        ValveState valves[4];
-        Call fancoils[4];
-        bool zonePump;
-        bool fcPump;
-        HeatPumpState hpState;
-    };
-
-    ZCUIManager(SystemState state, size_t nMsgIds, eventCb_t eventCb);
+    ZCUIManager(ZCDomain::SystemState state, size_t nMsgIds, eventCb_t eventCb);
     ~ZCUIManager() {
         delete msgMgr_;
         delete sleepMgr_;
@@ -59,9 +49,15 @@ class ZCUIManager {
 
     void setMessage(uint8_t msgID, const char *msg) { msgMgr_->setMessage(msgID, false, msg); }
     void clearMessage(uint8_t msgID) { msgMgr_->clearMessage(msgID); }
-    void updateState(SystemState state);
+    void updateState(ZCDomain::SystemState state);
 
   private:
+    using Call = ZCDomain::Call;
+    using ValveAction = ZCDomain::ValveAction;
+    using ValveState = ZCDomain::ValveState;
+    using HeatPumpMode = ZCDomain::HeatPumpMode;
+    using SystemState = ZCDomain::SystemState;
+
     eventCb_t eventCb_;
 
     SemaphoreHandle_t mutex_;
@@ -71,7 +67,7 @@ class ZCUIManager {
     void updateCall(lv_obj_t *icon, Call call);
     void updatePump(lv_obj_t *pmp, bool on);
     const char *getValveText(ValveState state);
-    const char *getHeatPumpText(HeatPumpState state);
+    const char *getHeatPumpText(HeatPumpMode state);
 
     void onSystemPower(bool on);
     void onTestMode(bool on);

@@ -104,7 +104,7 @@ void ZCUIManager::updateState(SystemState state) {
     updatePump(ui_zone_pump_state, state.zonePump);
     updatePump(ui_fc_pump_state, state.fcPump);
 
-    lv_label_set_text(ui_heat_pump_state1, getHeatPumpText(state.hpState));
+    lv_label_set_text(ui_heat_pump_state1, getHeatPumpText(state.heatPumpMode));
 }
 
 void ZCUIManager::updateCall(lv_obj_t *icon, Call call) {
@@ -134,34 +134,33 @@ void ZCUIManager::updateCall(lv_obj_t *icon, Call call) {
 void ZCUIManager::updatePump(lv_obj_t *pmp, bool on) { lv_label_set_text(pmp, on ? "ON" : "OFF"); }
 
 const char *ZCUIManager::getValveText(ValveState state) {
-    switch (state) {
-    case ValveState::Closed:
-        return "Closed";
-    case ValveState::Closing:
-        return "Closing";
-    case ValveState::Open:
-        return "OPEN";
-    case ValveState::Opening:
-        return "OPENING";
-    case ValveState::Error:
-        return "ERROR";
+    if (state.action == ValveAction::Wait) {
+        return "WAITNG";
+    } else if (state.target) {
+        if (state.action == ValveAction::Set) {
+            return "OPEN";
+        } else {
+            return "OPENING";
+        }
+    } else {
+        if (state.action == ValveAction::Set) {
+            return "CLOSED";
+        } else {
+            return "CLOSING";
+        }
     }
-
-    return nullptr;
 }
 
-const char *ZCUIManager::getHeatPumpText(HeatPumpState state) {
+const char *ZCUIManager::getHeatPumpText(HeatPumpMode state) {
     switch (state) {
-    case HeatPumpState::Off:
+    case HeatPumpMode::Off:
         return "OFF";
-    case HeatPumpState::Heat:
+    case HeatPumpMode::Heat:
         return "HEAT";
-    case HeatPumpState::Cool:
+    case HeatPumpMode::Cool:
         return "COOL";
-    case HeatPumpState::Standby:
+    case HeatPumpMode::Standby:
         return "STANDBY";
-    case HeatPumpState::Vacation:
-        return "VACATION";
     }
 
     return nullptr;

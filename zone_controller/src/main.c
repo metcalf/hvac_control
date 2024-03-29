@@ -15,9 +15,6 @@ void app_main() {
     esp_log_level_set("MAIN", ESP_LOG_DEBUG);
     esp_log_level_set("UI", ESP_LOG_DEBUG);
     esp_log_level_set("CTRL", ESP_LOG_DEBUG);
-    esp_log_level_set("SNS", ESP_LOG_DEBUG);
-    esp_log_level_set("VLV", ESP_LOG_DEBUG);
-    esp_log_level_set("sntp", ESP_LOG_DEBUG);
     vTaskDelay(2000 / portTICK_PERIOD_MS);
 
     init_display();

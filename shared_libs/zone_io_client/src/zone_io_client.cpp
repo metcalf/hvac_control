@@ -28,14 +28,14 @@ union BitByte {
 
 void zone_io_log_state(InputState s) {
     ESP_LOGI(
-        TAG, "FC:%d%d|%d%d|%d%d|%d%d V:%c%c|%c%c|%c%c|%c%c SW: %d",
+        TAG, "FC:%d%d|%d%d|%d%d|%d%d V:%c%c|%c%c|%c%c|%c%c SW: %d|%d",
         // Fancoils
         s.fc[0].v, s.fc[0].ob, s.fc[1].v, s.fc[1].ob, s.fc[2].v, s.fc[2].ob, s.fc[3].v, s.fc[3].ob,
         // Thermostats
         s.ts[0].w ? 'w' : '_', s.ts[0].y ? 'y' : '_', s.ts[1].w ? 'w' : '_', s.ts[1].y ? 'y' : '_',
         s.ts[2].w ? 'w' : '_', s.ts[2].y ? 'y' : '_', s.ts[3].w ? 'w' : '_', s.ts[3].y ? 'y' : '_',
         // Valve SW
-        static_cast<int>(s.valve_sw));
+        static_cast<int>(s.valve_sw[0]), static_cast<int>(s.valve_sw[1]));
 }
 
 bool zone_io_state_eq(InputState s1, InputState s2) {
@@ -51,7 +51,13 @@ bool zone_io_state_eq(InputState s1, InputState s2) {
         }
     }
 
-    return s1.valve_sw == s2.valve_sw;
+    for (int i = 0; i < ZONE_IO_NUM_SW; i++) {
+        if (s1.valve_sw[i] != s2.valve_sw[i]) {
+            return false;
+        }
+    }
+
+    return true;
 }
 
 void zone_io_init() {
@@ -75,12 +81,12 @@ void zone_io_init() {
                                  UART_PIN_NO_CHANGE));
 }
 
-void do_rx(size_t to_rx) {
+bool do_rx(size_t to_rx) {
     int rx_bytes = uart_read_bytes(ZIO_UART_NUM, zio_buf_, to_rx, portMAX_DELAY);
 
     if (rx_bytes < to_rx) {
         ESP_LOGI(TAG, "Read %d bytes (of %d expected)", rx_bytes, to_rx);
-        return;
+        return false;
     } else {
         ESP_LOGD(TAG, "Read %d bytes", rx_bytes);
     }
@@ -90,9 +96,10 @@ void do_rx(size_t to_rx) {
     for (int i = 0; i < rx_bytes; i++) {
         BitByte byte = {.byte = zio_buf_[i]};
         if (byte.bits.b7) {
-            input_state.ts[2] = {.w = byte.bits.b0, .y = byte.bits.b1};
-            input_state.ts[3] = {.w = byte.bits.b2, .y = byte.bits.b3};
-            input_state.valve_sw = static_cast<ValveSWState>((byte.byte >> 4) & 0x03);
+            input_state.ts[2] = {.w = byte.bits.b0, .y = 0};
+            input_state.ts[3] = {.w = byte.bits.b1, .y = 0};
+            input_state.valve_sw[0] = static_cast<ValveSWState>((byte.byte >> 2) & 0x03);
+            input_state.valve_sw[1] = static_cast<ValveSWState>((byte.byte >> 4) & 0x03);
         } else if (byte.bits.b6) {
             input_state.fc[3] = {.v = byte.bits.b0, .ob = byte.bits.b1};
             input_state.ts[0] = {.w = byte.bits.b2, .y = byte.bits.b3};
@@ -104,15 +111,18 @@ void do_rx(size_t to_rx) {
         }
     }
 
-    if (!zone_io_state_eq(input_state, last_input_state_)) {
-        if (xSemaphoreTake(mutex, portMAX_DELAY)) {
-            last_input_state_ = input_state;
-            xSemaphoreGive(mutex);
-        }
+    if (zone_io_state_eq(input_state, last_input_state_)) {
+        return false;
     }
+
+    xSemaphoreTake(mutex, portMAX_DELAY);
+    last_input_state_ = input_state;
+    xSemaphoreGive(mutex);
+    return true;
 }
 
-void zone_io_task(void *) {
+void zone_io_task(void *updateCb) {
+
     uart_event_t event;
 
     while (1) {
@@ -120,7 +130,10 @@ void zone_io_task(void *) {
         if (xQueueReceive(uart_queue, (void *)&event, (TickType_t)portMAX_DELAY)) {
             switch (event.type) {
             case UART_DATA:
-                do_rx(event.size);
+                if (do_rx(event.size)) {
+                    ((void (*)())updateCb)();
+                }
+
                 break;
             case UART_BREAK:
                 ESP_LOGD(TAG, "uart rx break");

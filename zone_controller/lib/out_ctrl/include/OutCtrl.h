@@ -1,10 +1,13 @@
 #pragma once
 
+#include <chrono>
 #include <functional>
 
 #include "BaseModbusClient.h"
 #include "BaseOutIO.h"
 #include "InputState.h"
+#include "ValveStateManager.h"
+#include "ZCDomain.h"
 
 #if defined(ESP_PLATFORM)
 #include "freertos/FreeRTOS.h"
@@ -13,36 +16,42 @@ typedef uint32_t TickType_t;
 #define portTICK_RATE_MS 100
 #endif
 
-enum class OutputMode { Off, Standby, Cool, Heat };
-static const char *OutputModeStrings[] = {"off", "standby", "cool", "heat"};
-
-typedef std::function<TickType_t()> ClockFn;
-
 class OutCtrl {
   public:
-    OutCtrl(BaseOutIO *outIO, BaseModbusClient *mb_client, ClockFn clk)
-        : outIO_(outIO), mb_client_(mb_client), clk_(clk){};
+    OutCtrl(ValveStateManager &valveStateManager) : valveStateManager_(valveStateManager){};
 
-    void update(bool system_on, InputState zio_state);
+    ZCDomain::SystemState update(bool systemOn, InputState zioState);
+    void resetLockout() {
+        lastHeat_ = {};
+        lastCool_ = {};
+    }
+
+  protected:
+    virtual std::chrono::steady_clock::time_point steadyNow() {
+        return std::chrono::steady_clock::now();
+    }
 
   private:
-    BaseOutIO *outIO_;
-    BaseModbusClient *mb_client_;
-    CxOpMode lastCxOpMode_ = CxOpMode::Unknown;
-    TickType_t lastHeatTick_, lastCoolTick_, lastCheckedCxOpMode_, lastCheckedCxFrequency_;
-    ClockFn clk_;
+    using SystemState = ZCDomain::SystemState;
+    using HeatPumpMode = ZCDomain::HeatPumpMode;
+    using Call = ZCDomain::Call;
+    using ValveState = ZCDomain::ValveState;
 
-    const char *stringForOutputMode(OutputMode mode) {
-        return OutputModeStrings[static_cast<int>(mode)];
+    ValveStateManager &valveStateManager_;
+
+    HeatPumpMode lastHeatPumpMode_ = HeatPumpMode::Off;
+    std::chrono::steady_clock::time_point lastHeat_{}, lastCool_{};
+
+    static constexpr const char *HeatPumpModeStrings[] = {"off", "standby", "cool", "heat"};
+    const char *stringForHeatPumpMode(HeatPumpMode mode) {
+        return HeatPumpModeStrings[static_cast<int>(mode)];
     };
 
-    void clampLastEventTicks();
-    bool checkModeLockout(TickType_t last_target_mode_tick, TickType_t last_other_mode_tick,
-                          TickType_t lockout_ticks);
-    OutputMode selectMode(bool system_on, InputState zio_state);
-    bool cxStandbyReady();
-    void setCxOpMode(CxOpMode cx_mode);
-    void setCxOpMode(OutputMode output_mode);
-    void setValves(InputState zio_state);
-    void setPumps(OutputMode mode, InputState zio_state);
+    SystemState stateFromInput(InputState zioState);
+    bool checkModeLockout(std::chrono::steady_clock::time_point lastTargetMode,
+                          std::chrono::steady_clock::time_point lastOtherMode,
+                          std::chrono::steady_clock::duration lockoutInterval);
+    void selectMode(SystemState &state, bool system_on, InputState zioState);
+    void setValves(SystemState &state, InputState zioState);
+    void setPumps(SystemState &state, InputState zioState);
 };

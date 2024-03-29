@@ -38,7 +38,7 @@ class ModbusClientFake : public BaseModbusClient {
 
 class OutIOFake : public BaseOutIO {
   public:
-    void setLoopPump(bool on) override { loopPumpState_ = on; }
+    void setZonePump(bool on) override { zonePumpState_ = on; }
     void setFancoilPump(bool on) override { fcPumpState_ = on; }
     void setValve(int idx, bool on) override {
         assert(idx < NUM_VALVES);
@@ -49,11 +49,11 @@ class OutIOFake : public BaseOutIO {
         return valveState_[idx];
     }
 
-    bool getLoopPump() { return loopPumpState_; }
+    bool getZonePump() { return zonePumpState_; }
     bool getFcPump() { return fcPumpState_; }
 
   private:
-    bool loopPumpState_, fcPumpState_;
+    bool zonePumpState_, fcPumpState_;
     bool valveState_[NUM_VALVES];
 };
 
