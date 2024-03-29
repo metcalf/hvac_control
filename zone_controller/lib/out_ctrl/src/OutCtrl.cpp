@@ -52,6 +52,7 @@ void OutCtrl::selectMode(SystemState &state, bool systemOn, InputState zioState)
             break;
         case Call::Heat:
             heat_demand = true;
+            break;
         case Call::None:
             break;
         }
@@ -64,6 +65,7 @@ void OutCtrl::selectMode(SystemState &state, bool systemOn, InputState zioState)
             break;
         case Call::Heat:
             heat_demand = true;
+            break;
         case Call::None:
             break;
         }
@@ -157,7 +159,7 @@ void OutCtrl::setCalls(ZCDomain::SystemState &state, InputState zioState) {
     for (int i = 0; i < ZONE_IO_NUM_FC; i++) {
         FancoilState fc = zioState.fc[i];
         if (fc.v) {
-            state.fancoils[i] = fc.ob ? Call::Heat : Call::Cool;
+            state.fancoils[i] = fc.ob ? Call::Cool : Call::Heat;
         }
     }
 }

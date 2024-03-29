@@ -1,7 +1,7 @@
 #include "ValveStateManager.h"
 
 void ValveStateManager::handleValvePair(ValveState *states, ValveState *pastStates,
-                                        ValveSWState sw) {
+                                        const ValveSWState sw) {
     // Only operate one valve at a time, in either direction so we can track things
     // with the single sw
     int expectOpen = 0;
@@ -23,7 +23,11 @@ void ValveStateManager::handleValvePair(ValveState *states, ValveState *pastStat
                 states[i].action = ValveAction::Wait;
             }
         } else if (allSet) {
-            states[i].action = ValveAction::Set;
+            if (pastStates[i].action == ValveAction::Wait) {
+                states[i].action = ValveAction::Act;
+            } else {
+                states[i].action = ValveAction::Set;
+            }
         } else {
             states[i].action = pastStates[i].action;
         }
@@ -31,7 +35,7 @@ void ValveStateManager::handleValvePair(ValveState *states, ValveState *pastStat
 }
 
 // TODO: This very much needs its own tests!!!
-void ValveStateManager::update(ValveState *valves, ValveSWState valveSW[2]) {
+void ValveStateManager::update(ValveState *valves, const ValveSWState valveSW[2]) {
     handleValvePair(valves, pastStates_, valveSW[0]);
     handleValvePair(&valves[2], &pastStates_[2], valveSW[1]);
 

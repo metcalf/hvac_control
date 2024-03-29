@@ -172,7 +172,6 @@ void ZCUIManager::onSystemPower(bool on) {
 }
 
 void ZCUIManager::onTestMode(bool on) {
-    // TODO: Add a test mode timeout
     Event evt{EventType::SetTestMode, EventPayload{.testMode = on}};
     eventCb_(evt);
 }
