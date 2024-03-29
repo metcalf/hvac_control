@@ -122,6 +122,10 @@ void OutCtrl::selectMode(SystemState &state, bool systemOn, InputState zioState)
 }
 
 void OutCtrl::setPumps(SystemState &state, InputState zioState) {
+    if (!(state.heatPumpMode == HeatPumpMode::Heat || state.heatPumpMode == HeatPumpMode::Cool)) {
+        return;
+    }
+
     for (int i = 0; i < ZONE_IO_NUM_TS; i++) {
         if (ZCDomain::callForMode(state.thermostats[i], state.heatPumpMode)) {
             state.zonePump = true;
@@ -137,9 +141,7 @@ void OutCtrl::setPumps(SystemState &state, InputState zioState) {
     }
 }
 
-ZCDomain::SystemState OutCtrl::stateFromInput(InputState zioState) {
-    SystemState state{};
-
+void OutCtrl::setCalls(ZCDomain::SystemState &state, InputState zioState) {
     for (int i = 0; i < ZONE_IO_NUM_TS; i++) {
         ThermostatState ts = zioState.ts[i];
         if (ts.w && ts.y) {
@@ -158,19 +160,20 @@ ZCDomain::SystemState OutCtrl::stateFromInput(InputState zioState) {
             state.fancoils[i] = fc.ob ? Call::Heat : Call::Cool;
         }
     }
-
-    return state;
 }
 
 ZCDomain::SystemState OutCtrl::update(bool systemOn, InputState zioState) {
-    SystemState state = stateFromInput(zioState);
+    SystemState state{};
 
+    setCalls(state, zioState);
     selectMode(state, systemOn, zioState);
 
-    if (state.heatPumpMode == HeatPumpMode::Heat || state.heatPumpMode == HeatPumpMode::Cool) {
-        valveStateManager_.update(state, zioState.valve_sw);
-        setPumps(state, zioState);
+    for (int i = 0; i < 4; i++) {
+        state.valves[i].target = ZCDomain::callForMode(state.thermostats[i], state.heatPumpMode);
     }
+    valveStateManager_.update(state.valves, zioState.valve_sw);
+
+    setPumps(state, zioState);
 
     return state;
 }

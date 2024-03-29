@@ -31,15 +31,11 @@ void ValveStateManager::handleValvePair(ValveState *states, ValveState *pastStat
 }
 
 // TODO: This very much needs its own tests!!!
-void ValveStateManager::update(ZCDomain::SystemState &state, ValveSWState valveSW[2]) {
-    for (int i = 0; i < 4; i++) {
-        state.valves[i].target = ZCDomain::callForMode(state.thermostats[i], state.heatPumpMode);
-    }
-
-    handleValvePair(state.valves, pastStates_, valveSW[0]);
-    handleValvePair(&state.valves[2], &pastStates_[2], valveSW[1]);
+void ValveStateManager::update(ValveState *valves, ValveSWState valveSW[2]) {
+    handleValvePair(valves, pastStates_, valveSW[0]);
+    handleValvePair(&valves[2], &pastStates_[2], valveSW[1]);
 
     for (int i = 0; i < 4; i++) {
-        pastStates_[i] = state.valves[i];
+        pastStates_[i] = valves[i];
     }
 }

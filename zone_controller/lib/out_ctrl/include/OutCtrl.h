@@ -26,6 +26,8 @@ class OutCtrl {
         lastCool_ = {};
     }
 
+    static void setCalls(ZCDomain::SystemState &state, InputState zioState);
+
   protected:
     virtual std::chrono::steady_clock::time_point steadyNow() {
         return std::chrono::steady_clock::now();
@@ -47,7 +49,6 @@ class OutCtrl {
         return HeatPumpModeStrings[static_cast<int>(mode)];
     };
 
-    SystemState stateFromInput(InputState zioState);
     bool checkModeLockout(std::chrono::steady_clock::time_point lastTargetMode,
                           std::chrono::steady_clock::time_point lastOtherMode,
                           std::chrono::steady_clock::duration lockoutInterval);

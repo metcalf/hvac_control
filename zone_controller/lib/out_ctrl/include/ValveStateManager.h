@@ -5,7 +5,7 @@
 
 class ValveStateManager {
   public:
-    void update(ZCDomain::SystemState &state, ValveSWState valveSW[2]);
+    void update(ZCDomain::ValveState *valves, ValveSWState valveSW[2]);
 
   private:
     using ValveState = ZCDomain::ValveState;

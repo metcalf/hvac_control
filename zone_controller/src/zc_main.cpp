@@ -47,9 +47,7 @@ static ESPModbusClient
 static ValveStateManager valveStateManager_;
 static OutCtrl outCtrl_(valveStateManager_);
 
-static ValveState testValves_[ZONE_IO_NUM_TS];
-static bool testZonePump_;
-static bool testFCPump_;
+static SystemState currentState_;
 
 static bool systemOn_ = true, testMode_ = false;
 CxOpMode lastCxOpMode_ = CxOpMode::Unknown;
@@ -104,13 +102,20 @@ bool pollUIEvent(bool wait) {
         break;
     case EventType::SetTestMode:
         testMode_ = evt.payload.testMode;
-        // TODO
         break;
     case EventType::TestToggleZone:
-        // TODO
+        currentState_.valves[evt.payload.zone].target =
+            !currentState_.valves[evt.payload.zone].target;
         break;
     case EventType::TestTogglePump:
-        // TODO
+        switch (evt.payload.pump) {
+        case ZCUIManager::Pump::Zone:
+            currentState_.zonePump = !currentState_.zonePump;
+            break;
+        case ZCUIManager::Pump::Fancoil:
+            currentState_.fcPump = !currentState_.fcPump;
+            break;
+        }
         break;
     }
 
@@ -123,8 +128,8 @@ void setIOStates(SystemState &state) {
     }
 
     // Do not enable the zone pump if we don't know the state of the heat pump to avoid
-    // running condensing cold water.
-    outIO_.setZonePump(state.zonePump && lastCxOpMode_ != CxOpMode::Error);
+    // running condensing cold water (except in test mode).
+    outIO_.setZonePump(state.zonePump && (testMode_ || lastCxOpMode_ != CxOpMode::Error));
     outIO_.setFancoilPump(state.fcPump);
 }
 
@@ -192,12 +197,19 @@ void pollCxStatus() {
 void outputTask(void *) {
     while (1) {
         // TODO: Need a way to generate the messages in OutCtrl
-        SystemState state = outCtrl_.update(systemOn_, zone_io_get_state());
-        uiManager_->updateState(state);
+        InputState zioState = zone_io_get_state();
+        if (testMode_) {
+            OutCtrl::setCalls(currentState_, zioState);
+            valveStateManager_.update(currentState_.valves, zioState.valve_sw);
+        } else {
+            currentState_ = outCtrl_.update(systemOn_, zioState);
+        }
 
-        setCxOpMode(state.heatPumpMode);
+        uiManager_->updateState(currentState_);
+
+        setCxOpMode(currentState_.heatPumpMode);
         pollCxStatus();
-        setIOStates(state);
+        setIOStates(currentState_);
 
         if (pollUIEvent(true)) {
             // If we found something in the queue, clear the queue before proceeeding with
@@ -220,11 +232,9 @@ extern "C" void zc_main() {
     outIO_.init();
 
     // TODO:
-    // * Wifi for NTP, logging, polling Ecobee vacation API (or maybe home assistant)
-    // * UI
+    // * polling Ecobee vacation API (or maybe home assistant)
 
     uiEvtQueue_ = xQueueCreate(10, sizeof(ZCUIManager::Event));
-    // TODO: Handle number of messages
     SystemState state{};
     uiManager_ = new ZCUIManager(state, static_cast<size_t>(MsgID::_Last), uiEvtCb);
 
