@@ -19,6 +19,9 @@
 // Transition to standby mode 1 hour after the last call
 #define STANDBY_DELAY std::chrono::hours(1)
 
+#define HEAT_LOCKOUT_MSG "Waiting to heat after cool"
+#define COOL_LOCKOUT_MSG "Waiting to cool after heat"
+
 static const char *TAG = "OUT";
 
 bool OutCtrl::checkModeLockout(std::chrono::steady_clock::time_point lastTargetMode,
@@ -74,8 +77,6 @@ void OutCtrl::selectMode(SystemState &state, bool systemOn, InputState zioState)
     HeatPumpMode mode;
     if (cool_demand && heat_demand) {
         // In case of conflicting demands, leave system in its current state
-        // TODO: Report this state in UI
-
         if (lastHeatPumpMode_ == HeatPumpMode::Heat) {
             mode = HeatPumpMode::Heat;
         } else if (lastHeatPumpMode_ == HeatPumpMode::Cool) {
@@ -85,24 +86,33 @@ void OutCtrl::selectMode(SystemState &state, bool systemOn, InputState zioState)
         }
         ESP_LOGI(TAG, "Conflicting cool and heat demands, leaving system in %s",
                  stringForHeatPumpMode(mode));
-    } else if (heat_demand) {
-        if (checkModeLockout(lastHeat_, lastCool_, COOL_TO_HEAT_LOCKOUT)) {
-            // TODO: Report this state in UI
-            ESP_LOGI(TAG, "Waiting for mode lockout before heating");
-            mode = HeatPumpMode::Standby;
-        } else {
-            mode = HeatPumpMode::Heat;
-        }
-    } else if (cool_demand) {
-        if (checkModeLockout(lastHeat_, lastCool_, HEAT_TO_COOL_LOCKOUT)) {
-            // TODO: Report this state in UI
-            ESP_LOGI(TAG, "Waiting for mode lockout before cooling");
-            mode = HeatPumpMode::Standby;
-        } else {
-            mode = HeatPumpMode::Cool;
-        }
+        messageUI_.setMessage(MsgID::SystemConflictingCallsError, false,
+                              "Both cool and heat calls");
     } else {
-        mode = HeatPumpMode::Standby;
+        messageUI_.clearMessage(MsgID::SystemConflictingCallsError);
+
+        if (heat_demand) {
+            if (checkModeLockout(lastHeat_, lastCool_, COOL_TO_HEAT_LOCKOUT)) {
+                messageUI_.setMessage(MsgID::HVACLockout, false, HEAT_LOCKOUT_MSG);
+                ESP_LOGI(TAG, HEAT_LOCKOUT_MSG);
+                mode = HeatPumpMode::Standby;
+            } else {
+                messageUI_.clearMessage(MsgID::HVACLockout);
+                mode = HeatPumpMode::Heat;
+            }
+        } else if (cool_demand) {
+            if (checkModeLockout(lastHeat_, lastCool_, HEAT_TO_COOL_LOCKOUT)) {
+                messageUI_.setMessage(MsgID::HVACLockout, false, COOL_LOCKOUT_MSG);
+                ESP_LOGI(TAG, COOL_LOCKOUT_MSG);
+                mode = HeatPumpMode::Standby;
+            } else {
+                messageUI_.clearMessage(MsgID::HVACLockout);
+                mode = HeatPumpMode::Cool;
+            }
+        } else {
+            messageUI_.clearMessage(MsgID::HVACLockout);
+            mode = HeatPumpMode::Standby;
+        }
     }
 
     std::chrono::steady_clock::time_point now = steadyNow();
@@ -147,7 +157,7 @@ void OutCtrl::setCalls(ZCDomain::SystemState &state, InputState zioState) {
     for (int i = 0; i < ZONE_IO_NUM_TS; i++) {
         ThermostatState ts = zioState.ts[i];
         if (ts.w && ts.y) {
-            // TODO: Report error/UI
+            // Note UI messaging is handled in `update` because this is static
             ESP_LOGW(TAG, "W+Y on thermostat %d", i + 1);
         } else if (ts.w) {
             state.thermostats[i] = Call::Heat;
@@ -166,6 +176,14 @@ void OutCtrl::setCalls(ZCDomain::SystemState &state, InputState zioState) {
 
 ZCDomain::SystemState OutCtrl::update(bool systemOn, InputState zioState) {
     SystemState state{};
+
+    for (int i = 0; i < ZONE_IO_NUM_TS; i++) {
+        ThermostatState ts = zioState.ts[i];
+        if (ts.w && ts.y) {
+            // Note: logging is in static setCalls
+            messageUI_.setMessage(MsgID::TSConflictingCallsError, false, "W+Y on thermostat");
+        }
+    }
 
     setCalls(state, zioState);
     selectMode(state, systemOn, zioState);

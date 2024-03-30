@@ -34,7 +34,6 @@ void ValveStateManager::handleValvePair(ValveState *states, ValveState *pastStat
     }
 }
 
-// TODO: This very much needs its own tests!!!
 void ValveStateManager::update(ValveState *valves, const ValveSWState valveSW[2]) {
     handleValvePair(valves, pastStates_, valveSW[0]);
     handleValvePair(&valves[2], &pastStates_[2], valveSW[1]);

@@ -32,9 +32,9 @@ struct SystemState {
 
 enum class MsgID {
     TSConflictingCallsError,
-    TSUnsupportedCoolingError,
     SystemConflictingCallsError,
     CXError,
+    CXModeMismatch,
     ValveError,
     HVACLockout,
     Vacation,

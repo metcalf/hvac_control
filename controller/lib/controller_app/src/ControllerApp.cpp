@@ -171,10 +171,7 @@ FanSpeed ControllerApp::computeFanSpeed(DemandRequest *requests) {
             fanSpeed = MAKEUP_FAN_SPEED;
         }
     } else {
-        char errMsg[UI_MAX_MSG_LEN];
-        snprintf(errMsg, sizeof(errMsg), "Error getting makeup demand: %d", err);
-        setMessage(MsgID::GetMakeupDemandErr, false, errMsg);
-        ESP_LOGE(TAG, "%s", errMsg);
+        setErrMessageF(MsgID::GetMakeupDemandErr, false, "Error getting makeup demand: %d", err);
     }
 
     return fanSpeed;
@@ -320,7 +317,6 @@ void ControllerApp::handleCancelMessage(MsgID id) {
         break;
     case MsgID::FanOverride:
         // Don't set to zero, computeFanSpeed will handle that
-        clearMessage(MsgID::FanOverride);
         fanOverrideUntil_ = {};
         break;
     case MsgID::TempOverride:
@@ -628,10 +624,7 @@ void ControllerApp::handleFreshAirState(ControllerDomain::FreshAirState *freshAi
         }
         clearMessage(MsgID::GetFreshAirStateErr);
     } else {
-        char errMsg[UI_MAX_MSG_LEN];
-        snprintf(errMsg, sizeof(errMsg), "Error getting fresh air state: %d", err);
-        setMessage(MsgID::GetFreshAirStateErr, false, errMsg);
-        ESP_LOGE(TAG, "%s", errMsg);
+        setErrMessageF(MsgID::GetFreshAirStateErr, false, "Error getting fresh air state: %d", err);
     }
 
     if (now - lastOutdoorTempUpdate_ > OUTDOOR_TEMP_MAX_AGE) {
@@ -641,7 +634,20 @@ void ControllerApp::handleFreshAirState(ControllerDomain::FreshAirState *freshAi
     }
 }
 
-void ControllerApp::setMessageF(MsgID msgID, bool allowCancel, const char *fmt, ...) {
+void __attribute__((format(printf, 4, 5)))
+ControllerApp::setErrMessageF(MsgID msgID, bool allowCancel, const char *fmt, ...) {
+    char msg[UI_MAX_MSG_LEN];
+
+    va_list args;
+    va_start(args, fmt);
+    vsnprintf(msg, sizeof(msg), fmt, args);
+    va_end(args);
+
+    setMessage(msgID, allowCancel, msg);
+    ESP_LOGE(TAG, "%s", msg);
+}
+void __attribute__((format(printf, 4, 5)))
+ControllerApp::setMessageF(MsgID msgID, bool allowCancel, const char *fmt, ...) {
     char msg[UI_MAX_MSG_LEN];
 
     va_list args;
@@ -691,10 +697,7 @@ void ControllerApp::task(bool firstTime) {
         if (err == ESP_OK) {
             clearMessage(MsgID::SecondaryControllerErr);
         } else {
-            char errMsg[UI_MAX_MSG_LEN];
-            snprintf(errMsg, sizeof(errMsg), "Sec ctrl err: %d", err);
-            setMessage(MsgID::SecondaryControllerErr, false, errMsg);
-            ESP_LOGE(TAG, "%s", errMsg);
+            setErrMessageF(MsgID::SecondaryControllerErr, false, "Sec ctrl err: %d", err);
         }
 
         requests[1] = demandController_->update(sensorData[1], setpoints[1], outdoorTempC());

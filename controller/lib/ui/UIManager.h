@@ -88,6 +88,7 @@ class UIManager : public AbstractUIManager {
     void setupTempRoller(lv_obj_t *roller, uint8_t minDeg, uint8_t maxDeg);
     void updateTempLimits(uint8_t maxHeatDeg, uint8_t minCoolDeg);
     void updateUIForEquipment();
+    void onCancelMsg(uint8_t msgID);
 
     inline static UIManager *eventsInst_;
 

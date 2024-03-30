@@ -11,7 +11,6 @@ class ValveStateManager {
     using ValveState = ZCDomain::ValveState;
     using ValveAction = ZCDomain::ValveAction;
 
-    // TODO: What happens if valves are open when we reboot?
     ValveState pastStates_[4]{{}, {}, {}, {}};
 
     void handleValvePair(ValveState *states, ValveState *pastStates, const ValveSWState sw);

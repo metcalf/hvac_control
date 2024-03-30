@@ -5,6 +5,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
 
+#include "AbstractMessageUI.h"
 #include "MessageManager.h"
 #include "SleepManager.h"
 #include "ZCDomain.h"
@@ -13,7 +14,7 @@
 
 #define UI_MAX_MSG_LEN 18 * 2
 
-class ZCUIManager {
+class ZCUIManager : public AbstractMessageUI {
   public:
     enum class EventType {
         InputUpdate, // Used by zc_main
@@ -39,7 +40,7 @@ class ZCUIManager {
     typedef void (*eventCb_t)(Event &);
 
     ZCUIManager(ZCDomain::SystemState state, size_t nMsgIds, eventCb_t eventCb);
-    ~ZCUIManager() {
+    ~ZCUIManager() override {
         delete msgMgr_;
         delete sleepMgr_;
         vSemaphoreDelete(mutex_);
@@ -47,8 +48,12 @@ class ZCUIManager {
 
     uint32_t handleTasks();
 
-    void setMessage(uint8_t msgID, const char *msg) { msgMgr_->setMessage(msgID, false, msg); }
-    void clearMessage(uint8_t msgID) { msgMgr_->clearMessage(msgID); }
+    void setMessage(ZCDomain::MsgID msgID, bool allowCancel, const char *msg) override {
+        msgMgr_->setMessage(static_cast<uint8_t>(msgID), allowCancel, msg);
+    }
+    void clearMessage(ZCDomain::MsgID msgID) override {
+        msgMgr_->clearMessage(static_cast<uint8_t>(msgID));
+    }
     void updateState(ZCDomain::SystemState state);
 
   private:

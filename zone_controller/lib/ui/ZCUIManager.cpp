@@ -37,9 +37,9 @@ lv_obj_t **fcCalls[] = {
     &ui_fc_state_4,
 };
 
-void uiEventCb(lv_event_t *e) {
-    (*(std::function<void(lv_event_t *)> *)lv_event_get_user_data(e))(e);
-}
+typedef std::function<void(lv_event_t *)> uiCbFn;
+
+void uiEventCb(lv_event_t *e) { (*(uiCbFn *)lv_event_get_user_data(e))(e); }
 
 static const char *TAG = "UI";
 
@@ -52,36 +52,28 @@ ZCUIManager::ZCUIManager(SystemState state, size_t nMsgIds, eventCb_t eventCb) :
     ui_init();
 
     sleepMgr_ = new SleepManager(ui_Home, GPIO_NUM_48);
-    msgMgr_ = new MessageManager(nMsgIds, ui_normal_mode_footer, &ui_font_MaterialSymbols24);
+    msgMgr_ = new MessageManager(nMsgIds, ui_normal_mode_footer, &ui_font_MaterialSymbols24, NULL);
 
-    lv_obj_add_event_cb(
-        ui_system_on_button, uiEventCb, LV_EVENT_CLICKED,
-        new std::function<void(lv_event_t *)>([this](lv_event_t *e) { onSystemPower(true); }));
-    lv_obj_add_event_cb(
-        ui_system_off_button, uiEventCb, LV_EVENT_CLICKED,
-        new std::function<void(lv_event_t *)>([this](lv_event_t *e) { onSystemPower(false); }));
-    lv_obj_add_event_cb(
-        ui_test_mode_button, uiEventCb, LV_EVENT_CLICKED,
-        new std::function<void(lv_event_t *)>([this](lv_event_t *e) { onTestMode(true); }));
-    lv_obj_add_event_cb(
-        ui_exit_test_mode_button, uiEventCb, LV_EVENT_CLICKED,
-        new std::function<void(lv_event_t *)>([this](lv_event_t *e) { onTestMode(false); }));
-    lv_obj_add_event_cb(
-        ui_end_lockout_button, uiEventCb, LV_EVENT_CLICKED,
-        new std::function<void(lv_event_t *)>([this](lv_event_t *e) { onEndLockout(); }));
+    lv_obj_add_event_cb(ui_system_on_button, uiEventCb, LV_EVENT_CLICKED,
+                        new uiCbFn([this](lv_event_t *e) { onSystemPower(true); }));
+    lv_obj_add_event_cb(ui_system_off_button, uiEventCb, LV_EVENT_CLICKED,
+                        new uiCbFn([this](lv_event_t *e) { onSystemPower(false); }));
+    lv_obj_add_event_cb(ui_test_mode_button, uiEventCb, LV_EVENT_CLICKED,
+                        new uiCbFn([this](lv_event_t *e) { onTestMode(true); }));
+    lv_obj_add_event_cb(ui_exit_test_mode_button, uiEventCb, LV_EVENT_CLICKED,
+                        new uiCbFn([this](lv_event_t *e) { onTestMode(false); }));
+    lv_obj_add_event_cb(ui_end_lockout_button, uiEventCb, LV_EVENT_CLICKED,
+                        new uiCbFn([this](lv_event_t *e) { onEndLockout(); }));
 
     // Configure test mode events for each zone/fancoil/pump
     for (int i = 0; i < 4; i++) {
-        lv_obj_add_event_cb(
-            *zoneContainers[i], uiEventCb, LV_EVENT_CLICKED,
-            new std::function<void(lv_event_t *)>([this, i](lv_event_t *e) { onZoneToggle(i); }));
+        lv_obj_add_event_cb(*zoneContainers[i], uiEventCb, LV_EVENT_CLICKED,
+                            new uiCbFn([this, i](lv_event_t *e) { onZoneToggle(i); }));
     }
-    lv_obj_add_event_cb(
-        ui_zone_pump_container, uiEventCb, LV_EVENT_CLICKED,
-        new std::function<void(lv_event_t *)>([this](lv_event_t *e) { onPumpToggle(Pump::Zone); }));
+    lv_obj_add_event_cb(ui_zone_pump_container, uiEventCb, LV_EVENT_CLICKED,
+                        new uiCbFn([this](lv_event_t *e) { onPumpToggle(Pump::Zone); }));
     lv_obj_add_event_cb(ui_fc_pump_container, uiEventCb, LV_EVENT_CLICKED,
-                        new std::function<void(lv_event_t *)>(
-                            [this](lv_event_t *e) { onPumpToggle(Pump::Fancoil); }));
+                        new uiCbFn([this](lv_event_t *e) { onPumpToggle(Pump::Fancoil); }));
 
     updateState(state);
 }

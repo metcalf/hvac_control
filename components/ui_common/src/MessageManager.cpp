@@ -14,14 +14,21 @@ void messageTimerCb(lv_timer_t *timer) {
   ((MessageManager *)timer->user_data)->onMessageTimer();
 }
 
+void msgCancelCb(lv_event_t *e) {
+  (*(__intCancelCbFn_t *)lv_event_get_user_data(e))();
+}
+
 MessageManager::MessageManager(size_t nMsgIds, lv_obj_t *msgsContainer,
-                               const lv_font_t *closeSymbolFont)
-    : msgsContainer_(msgsContainer) {
+                               const lv_font_t *closeSymbolFont,
+                               cancelCbFn_t *cancelCb)
+    : msgsContainer_(msgsContainer), cancelCb_(cancelCb) {
   nMsgIds_ = nMsgIds;
   messages_ = new MessageContainer *[nMsgIds_];
 
   for (int i = 0; i < nMsgIds; i++) {
-    messages_[i] = new MessageContainer(msgsContainer_, closeSymbolFont);
+    messages_[i] = new MessageContainer(
+        msgsContainer_, closeSymbolFont,
+        new __intCancelCbFn_t([this, i]() { onCancelMessage(i); }));
   }
 
   lv_obj_set_scroll_snap_y(msgsContainer_, LV_SCROLL_SNAP_START);
@@ -97,8 +104,17 @@ MessageManager::MessageContainer *MessageManager::focusedMessage() {
   return nullptr;
 }
 
+void MessageManager::onCancelMessage(uint8_t msgID) {
+  clearMessage(msgID);
+  if (cancelCb_ != nullptr) {
+    (*cancelCb_)(msgID);
+  }
+}
+
 MessageManager::MessageContainer::MessageContainer(
-    lv_obj_t *parent, const lv_font_t *closeSymbolFont) {
+    lv_obj_t *parent, const lv_font_t *closeSymbolFont,
+    __intCancelCbFn_t *cancelCb)
+    : parent_(parent), cancelCb_(cancelCb) {
   lv_obj_t *ui_message_container, *ui_message_close, *ui_message_text;
   lv_obj_t *ui_Footer = parent; // Gross but allows for copy-paste
 
@@ -141,7 +157,9 @@ MessageManager::MessageContainer::MessageContainer(
   container_ = ui_message_container;
   cancel_ = ui_message_close;
   text_ = ui_message_text;
-  parent_ = parent;
+
+  lv_obj_add_event_cb(cancel_, msgCancelCb, LV_EVENT_CLICKED,
+                      (void *)cancelCb_);
 
   setVisibility(false);
 }

@@ -514,6 +514,11 @@ void UIManager::updateUIForEquipment() {
     objSetVisibility(!isSecondary, ui_fan_offset_divider);
 }
 
+void UIManager::onCancelMsg(uint8_t msgID) {
+    Event evt{EventType::MsgCancel, EventPayload{.msgID = msgID}};
+    eventCb_(evt);
+}
+
 UIManager::UIManager(ControllerDomain::Config config, size_t nMsgIds, eventCb_t eventCb)
     : eventCb_(eventCb) {
     mutex_ = xSemaphoreCreateMutex();
@@ -547,7 +552,8 @@ UIManager::UIManager(ControllerDomain::Config config, size_t nMsgIds, eventCb_t 
 
     lv_obj_del(
         ui_message_container); // Delete the message container we created with Squareline for design purposes
-    msgMgr_ = new MessageManager(nMsgIds, ui_Footer, &ui_font_MaterialSymbols24);
+    msgMgr_ = new MessageManager(nMsgIds, ui_Footer, &ui_font_MaterialSymbols24,
+                                 new cancelCbFn_t([this](uint8_t msgID) { onCancelMsg(msgID); }));
 
     restartTimer_ = lv_timer_create(restartCb, RESTART_DELAY_MS, NULL);
     lv_timer_pause(restartTimer_);

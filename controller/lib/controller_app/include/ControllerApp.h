@@ -130,6 +130,7 @@ class ControllerApp {
     bool pollUIEvent(bool wait);
     void handleCancelMessage(MsgID id);
     void setHVAC(DemandRequest *requests, HVACState *states);
+    void setErrMessageF(MsgID msgID, bool allowCancel, const char *fmt, ...);
     void setMessageF(MsgID msgID, bool allowCancel, const char *fmt, ...);
     void setMessage(MsgID msgID, bool allowCancel, const char *msg);
     void clearMessage(MsgID msgID);

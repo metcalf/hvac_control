@@ -29,6 +29,10 @@
 #define INIT_ERR_RESTART_DELAY_TICKS pdMS_TO_TICKS(10 * 1000)
 // Check the CX status every minute to see if it differs from what we expect
 #define CHECK_CX_STATUS_INTERVAL std::chrono::seconds(60)
+#define MAX_VALVE_TRANSITION_INTERVAL std::chrono::minutes(2)
+
+#define VALVE_STUCK_MSG "valves may be stuck"
+#define VALVE_SW_MSG "valves not consistent with switches"
 
 using SystemState = ZCDomain::SystemState;
 using HeatPumpMode = ZCDomain::HeatPumpMode;
@@ -45,13 +49,15 @@ static ESPOutIO outIO_;
 static ESPModbusClient
     mbClient_; // TODO: Temporarily swap this for a stub while we don't have a CX to work with
 static ValveStateManager valveStateManager_;
-static OutCtrl outCtrl_(valveStateManager_);
+static OutCtrl *outCtrl_;
 
 static SystemState currentState_;
 
 static bool systemOn_ = true, testMode_ = false;
-CxOpMode lastCxOpMode_ = CxOpMode::Unknown;
-std::chrono::steady_clock::time_point lastCheckedCxOpMode_;
+static CxOpMode lastCxOpMode_ = CxOpMode::Unknown;
+static std::chrono::steady_clock::time_point lastCheckedCxOpMode_;
+
+static std::chrono::steady_clock::time_point valveLastSet_[4];
 
 void inputEvtCb() {
     ZCUIManager::Event evt{ZCUIManager::EventType::InputUpdate, 0};
@@ -98,7 +104,7 @@ bool pollUIEvent(bool wait) {
         systemOn_ = evt.payload.systemPower;
         break;
     case EventType::ResetHVACLockout:
-        outCtrl_.resetLockout();
+        outCtrl_->resetLockout();
         break;
     case EventType::SetTestMode:
         testMode_ = evt.payload.testMode;
@@ -141,9 +147,10 @@ void setCxOpMode(CxOpMode cxMode) {
     if (mbClient_.setCxOpMode(cxMode) == ESP_OK) {
         lastCxOpMode_ = cxMode;
         lastCheckedCxOpMode_ = std::chrono::steady_clock::now();
+        uiManager_->clearMessage(MsgID::CXError);
     } else {
         lastCxOpMode_ = CxOpMode::Error;
-        // TODO: Error reporting / UI
+        uiManager_->setMessage(MsgID::CXError, false, "CX communication error");
     }
 }
 
@@ -181,32 +188,77 @@ void pollCxStatus() {
     if (mbClient_.getCxOpMode(&currMode) == ESP_OK) {
         lastCheckedCxOpMode_ = now;
         if (currMode != lastCxOpMode_) {
-            // TODO: Error reporting / UI
+            ESP_LOGE(TAG, "CX mode %d != %d", static_cast<int>(currMode),
+                     static_cast<int>(lastCxOpMode_));
+            uiManager_->setMessage(MsgID::CXModeMismatch, true, "CX mode mismatch occurred");
             CxOpMode cxMode = lastCxOpMode_;
             lastCxOpMode_ = currMode;
             // Attempt to reset the mode
             setCxOpMode(cxMode);
+        } else {
+            uiManager_->clearMessage(MsgID::CXError);
         }
-
     } else {
         lastCxOpMode_ = CxOpMode::Error;
-        // TODO: Error reporting / UI
+        uiManager_->setMessage(MsgID::CXError, false, "CX communication error");
+    }
+}
+
+bool checkValveSWConsistency(ValveState *valves, ValveSWState sw) {
+    int expectOpen = 0;
+    for (int i = 0; i < 2; i++) {
+        if (valves[i].action != ValveAction::Set) {
+            return true;
+        }
+        if (valves[i].target) {
+            expectOpen += 1;
+        }
+    }
+
+    return expectOpen == static_cast<int>(sw);
+}
+
+void checkValveErrors(ValveSWState sws[2]) {
+    std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now();
+
+    bool anyStuck = false;
+    for (int i = 0; i < 4; i++) {
+        if (currentState_.valves[i].action == ValveAction::Set) {
+            valveLastSet_[i] = now;
+        } else if (now - valveLastSet_[i] > MAX_VALVE_TRANSITION_INTERVAL) {
+            anyStuck = true;
+        }
+    }
+
+    if (anyStuck) {
+        uiManager_->setMessage(MsgID::ValveStuckError, false, VALVE_STUCK_MSG);
+        ESP_LOGE(TAG, VALVE_STUCK_MSG);
+    } else {
+        uiManager_->clearMessage(MsgID::ValveStuckError);
+    }
+
+    if (!(checkValveSWConsistency(currentState_.valves, sws[0]) &&
+          checkValveSWConsistency(&currentState_.valves[2], sws[1]))) {
+        uiManager_->setMessage(MsgID::ValveSWError, false, VALVE_SW_MSG);
+        ESP_LOGE(TAG, VALVE_SW_MSG);
+    } else {
+        uiManager_->clearMessage(MsgID::ValveSWError);
     }
 }
 
 void outputTask(void *) {
     while (1) {
-        // TODO: Need a way to generate the messages in OutCtrl
         InputState zioState = zone_io_get_state();
         if (testMode_) {
             OutCtrl::setCalls(currentState_, zioState);
             valveStateManager_.update(currentState_.valves, zioState.valve_sw);
         } else {
-            currentState_ = outCtrl_.update(systemOn_, zioState);
+            currentState_ = outCtrl_->update(systemOn_, zioState);
         }
 
         uiManager_->updateState(currentState_);
 
+        checkValveErrors(zioState.valve_sw);
         setCxOpMode(currentState_.heatPumpMode);
         pollCxStatus();
         setIOStates(currentState_);
@@ -233,13 +285,15 @@ extern "C" void zc_main() {
 
     // TODO:
     // * polling Ecobee vacation API (or maybe home assistant)
+    // * OTA updaates
+    // * Remote logging
 
     uiEvtQueue_ = xQueueCreate(10, sizeof(ZCUIManager::Event));
     SystemState state{};
     uiManager_ = new ZCUIManager(state, static_cast<size_t>(MsgID::_Last), uiEvtCb);
 
-    // TODO: Setup OTA updates
-    // TODO: Remote logging
+    outCtrl_ = new OutCtrl(valveStateManager_, *uiManager_);
+
     wifi_.init();
     wifi_.connect(default_wifi_ssid, default_wifi_pswd);
 

@@ -3,22 +3,17 @@
 #include <chrono>
 #include <functional>
 
+#include "AbstractMessageUI.h"
 #include "BaseModbusClient.h"
 #include "BaseOutIO.h"
 #include "InputState.h"
 #include "ValveStateManager.h"
 #include "ZCDomain.h"
 
-#if defined(ESP_PLATFORM)
-#include "freertos/FreeRTOS.h"
-#else
-typedef uint32_t TickType_t;
-#define portTICK_RATE_MS 100
-#endif
-
 class OutCtrl {
   public:
-    OutCtrl(ValveStateManager &valveStateManager) : valveStateManager_(valveStateManager){};
+    OutCtrl(ValveStateManager &valveStateManager, AbstractMessageUI &messageUI)
+        : valveStateManager_(valveStateManager), messageUI_(messageUI){};
 
     ZCDomain::SystemState update(bool systemOn, InputState zioState);
     void resetLockout() {
@@ -38,8 +33,10 @@ class OutCtrl {
     using HeatPumpMode = ZCDomain::HeatPumpMode;
     using Call = ZCDomain::Call;
     using ValveState = ZCDomain::ValveState;
+    using MsgID = ZCDomain::MsgID;
 
     ValveStateManager &valveStateManager_;
+    AbstractMessageUI &messageUI_;
 
     HeatPumpMode lastHeatPumpMode_ = HeatPumpMode::Off;
     std::chrono::steady_clock::time_point lastHeat_{}, lastCool_{};
