@@ -49,10 +49,14 @@ class ZCUIManager : public AbstractMessageUI {
     uint32_t handleTasks();
 
     void setMessage(ZCDomain::MsgID msgID, bool allowCancel, const char *msg) override {
+        xSemaphoreTake(mutex_, portMAX_DELAY);
         msgMgr_->setMessage(static_cast<uint8_t>(msgID), allowCancel, msg);
+        xSemaphoreGive(mutex_);
     }
     void clearMessage(ZCDomain::MsgID msgID) override {
+        xSemaphoreTake(mutex_, portMAX_DELAY);
         msgMgr_->clearMessage(static_cast<uint8_t>(msgID));
+        xSemaphoreGive(mutex_);
     }
     void updateState(ZCDomain::SystemState state);
 

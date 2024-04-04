@@ -25,8 +25,6 @@ MessageManager::MessageManager(size_t nMsgIds, lv_obj_t *msgsContainer,
   nMsgIds_ = nMsgIds;
   messages_ = new MessageContainer *[nMsgIds_];
 
-  mutex_ = xSemaphoreCreateMutex();
-
   for (int i = 0; i < nMsgIds; i++) {
     messages_[i] = new MessageContainer(
         msgsContainer_, closeSymbolFont,
@@ -45,7 +43,6 @@ MessageManager::MessageManager(size_t nMsgIds, lv_obj_t *msgsContainer,
 
 void MessageManager::setMessage(uint8_t msgID, bool allowCancel,
                                 const char *msg) {
-  xSemaphoreTake(mutex_, portMAX_DELAY);
   MessageContainer *msgContainer = messages_[msgID];
 
   msgContainer->setText(msg);
@@ -61,19 +58,15 @@ void MessageManager::setMessage(uint8_t msgID, bool allowCancel,
   }
 
   msgContainer->setVisibility(true);
-  xSemaphoreGive(mutex_);
 }
 
 void MessageManager::clearMessage(uint8_t msgID) {
-  xSemaphoreTake(mutex_, portMAX_DELAY);
   messages_[msgID]->setVisibility(false);
-  xSemaphoreGive(mutex_);
 }
 
 // TODO: Mutex?
 void MessageManager::onMessageTimer() {
   // TODO(future): It'd be nicer to make this a circular scroll
-  xSemaphoreTake(mutex_, portMAX_DELAY);
   lv_coord_t currY = lv_obj_get_scroll_y(msgsContainer_);
 
   int nVisible = 0;
@@ -89,20 +82,16 @@ void MessageManager::onMessageTimer() {
   }
 
   lv_obj_scroll_to_y(msgsContainer_, newY, LV_ANIM_ON);
-  xSemaphoreGive(mutex_);
 }
 
 // TODO: Mutex?
 MessageManager::MessageContainer *MessageManager::focusedMessage() {
-  xSemaphoreTake(mutex_, portMAX_DELAY);
   for (int i = 0; i < nMsgIds_; i++) {
     if (messages_[i]->isFocused()) {
-      xSemaphoreGive(mutex_);
       return messages_[i];
     }
   }
 
-  xSemaphoreGive(mutex_);
   return nullptr;
 }
 

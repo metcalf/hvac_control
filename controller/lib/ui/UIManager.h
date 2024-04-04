@@ -35,9 +35,15 @@ class UIManager : public AbstractUIManager {
     void setSystemPower(bool on) override;
 
     void setMessage(uint8_t msgID, bool allowCancel, const char *msg) override {
+        xSemaphoreTake(mutex_, portMAX_DELAY);
         msgMgr_->setMessage(msgID, allowCancel, msg);
+        xSemaphoreGive(mutex_);
     }
-    void clearMessage(uint8_t msgID) override { msgMgr_->clearMessage(msgID); }
+    void clearMessage(uint8_t msgID) override {
+        xSemaphoreTake(mutex_, portMAX_DELAY);
+        msgMgr_->clearMessage(msgID);
+        xSemaphoreGive(mutex_);
+    }
 
     void bootDone() override;
     void bootErr(const char *msg) override;

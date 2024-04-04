@@ -23,7 +23,6 @@ public:
       delete messages_[i];
     }
     delete messages_;
-    vSemaphoreDelete(mutex_);
   }
 
   void setMessage(uint8_t msgID, bool allowCancel, const char *msg);
@@ -71,7 +70,6 @@ private:
   lv_obj_t *msgsContainer_;
   cancelCbFn_t *cancelCb_;
 
-  SemaphoreHandle_t mutex_;
   MessageContainer **messages_;
   size_t nMsgIds_;
   lv_timer_t *msgTimer_;

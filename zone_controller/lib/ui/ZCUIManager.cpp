@@ -88,6 +88,7 @@ uint32_t ZCUIManager::handleTasks() {
 }
 
 void ZCUIManager::updateState(SystemState state) {
+    xSemaphoreTake(mutex_, portMAX_DELAY);
     for (int i = 0; i < 4; i++) {
         updateCall(*zoneCalls[i], state.thermostats[i]);
         lv_label_set_text(*zoneValves[i], getValveText(state.valves[i]));
@@ -97,6 +98,7 @@ void ZCUIManager::updateState(SystemState state) {
     updatePump(ui_fc_pump_state, state.fcPump);
 
     lv_label_set_text(ui_heat_pump_state1, getHeatPumpText(state.heatPumpMode));
+    xSemaphoreGive(mutex_);
 }
 
 void ZCUIManager::updateCall(lv_obj_t *icon, Call call) {
