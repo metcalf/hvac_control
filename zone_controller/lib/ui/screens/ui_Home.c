@@ -627,7 +627,7 @@ lv_obj_remove_style_all(ui_test_mode_footer);
 lv_obj_set_height( ui_test_mode_footer, 40);
 lv_obj_set_width( ui_test_mode_footer, lv_pct(100));
 lv_obj_set_align( ui_test_mode_footer, LV_ALIGN_BOTTOM_MID );
-lv_obj_add_flag( ui_test_mode_footer, LV_OBJ_FLAG_SCROLL_ONE );   /// Flags
+lv_obj_add_flag( ui_test_mode_footer, LV_OBJ_FLAG_HIDDEN | LV_OBJ_FLAG_SCROLL_ONE );   /// Flags
 lv_obj_clear_flag( ui_test_mode_footer, LV_OBJ_FLAG_CLICKABLE | LV_OBJ_FLAG_SCROLLABLE );    /// Flags
 
 ui_exit_test_mode_button = lv_btn_create(ui_test_mode_footer);

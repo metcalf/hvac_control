@@ -119,7 +119,7 @@ void ZCUIManager::updateCall(lv_obj_t *icon, Call call) {
     }
 
     lv_label_set_text_static(icon, txt);
-    ui_object_set_themeable_style_property(ui_tstat_state_2, LV_PART_MAIN | LV_STATE_DEFAULT,
+    ui_object_set_themeable_style_property(icon, LV_PART_MAIN | LV_STATE_DEFAULT,
                                            LV_STYLE_TEXT_COLOR, color);
 }
 

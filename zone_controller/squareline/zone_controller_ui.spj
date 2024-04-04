@@ -15300,7 +15300,7 @@
               {
                 "nid": 129249755,
                 "strtype": "OBJECT/Hidden",
-                "strval": "False",
+                "strval": "True",
                 "InheritedType": 2
               },
               {
@@ -19678,7 +19678,7 @@
     "theme_color2": 0,
     "uiExportFolderPath": "/Users/andrew/code/hvac_control/zone_controller/lib/ui",
     "projectExportFolderPath": "",
-    "backup_cnt": 176,
+    "backup_cnt": 384,
     "autosave_cnt": 0,
     "lvgl_version": "8.3.11",
     "callfuncsexport": "CPP_FILE",

@@ -25,6 +25,8 @@ MessageManager::MessageManager(size_t nMsgIds, lv_obj_t *msgsContainer,
   nMsgIds_ = nMsgIds;
   messages_ = new MessageContainer *[nMsgIds_];
 
+  mutex_ = xSemaphoreCreateMutex();
+
   for (int i = 0; i < nMsgIds; i++) {
     messages_[i] = new MessageContainer(
         msgsContainer_, closeSymbolFont,

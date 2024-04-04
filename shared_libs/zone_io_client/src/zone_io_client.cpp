@@ -5,7 +5,7 @@
 #include "driver/uart.h"
 #include "esp_log.h"
 
-#define ZIO_UART_NUM UART_NUM_1
+#define ZIO_UART_NUM UART_NUM_2
 #define ZIO_RXD 35
 
 #define BUF_SIZE 1024

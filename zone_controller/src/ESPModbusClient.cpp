@@ -17,22 +17,22 @@ static const char *TAG = "MBC";
 
 esp_err_t ESPModbusClient::init() {
     int i = 0;
-    for (auto const &item : cx_registers_) {
+    for (auto &[reg, def] : cx_registers_) {
         // TODO: Do we need to subtract one to get the wire register ID?
-        uint16_t id = static_cast<uint16_t>(item.first);
+        def.idx = i;
         deviceParameters_[i] = {
-            id,
-            item.second,
+            def.idx,
+            def.name,
             NULL, // Units (ignored)
             MB_CX_SLAVE_ADDR,
             MB_PARAM_HOLDING,
-            id,                 // Start register address
-            1,                  // Number of registers
-            0,                  // Instance offset (ignored)
-            (mb_descr_type_t)0, // Ignored
-            (mb_descr_size_t)0, // Ignored
-            {},                 // Ignored
-            (mb_param_perms_t)0 // Ignored
+            static_cast<uint16_t>(reg), // Start register address
+            1,                          // Number of registers
+            0,                          // Instance offset (ignored)
+            (mb_descr_type_t)0,         // Ignored
+            (mb_descr_size_t)0,         // Ignored
+            {},                         // Ignored
+            (mb_param_perms_t)0         // Ignored
         };
         i++;
     }
@@ -80,15 +80,14 @@ esp_err_t ESPModbusClient::getParam(CxRegister reg, uint16_t *value) {
     esp_err_t err = ESP_OK;
     uint8_t type = 0; // throwaway
 
-    const char *name = cx_registers_.at(reg);
-    uint16_t id = static_cast<uint16_t>(reg);
+    const CxRegDef regDef = cx_registers_.at(reg);
 
-    ESP_LOGD(TAG, "Getting heatpump %s(%d)", name, id);
-    err = mbc_master_get_parameter(id, (char *)name, (uint8_t *)value, &type);
+    ESP_LOGD(TAG, "Getting heatpump %s(%d)", regDef.name, regDef.idx);
+    err = mbc_master_get_parameter(regDef.idx, (char *)regDef.name, (uint8_t *)value, &type);
     if (err == ESP_OK) {
-        ESP_LOGD(TAG, "Got heatpump %s(%d)=%d", name, id, *value);
+        ESP_LOGD(TAG, "Got heatpump %s(%d)=%d", regDef.name, regDef.idx, *value);
     } else {
-        ESP_LOGE(TAG, "Get failed %s(%d), err = 0x%x (%s)", name, id, (int)err,
+        ESP_LOGE(TAG, "Get failed %s(%d), err = 0x%x (%s)", regDef.name, regDef.idx, (int)err,
                  (char *)esp_err_to_name(err));
     }
 
@@ -99,16 +98,15 @@ esp_err_t ESPModbusClient::setParam(CxRegister reg, uint16_t value) {
     esp_err_t err = ESP_OK;
     uint8_t type = 0; // throwaway
 
-    const char *name = cx_registers_.at(reg);
-    uint16_t id = static_cast<uint16_t>(reg);
+    const CxRegDef regDef = cx_registers_.at(reg);
 
-    ESP_LOGD(TAG, "Setting heatpump %s(%d)=%d", name, id, value);
-    err = mbc_master_set_parameter(id, (char *)name, (uint8_t *)&value, &type);
+    ESP_LOGD(TAG, "Setting heatpump %s(%d)=%d", regDef.name, regDef.idx, value);
+    err = mbc_master_set_parameter(regDef.idx, (char *)regDef.name, (uint8_t *)&value, &type);
     if (err == ESP_OK) {
-        ESP_LOGI(TAG, "Set heatpump %s(%d)=%d", name, id, value);
+        ESP_LOGI(TAG, "Set heatpump %s(%d)=%d", regDef.name, regDef.idx, value);
     } else {
-        ESP_LOGE(TAG, "Set failed %s(%d)=%d, err = 0x%x (%s)", name, id, value, (int)err,
-                 (char *)esp_err_to_name(err));
+        ESP_LOGE(TAG, "Set failed %s(%d)=%d, err = 0x%x (%s)", regDef.name, regDef.idx, value,
+                 (int)err, (char *)esp_err_to_name(err));
     }
 
     return err;

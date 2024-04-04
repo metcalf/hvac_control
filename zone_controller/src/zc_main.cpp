@@ -8,6 +8,7 @@
 #include "freertos/queue.h"
 #include "freertos/task.h"
 #include "lvgl.h"
+#include "nvs_flash.h"
 
 #include "ESPModbusClient.h"
 #include "ESPOutIO.h"
@@ -22,7 +23,7 @@
 #define ZONE_IO_TASK_PRIORITY ESP_TASK_MAIN_PRIO
 #define OUTPUT_TASK_PRIORITY ESP_TASK_MAIN_PRIO
 
-#define OUTPUT_TASK_STACK_SIZE 2048
+#define OUTPUT_TASK_STACK_SIZE 4096
 #define UI_TASK_STACK_SIZE 8192
 
 #define OUTPUT_UPDATE_PERIOD_TICKS pdMS_TO_TICKS(500)
@@ -272,6 +273,19 @@ void outputTask(void *) {
     }
 }
 
+void initWifi() {
+    // Initialize NVS (required internally by wifi driver)
+    esp_err_t ret = nvs_flash_init();
+    if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
+        ESP_ERROR_CHECK(nvs_flash_erase());
+        ret = nvs_flash_init();
+    }
+    ESP_ERROR_CHECK(ret);
+
+    wifi_.init();
+    wifi_.connect(default_wifi_ssid, default_wifi_pswd);
+}
+
 extern "C" void zc_main() {
     zone_io_init();
 
@@ -294,8 +308,7 @@ extern "C" void zc_main() {
 
     outCtrl_ = new OutCtrl(valveStateManager_, *uiManager_);
 
-    wifi_.init();
-    wifi_.connect(default_wifi_ssid, default_wifi_pswd);
+    initWifi();
 
     xTaskCreate(zone_io_task, "zone_io_task", ZONE_IO_TASK_STACK_SIZE, (void *)inputEvtCb,
                 ZONE_IO_TASK_PRIORITY, NULL);

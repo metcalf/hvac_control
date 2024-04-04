@@ -86,6 +86,7 @@ void mainTask(void *app) {
         }
         vTaskDelay(pdMS_TO_TICKS(CLOCK_POLL_PERIOD_MS));
     }
+    ESP_LOGI(TAG, "clock ready, starting app");
 
     while (1) {
         ((ControllerApp *)app)->task(first);
