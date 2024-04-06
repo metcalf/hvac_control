@@ -4,9 +4,9 @@
 
 #include "BaseModbusClient.h"
 
-class ModbusClientFake : public BaseModbusClient {
+class FakeModbusClient : public BaseModbusClient {
   public:
-    ModbusClientFake() {
+    FakeModbusClient() {
         setParam(CxRegister::SwitchOnOff, 0);
         setParam(CxRegister::ACMode, 0);
         setParam(CxRegister::CompressorFrequency, 0);

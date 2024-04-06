@@ -30,7 +30,7 @@ esp_err_t BaseModbusClient::getCxOpMode(CxOpMode *op_mode) {
         return err;
     }
 
-    err = setParam(CxRegister::ACMode, value);
+    err = getParam(CxRegister::ACMode, &value);
     if (err == ESP_OK) {
         *op_mode = static_cast<CxOpMode>(value);
     }

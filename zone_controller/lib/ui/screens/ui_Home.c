@@ -29,12 +29,12 @@ lv_obj_set_style_pad_right(ui_test_mode_header, 0, LV_PART_MAIN| LV_STATE_DEFAUL
 lv_obj_set_style_pad_top(ui_test_mode_header, 0, LV_PART_MAIN| LV_STATE_DEFAULT);
 lv_obj_set_style_pad_bottom(ui_test_mode_header, 0, LV_PART_MAIN| LV_STATE_DEFAULT);
 
-ui_heat_pump_state1 = lv_label_create(ui_test_mode_header);
-lv_obj_set_width( ui_heat_pump_state1, LV_SIZE_CONTENT);  /// 1
-lv_obj_set_height( ui_heat_pump_state1, LV_SIZE_CONTENT);   /// 1
-lv_obj_set_align( ui_heat_pump_state1, LV_ALIGN_CENTER );
-lv_label_set_text(ui_heat_pump_state1,"TAP ZONES/PUMPS TO TOGGLE");
-lv_obj_set_style_text_font(ui_heat_pump_state1, &lv_font_montserrat_18, LV_PART_MAIN| LV_STATE_DEFAULT);
+ui_test_mode_header_label = lv_label_create(ui_test_mode_header);
+lv_obj_set_width( ui_test_mode_header_label, LV_SIZE_CONTENT);  /// 1
+lv_obj_set_height( ui_test_mode_header_label, LV_SIZE_CONTENT);   /// 1
+lv_obj_set_align( ui_test_mode_header_label, LV_ALIGN_CENTER );
+lv_label_set_text(ui_test_mode_header_label,"TAP ZONES/PUMPS TO TOGGLE");
+lv_obj_set_style_text_font(ui_test_mode_header_label, &lv_font_montserrat_18, LV_PART_MAIN| LV_STATE_DEFAULT);
 
 ui_normal_mode_header = lv_obj_create(ui_Home);
 lv_obj_remove_style_all(ui_normal_mode_header);
@@ -657,7 +657,7 @@ lv_obj_set_width( ui_control_overlay, lv_pct(100));
 lv_obj_set_height( ui_control_overlay, lv_pct(100));
 lv_obj_set_align( ui_control_overlay, LV_ALIGN_CENTER );
 lv_obj_add_flag( ui_control_overlay, LV_OBJ_FLAG_HIDDEN );   /// Flags
-lv_obj_clear_flag( ui_control_overlay, LV_OBJ_FLAG_CLICKABLE | LV_OBJ_FLAG_SCROLLABLE );    /// Flags
+lv_obj_clear_flag( ui_control_overlay, LV_OBJ_FLAG_SCROLLABLE );    /// Flags
 lv_obj_set_style_bg_color(ui_control_overlay, lv_color_hex(0x000000), LV_PART_MAIN | LV_STATE_DEFAULT );
 lv_obj_set_style_bg_opa(ui_control_overlay, 180, LV_PART_MAIN| LV_STATE_DEFAULT);
 
@@ -763,9 +763,6 @@ lv_obj_set_style_text_font(ui_end_lockout_label, &lv_font_montserrat_18, LV_PART
 
 lv_obj_add_event_cb(ui_Label6, ui_event_Label6, LV_EVENT_ALL, NULL);
 lv_obj_add_event_cb(ui_exit_test_mode_button, ui_event_exit_test_mode_button, LV_EVENT_ALL, NULL);
-lv_obj_add_event_cb(ui_test_mode_button, ui_event_test_mode_button, LV_EVENT_ALL, NULL);
-lv_obj_add_event_cb(ui_system_off_button, ui_event_system_off_button, LV_EVENT_ALL, NULL);
-lv_obj_add_event_cb(ui_system_on_button, ui_event_system_on_button, LV_EVENT_ALL, NULL);
 lv_obj_add_event_cb(ui_control_overlay, ui_event_control_overlay, LV_EVENT_ALL, NULL);
 
 }

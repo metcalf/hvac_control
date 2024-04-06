@@ -13,6 +13,7 @@
 #include "ESPModbusClient.h"
 #include "ESPOutIO.h"
 #include "ESPWifi.h"
+#include "FakeModbusClient.h"
 #include "OutCtrl.h"
 #include "ValveStateManager.h"
 #include "ZCUIManager.h"
@@ -47,8 +48,10 @@ static ZCUIManager *uiManager_;
 static ESPWifi wifi_;
 static QueueHandle_t uiEvtQueue_;
 static ESPOutIO outIO_;
-static ESPModbusClient
-    mbClient_; // TODO: Temporarily swap this for a stub while we don't have a CX to work with
+// TODO: Switch to real modbus client only when we have the CX
+static ESPModbusClient realMbClient_;
+static FakeModbusClient mbClient_;
+
 static ValveStateManager valveStateManager_;
 static OutCtrl *outCtrl_;
 
@@ -248,8 +251,14 @@ void checkValveErrors(ValveSWState sws[2]) {
 }
 
 void outputTask(void *) {
+    InputState lastZioState;
     while (1) {
         InputState zioState = zone_io_get_state();
+        if (!zone_io_state_eq(zioState, lastZioState)) {
+            zone_io_log_state(zioState);
+        }
+        lastZioState = zioState;
+
         if (testMode_) {
             OutCtrl::setCalls(currentState_, zioState);
             valveStateManager_.update(currentState_.valves, zioState.valve_sw);
@@ -289,7 +298,9 @@ void initWifi() {
 extern "C" void zc_main() {
     zone_io_init();
 
-    esp_err_t err = mbClient_.init();
+    // We initialize the real mb client to exercise that code path
+    // even though we never actually use the client for now
+    esp_err_t err = realMbClient_.init();
     if (err != ESP_OK) {
         bootErr("Modbus init error: %d", err);
     }

@@ -10,18 +10,25 @@
 #include "ValveStateManager.h"
 #include "ZCDomain.h"
 
+// Require 6 hours after last heating call before cooling
+#define HEAT_TO_COOL_LOCKOUT std::chrono::hours(6)
+// Require 1 hour after last cooling call before heating
+#define COOL_TO_HEAT_LOCKOUT std::chrono::hours(1)
+// Transition to standby mode 1 hour after the last call
+#define STANDBY_DELAY std::chrono::hours(1)
+
 class OutCtrl {
   public:
     OutCtrl(ValveStateManager &valveStateManager, AbstractMessageUI &messageUI)
         : valveStateManager_(valveStateManager), messageUI_(messageUI){};
 
-    ZCDomain::SystemState update(bool systemOn, InputState zioState);
+    ZCDomain::SystemState update(bool systemOn, const InputState &zioState);
     void resetLockout() {
         lastHeat_ = {};
         lastCool_ = {};
     }
 
-    static void setCalls(ZCDomain::SystemState &state, InputState zioState);
+    static void setCalls(ZCDomain::SystemState &state, const InputState &zioState);
 
   protected:
     virtual std::chrono::steady_clock::time_point steadyNow() {
@@ -49,7 +56,7 @@ class OutCtrl {
     bool checkModeLockout(std::chrono::steady_clock::time_point lastTargetMode,
                           std::chrono::steady_clock::time_point lastOtherMode,
                           std::chrono::steady_clock::duration lockoutInterval);
-    void selectMode(SystemState &state, bool system_on, InputState zioState);
-    void setValves(SystemState &state, InputState zioState);
-    void setPumps(SystemState &state, InputState zioState);
+    void selectMode(SystemState &state, bool system_on, const InputState &zioState);
+    void setValves(SystemState &state, const InputState &zioState);
+    void setPumps(SystemState &state, const InputState &zioState);
 };

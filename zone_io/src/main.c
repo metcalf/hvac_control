@@ -109,11 +109,11 @@ void setupInputPins() {
     }
 }
 
-void setupTCBn(TCB_t tcb) {
-    tcb.CTRLB = TCB_CNTMODE_FRQ_gc;           // Frequency count mode
-    tcb.EVCTRL = TCB_CAPTEI_bm | TCB_EDGE_bm; // Measure frequency between falling edge events
-    tcb.INTCTRL = TCB_CAPT_bm;
-    tcb.CTRLA =
+void setupTCBn(TCB_t *tcb) {
+    tcb->CTRLB = TCB_CNTMODE_FRQ_gc;           // Frequency count mode
+    tcb->EVCTRL = TCB_CAPTEI_bm | TCB_EDGE_bm; // Measure frequency between falling edge events
+    tcb->INTCTRL = TCB_CAPT_bm | TCB_OVF_bm;
+    tcb->CTRLA =
         TCB_ENABLE_bm | TCB_CLKSEL_DIV2_gc; // Configure tach frequency measurement @ ~156khz
 }
 
@@ -122,13 +122,13 @@ void setupVlvTimer() {
     PORTC.PIN2CTRL = PORT_PULLUPEN_bm;
     EVSYS.CHANNEL2 = EVSYS_CHANNEL2_PORTC_PIN2_gc; // Route pin PC2
     EVSYS.USERTCB0CAPT = EVSYS_USER_CHANNEL2_gc;   // to TCB0
-    setupTCBn(TCB0);
+    setupTCBn(&TCB0);
 
     // Configure TCB1 on PC3 for frequency measurement for VLV3/4_SW_IO
     PORTC.PIN3CTRL = PORT_PULLUPEN_bm;
     EVSYS.CHANNEL3 = EVSYS_CHANNEL2_PORTC_PIN3_gc; // Route pin PC3
     EVSYS.USERTCB1CAPT = EVSYS_USER_CHANNEL3_gc;   // to TCB1
-    setupTCBn(TCB1);
+    setupTCBn(&TCB1);
 }
 
 int main(void) {
@@ -166,19 +166,19 @@ int main(void) {
     }
 }
 
-uint16_t handleVlvInt(TCB_t tcb) {
-    if (tcb.INTFLAGS & TCB_OVF_bm) {
+uint16_t handleVlvInt(TCB_t *tcb) {
+    if (tcb->INTFLAGS & TCB_OVF_bm) {
         // If we overflowed, clear both flags and set an invalid period
-        tcb.INTFLAGS |= TCB_OVF_bm;
-        tcb.INTFLAGS |= TCB_CAPT_bm;
+        tcb->INTFLAGS |= TCB_OVF_bm;
+        tcb->INTFLAGS |= TCB_CAPT_bm;
         return 0;
     } else {
-        return tcb.CCMP; // reading CCMP clears interrupt flag
+        return tcb->CCMP; // reading CCMP clears interrupt flag
     }
 }
 
-ISR(TCB0_INT_vect) { vlv12_sw_period_ = handleVlvInt(TCB0); }
-ISR(TCB1_INT_vect) { vlv34_sw_period_ = handleVlvInt(TCB1); }
+ISR(TCB0_INT_vect) { vlv12_sw_period_ = handleVlvInt(&TCB0); }
+ISR(TCB1_INT_vect) { vlv34_sw_period_ = handleVlvInt(&TCB1); }
 
 ISR(USART1_DRE_vect) {
     USART1_TXDATAL = tx_buffer_[tx_pos_];

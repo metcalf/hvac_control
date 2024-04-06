@@ -16,9 +16,13 @@ void ValveStateManager::handleValvePair(ValveState *states, ValveState *pastStat
 
     for (int i = 0; i < 2; i++) {
         if (states[i].target != pastStates[i].target) {
-            if (canAct) {
+            if (canAct || pastStates[i].action == ValveAction::Act) {
+                // Either OK to start acting or we were already acting
                 states[i].action = ValveAction::Act;
                 canAct = false;
+            } else if (pastStates[i].action == ValveAction::Wait) {
+                // If we never actually started acting, we can just revert to Set
+                states[i].action = ValveAction::Set;
             } else {
                 states[i].action = ValveAction::Wait;
             }

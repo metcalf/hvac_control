@@ -97,7 +97,7 @@ void ZCUIManager::updateState(SystemState state) {
     updatePump(ui_zone_pump_state, state.zonePump);
     updatePump(ui_fc_pump_state, state.fcPump);
 
-    lv_label_set_text(ui_heat_pump_state1, getHeatPumpText(state.heatPumpMode));
+    lv_label_set_text(ui_heat_pump_state, getHeatPumpText(state.heatPumpMode));
     xSemaphoreGive(mutex_);
 }
 
@@ -161,16 +161,35 @@ const char *ZCUIManager::getHeatPumpText(HeatPumpMode state) {
 }
 
 void ZCUIManager::onSystemPower(bool on) {
+    objSetVisibility(on, ui_system_off_button);
+    objSetVisibility(!on, ui_system_on_button);
+
     Event evt{EventType::SetSystemPower, EventPayload{.systemPower = on}};
     eventCb_(evt);
 }
 
 void ZCUIManager::onTestMode(bool on) {
+    for (int i = 0; i < 4; i++) {
+        objSetFlag(on, *zoneContainers[i], LV_OBJ_FLAG_CLICKABLE);
+    }
+    objSetFlag(on, ui_zone_pump_container, LV_OBJ_FLAG_CLICKABLE);
+    objSetFlag(on, ui_fc_pump_container, LV_OBJ_FLAG_CLICKABLE);
+
+    if (on) {
+        objSetVisibility(false, ui_control_overlay);
+    }
+    objSetVisibility(!on, ui_normal_mode_header);
+    objSetVisibility(on, ui_test_mode_header);
+    objSetVisibility(!on, ui_normal_mode_footer);
+    objSetVisibility(on, ui_test_mode_footer);
+
     Event evt{EventType::SetTestMode, EventPayload{.testMode = on}};
     eventCb_(evt);
 }
 
 void ZCUIManager::onEndLockout() {
+    objSetVisibility(false, ui_control_overlay);
+
     Event evt{EventType::ResetHVACLockout, EventPayload{}};
     eventCb_(evt);
 }

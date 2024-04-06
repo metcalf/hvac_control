@@ -12,12 +12,6 @@
 #endif
 
 #define MAX_CONCURRENT_OPENING 2
-// Require 6 hours after last heating call before cooling
-#define HEAT_TO_COOL_LOCKOUT std::chrono::hours(6)
-// Require 1 hour after last cooling call before heating
-#define COOL_TO_HEAT_LOCKOUT std::chrono::hours(1)
-// Transition to standby mode 1 hour after the last call
-#define STANDBY_DELAY std::chrono::hours(1)
 
 #define HEAT_LOCKOUT_MSG "Waiting to heat after cool"
 #define COOL_LOCKOUT_MSG "Waiting to cool after heat"
@@ -40,7 +34,7 @@ bool OutCtrl::checkModeLockout(std::chrono::steady_clock::time_point lastTargetM
     return sinceOther < lockoutInterval;
 }
 
-void OutCtrl::selectMode(SystemState &state, bool systemOn, InputState zioState) {
+void OutCtrl::selectMode(SystemState &state, bool systemOn, const InputState &zioState) {
     if (!systemOn) {
         state.heatPumpMode = HeatPumpMode::Off;
         return;
@@ -101,7 +95,7 @@ void OutCtrl::selectMode(SystemState &state, bool systemOn, InputState zioState)
                 mode = HeatPumpMode::Heat;
             }
         } else if (cool_demand) {
-            if (checkModeLockout(lastHeat_, lastCool_, HEAT_TO_COOL_LOCKOUT)) {
+            if (checkModeLockout(lastCool_, lastHeat_, HEAT_TO_COOL_LOCKOUT)) {
                 messageUI_.setMessage(MsgID::HVACLockout, false, COOL_LOCKOUT_MSG);
                 ESP_LOGI(TAG, COOL_LOCKOUT_MSG);
                 mode = HeatPumpMode::Standby;
@@ -125,15 +119,17 @@ void OutCtrl::selectMode(SystemState &state, bool systemOn, InputState zioState)
     // Only drop the heatpump into standby mode if some time has elapsed since the last
     // heat/cool call otherwise retain the current mode.
     if (mode == HeatPumpMode::Standby && lastHeatPumpMode_ != HeatPumpMode::Off &&
-        ((lastHeatPumpMode_ == HeatPumpMode::Heat && (now - lastHeat_) < STANDBY_DELAY) ||
-         (lastHeatPumpMode_ == HeatPumpMode::Cool && (now - lastCool_) < STANDBY_DELAY))) {
+        ((lastHeatPumpMode_ == HeatPumpMode::Heat && !cool_demand &&
+          (now - lastHeat_) < STANDBY_DELAY) ||
+         (lastHeatPumpMode_ == HeatPumpMode::Cool && !heat_demand &&
+          (now - lastCool_) < STANDBY_DELAY))) {
         mode = lastHeatPumpMode_;
     }
 
-    state.heatPumpMode = mode;
+    state.heatPumpMode = lastHeatPumpMode_ = mode;
 }
 
-void OutCtrl::setPumps(SystemState &state, InputState zioState) {
+void OutCtrl::setPumps(SystemState &state, const InputState &zioState) {
     if (!(state.heatPumpMode == HeatPumpMode::Heat || state.heatPumpMode == HeatPumpMode::Cool)) {
         return;
     }
@@ -153,7 +149,7 @@ void OutCtrl::setPumps(SystemState &state, InputState zioState) {
     }
 }
 
-void OutCtrl::setCalls(ZCDomain::SystemState &state, InputState zioState) {
+void OutCtrl::setCalls(ZCDomain::SystemState &state, const InputState &zioState) {
     for (int i = 0; i < ZONE_IO_NUM_TS; i++) {
         ThermostatState ts = zioState.ts[i];
         if (ts.w && ts.y) {
@@ -174,7 +170,7 @@ void OutCtrl::setCalls(ZCDomain::SystemState &state, InputState zioState) {
     }
 }
 
-ZCDomain::SystemState OutCtrl::update(bool systemOn, InputState zioState) {
+ZCDomain::SystemState OutCtrl::update(bool systemOn, const InputState &zioState) {
     SystemState state{};
 
     for (int i = 0; i < ZONE_IO_NUM_TS; i++) {

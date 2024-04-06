@@ -4,7 +4,8 @@
 
 #define DISP_SLEEP_SECS 30
 
-SleepManager::SleepManager(lv_obj_t *homeScr, int bcklGpio) {
+SleepManager::SleepManager(lv_obj_t *homeScr, int bcklGpio)
+    : homeScr_(homeScr) {
   const disp_backlight_config_t bckl_config = {
       .pwm_control = true,
       .output_invert = false, // Backlight on high

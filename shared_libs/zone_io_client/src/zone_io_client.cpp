@@ -85,8 +85,11 @@ bool do_rx(size_t to_rx) {
     int rx_bytes = uart_read_bytes(ZIO_UART_NUM, zio_buf_, to_rx, portMAX_DELAY);
 
     if (rx_bytes < to_rx) {
-        ESP_LOGI(TAG, "Read %d bytes (of %d expected)", rx_bytes, to_rx);
+        ESP_LOGD(TAG, "Read %d bytes (of %d expected)", rx_bytes, to_rx);
         return false;
+    } else if (rx_bytes == 3) {
+        ESP_LOGD(TAG, "Read %d bytes: %02x%02x%02x", rx_bytes, zio_buf_[0], zio_buf_[1],
+                 zio_buf_[2]);
     } else {
         ESP_LOGD(TAG, "Read %d bytes", rx_bytes);
     }

@@ -8,7 +8,7 @@
 static gpio_num_t valve_gpios_[NUM_VALVES] = {GPIO_NUM_40, GPIO_NUM_39, GPIO_NUM_38, GPIO_NUM_37};
 
 void ESPOutIO::init() {
-    uint64_t mask = (1ULL << LOOP_PUMP_GPIO) || (1ULL << FC_PUMP_GPIO);
+    uint64_t mask = (1ULL << LOOP_PUMP_GPIO) | (1ULL << FC_PUMP_GPIO);
     for (int i = 0; i < NUM_VALVES; i++) {
         mask |= (1ULL << valve_gpios_[i]);
     }
