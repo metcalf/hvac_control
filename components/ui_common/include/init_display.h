@@ -8,8 +8,6 @@
 #include "esp_log.h"
 #include "lvgl_helpers.h"
 
-// TODO: Extract this into something shared for zone_controller
-
 static lv_indev_drv_t indev_drv;
 static lv_disp_draw_buf_t disp_buf;
 

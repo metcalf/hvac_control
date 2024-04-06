@@ -64,7 +64,6 @@ void MessageManager::clearMessage(uint8_t msgID) {
   messages_[msgID]->setVisibility(false);
 }
 
-// TODO: Mutex?
 void MessageManager::onMessageTimer() {
   // TODO(future): It'd be nicer to make this a circular scroll
   lv_coord_t currY = lv_obj_get_scroll_y(msgsContainer_);
@@ -84,7 +83,6 @@ void MessageManager::onMessageTimer() {
   lv_obj_scroll_to_y(msgsContainer_, newY, LV_ANIM_ON);
 }
 
-// TODO: Mutex?
 MessageManager::MessageContainer *MessageManager::focusedMessage() {
   for (int i = 0; i < nMsgIds_; i++) {
     if (messages_[i]->isFocused()) {

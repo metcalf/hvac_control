@@ -61,7 +61,6 @@ int main(void) {
     // Enable pullup resistor on input PC0 and invert value
     PORTC.PIN0CTRL |= (PORT_PULLUPEN_bm | PORT_INVEN_bm);
 
-    // TODO: Read from EEPROM
     uint8_t slave_id = USERROW_USERROW0;
     uint8_t mode_bits = USERROW_USERROW1;
 

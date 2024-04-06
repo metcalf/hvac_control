@@ -11,7 +11,6 @@
 // This changes over time but slowly enough that the inaccuracy shouldn't matter much
 #define BASELINE_PPM 421
 
-// TODO: This very much needs tests
 int16_t CO2Calibration::update(uint16_t ppm, uint8_t month, uint16_t year) {
     loadState();
 
