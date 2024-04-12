@@ -184,12 +184,14 @@ void UIManager::eThermotatOverride() {
     eventCb_(evt);
 }
 
+// This isn't currently implemented since it requires more complicated
+// state tracking with the AC on/off override and may not be necessary at all
 void UIManager::eUseAC() {
     sendACOverrideEvent(ACOverride::Force);
 
     // Hide "use A/C" and show "stop A/C"
-    objSetVisibility(false, ui_use_ac_button);
-    objSetVisibility(true, ui_stop_ac_button);
+    // objSetVisibility(false, ui_use_ac_button);
+    // objSetVisibility(true, ui_stop_ac_button);
 }
 
 void UIManager::eStopAC() {
@@ -639,11 +641,6 @@ void UIManager::setHVACState(ControllerDomain::HVACState state) {
             lv_obj_set_style_border_color(ui_Indoor_temp_value, lv_color_hex(0x4CAFFF), 0);
         }
     }
-
-    // TODO: This is a mess and doesn't work right with overrides
-    bool ac = state == HVACState::ACCool;
-    objSetVisibility(!ac, ui_use_ac_button);
-    objSetVisibility(ac, ui_stop_ac_button);
 
     xSemaphoreGive(mutex_);
 }

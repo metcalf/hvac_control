@@ -2361,7 +2361,6 @@
                       },
                       {
                         "nid": 1574834519,
-                        "flags": 1048576,
                         "strtype": "OBJECT/Flags",
                         "InheritedType": 1
                       },
@@ -2669,7 +2668,6 @@
                       },
                       {
                         "nid": 100926080,
-                        "flags": 1048576,
                         "strtype": "OBJECT/Flags",
                         "InheritedType": 1
                       },
@@ -2982,7 +2980,6 @@
                       },
                       {
                         "nid": -171878587,
-                        "flags": 1048576,
                         "strtype": "OBJECT/Flags",
                         "InheritedType": 1
                       },
@@ -3649,7 +3646,6 @@
                       },
                       {
                         "nid": -1968265753,
-                        "flags": 1048576,
                         "strtype": "OBJECT/Flags",
                         "InheritedType": 1
                       },
@@ -3950,7 +3946,6 @@
                       },
                       {
                         "nid": 1243883570,
-                        "flags": 1048576,
                         "strtype": "OBJECT/Flags",
                         "InheritedType": 1
                       },
@@ -4263,7 +4258,6 @@
                       },
                       {
                         "nid": -2108037829,
-                        "flags": 1048576,
                         "strtype": "OBJECT/Flags",
                         "InheritedType": 1
                       },
@@ -4932,7 +4926,6 @@
                       },
                       {
                         "nid": -1094581231,
-                        "flags": 1048576,
                         "strtype": "OBJECT/Flags",
                         "InheritedType": 1
                       },
@@ -5239,7 +5232,6 @@
                       },
                       {
                         "nid": -1083807503,
-                        "flags": 1048576,
                         "strtype": "OBJECT/Flags",
                         "InheritedType": 1
                       },
@@ -5552,7 +5544,6 @@
                       },
                       {
                         "nid": -746212220,
-                        "flags": 1048576,
                         "strtype": "OBJECT/Flags",
                         "InheritedType": 1
                       },
@@ -6221,7 +6212,6 @@
                       },
                       {
                         "nid": -1209433923,
-                        "flags": 1048576,
                         "strtype": "OBJECT/Flags",
                         "InheritedType": 1
                       },
@@ -6528,7 +6518,6 @@
                       },
                       {
                         "nid": -687080153,
-                        "flags": 1048576,
                         "strtype": "OBJECT/Flags",
                         "InheritedType": 1
                       },
@@ -6841,7 +6830,6 @@
                       },
                       {
                         "nid": 455475835,
-                        "flags": 1048576,
                         "strtype": "OBJECT/Flags",
                         "InheritedType": 1
                       },
@@ -7510,7 +7498,6 @@
                       },
                       {
                         "nid": -822466772,
-                        "flags": 1048576,
                         "strtype": "OBJECT/Flags",
                         "InheritedType": 1
                       },
@@ -7811,7 +7798,6 @@
                       },
                       {
                         "nid": -1871538021,
-                        "flags": 1048576,
                         "strtype": "OBJECT/Flags",
                         "InheritedType": 1
                       },
@@ -12943,7 +12929,6 @@
                       },
                       {
                         "nid": -2078667611,
-                        "flags": 1048576,
                         "strtype": "OBJECT/Flags",
                         "InheritedType": 1
                       },
@@ -13250,7 +13235,6 @@
                       },
                       {
                         "nid": 1822214944,
-                        "flags": 1048576,
                         "strtype": "OBJECT/Flags",
                         "InheritedType": 1
                       },
@@ -19135,7 +19119,7 @@
     "theme_color2": 0,
     "uiExportFolderPath": "/Users/andrew/code/hvac_control/zone_controller/lib/ui",
     "projectExportFolderPath": "",
-    "backup_cnt": 392,
+    "backup_cnt": 524,
     "autosave_cnt": 0,
     "lvgl_version": "8.3.11",
     "callfuncsexport": "CPP_FILE",
