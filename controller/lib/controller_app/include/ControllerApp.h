@@ -28,10 +28,7 @@ class ControllerApp {
           cfgStore_(cfgStore), uiEvtRcv_(uiEvtRcv) {
         setConfig(config);
     }
-    void setConfig(ControllerDomain::Config config) {
-        config_ = config;
-        nControllers_ = config.equipment.controllerType == Config::ControllerType::Primary ? 2 : 1;
-    }
+    void setConfig(ControllerDomain::Config config) { config_ = config; }
 
     void task(bool firstTime = false);
     void bootErr(const char *msg);
@@ -52,7 +49,6 @@ class ControllerApp {
 
   private:
     using FancoilSpeed = ControllerDomain::FancoilSpeed;
-    using FancoilID = ControllerDomain::FancoilID;
     using SensorData = ControllerDomain::SensorData;
     using FreshAirState = ControllerDomain::FreshAirState;
     using DemandRequest = ControllerDomain::DemandRequest;
@@ -74,7 +70,6 @@ class ControllerApp {
         SetFreshAirSpeedErr,
         GetMakeupDemandErr,
         SetFancoilErr,
-        SecondaryControllerErr,
         _Last,
     };
 
@@ -113,9 +108,6 @@ class ControllerApp {
         case MsgID::SetFancoilErr:
             return "SetFancoilErr";
             break;
-        case MsgID::SecondaryControllerErr:
-            return "SecondaryControllerErr";
-            break;
         case MsgID::_Last:
             return "";
             break;
@@ -124,12 +116,12 @@ class ControllerApp {
         __builtin_unreachable();
     }
 
-    void updateACMode(DemandRequest *requests);
-    FanSpeed computeFanSpeed(DemandRequest *requests);
+    void updateACMode(const DemandRequest &request);
+    FanSpeed computeFanSpeed(const DemandRequest &request);
     void setFanSpeed(FanSpeed);
     bool pollUIEvent(bool wait);
     void handleCancelMessage(MsgID id);
-    void setHVAC(DemandRequest *requests, HVACState *states);
+    HVACState setHVAC(const DemandRequest &request);
     void setErrMessageF(MsgID msgID, bool allowCancel, const char *fmt, ...);
     void setMessageF(MsgID msgID, bool allowCancel, const char *fmt, ...);
     void setMessage(MsgID msgID, bool allowCancel, const char *msg);
@@ -140,9 +132,12 @@ class ControllerApp {
     Setpoints getCurrentSetpoints();
     void setTempOverride(AbstractUIManager::TempOverride);
     uint16_t localMinOfDay();
-    void logState(ControllerDomain::FreshAirState &freshAirState, ControllerDomain::SensorData[],
-                  ControllerDomain::DemandRequest[], ControllerDomain::Setpoints setpoints[],
-                  ControllerDomain::HVACState[], FanSpeed fanSpeed);
+
+    void logState(const ControllerDomain::FreshAirState &freshAirState,
+                  const ControllerDomain::SensorData &sensorData,
+                  const ControllerDomain::DemandRequest &request,
+                  const ControllerDomain::Setpoints &setpoints,
+                  const ControllerDomain::HVACState hvacState, const FanSpeed fanSpeed);
     void checkWifiState();
     double outdoorTempC() { return rawOutdoorTempC_ + config_.outTempOffsetC; }
 
@@ -153,7 +148,6 @@ class ControllerApp {
     AbstractDemandController *demandController_;
     AbstractValveCtrl *valveCtrl_;
     AbstractWifi *wifi_;
-    uint8_t nControllers_;
     AbstractConfigStore<ControllerDomain::Config> *cfgStore_;
     uiEvtRcv_t uiEvtRcv_;
 

@@ -9,13 +9,7 @@ class AbstractDemandController {
                                                    const ControllerDomain::Setpoints &setpoints,
                                                    const double outdoorTempC) = 0;
 
-    static bool isFanCoolingTempLimited(const ControllerDomain::DemandRequest *requests, size_t n) {
-        for (int i = 0; i < n; i++) {
-            if (requests[i].targetFanCooling > 0 && requests[i].maxFanCooling < UINT8_MAX) {
-                return true;
-            }
-        }
-
-        return false;
+    static bool isFanCoolingTempLimited(const ControllerDomain::DemandRequest &request) {
+        return request.targetFanCooling > 0 && request.maxFanCooling < UINT8_MAX;
     }
 };

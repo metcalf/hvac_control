@@ -10,16 +10,11 @@
 using HVACState = ControllerDomain::HVACState;
 using Config = ControllerDomain::Config;
 
-#define RESTART_DELAY_MS 1500
 #define TEMP_LIMIT_ROLLER_START 64
 #define MIN_HEAT_DEG 50
 #define MAX_COOL_DEG 99
 #define MIN_HEAT_COOL_DELTA_DEG 2
 #define MIN_HEAT_COOL_DELTA_C ABS_F_TO_C(MIN_HEAT_COOL_DELTA_DEG)
-
-// Support for controlling valves on the secondary isn't implemented
-#define STANDALONE_HVAC_TYPE_OPTIONS "NONE\nFANCOIL\nVALVE"
-#define PRIMARY_HVAC_TYPE_OPTIONS "NONE\nFANCOIL"
 
 static const char *TAG = "UI";
 
@@ -61,8 +56,6 @@ void updateClk() {
 }
 
 void updateClkCb(lv_timer_t *timer) { updateClk(); }
-
-void restartCb(lv_timer_t *) { esp_restart(); }
 
 void wifiTextareaEventCb(lv_event_t *e) {
     ((UIManager *)lv_event_get_user_data(e))->eWifiTextarea(e);
@@ -292,11 +285,6 @@ void UIManager::eScheduleLoadStart() {
 }
 
 void UIManager::eSaveEquipmentSettings() {
-    Config::ControllerType newType =
-        Config::ControllerType(lv_dropdown_get_selected(ui_controller_type));
-    bool typeChanged = newType != equipment_.controllerType;
-
-    equipment_.controllerType = newType;
     equipment_.heatType = Config::HVACType(lv_dropdown_get_selected(ui_heat_type));
     equipment_.coolType = Config::HVACType(lv_dropdown_get_selected(ui_cool_type));
     equipment_.hasMakeupDemand = lv_obj_has_state(ui_makeup_air_switch, LV_STATE_CHECKED);
@@ -310,13 +298,7 @@ void UIManager::eSaveEquipmentSettings() {
 
     eventCb_(evt);
 
-    // Show reboot screen if the controller changed, otherwise back to settings
-    if (typeChanged) {
-        lv_timer_resume(restartTimer_);
-        _ui_screen_change(&ui_Restart, LV_SCR_LOAD_ANIM_NONE, 0, 0, &ui_Restart_screen_init);
-    } else {
-        _ui_screen_change(&ui_Settings, LV_SCR_LOAD_ANIM_NONE, 0, 0, &ui_Settings_screen_init);
-    }
+    _ui_screen_change(&ui_Settings, LV_SCR_LOAD_ANIM_NONE, 0, 0, &ui_Settings_screen_init);
 }
 
 void UIManager::eSaveTempLimits() {
@@ -393,7 +375,6 @@ void UIManager::eSaveWifiSettings() {
 }
 
 void UIManager::eEquipmentSettingsLoadStart() {
-    lv_dropdown_set_selected(ui_controller_type, static_cast<uint16_t>(equipment_.controllerType));
     lv_dropdown_set_selected(ui_heat_type, static_cast<uint16_t>(equipment_.heatType));
     lv_dropdown_set_selected(ui_cool_type, static_cast<uint16_t>(equipment_.coolType));
     if (equipment_.hasMakeupDemand) {
@@ -401,8 +382,6 @@ void UIManager::eEquipmentSettingsLoadStart() {
     } else {
         lv_obj_clear_state(ui_makeup_air_switch, LV_STATE_CHECKED);
     }
-
-    eControllerTypeSelectionChanged(); // Simulate event to update UI
 }
 
 void UIManager::eTempLimitsLoadStart() {
@@ -454,34 +433,6 @@ void UIManager::eWifiTextarea(lv_event_t *e) {
     }
 }
 
-void configureHvacTypeDropdown(lv_obj_t *dropdown, bool isPrimary) {
-    const char *options = isPrimary ? PRIMARY_HVAC_TYPE_OPTIONS : STANDALONE_HVAC_TYPE_OPTIONS;
-
-    uint16_t selected = lv_dropdown_get_selected(dropdown);
-
-    lv_dropdown_set_options_static(dropdown, options);
-    if (lv_dropdown_get_option_cnt(dropdown) <= selected) {
-        selected = 0; // Reset to `NONE` if `VALVE` had been selected
-    };
-    lv_dropdown_set_selected(dropdown, selected);
-}
-
-void UIManager::eControllerTypeSelectionChanged() {
-    Config::ControllerType type =
-        Config::ControllerType(lv_dropdown_get_selected(ui_controller_type));
-
-    bool isPrimary = type == Config::ControllerType::Primary;
-    bool isSecondary = type == Config::ControllerType::Secondary;
-
-    configureHvacTypeDropdown(ui_heat_type, isPrimary);
-    configureHvacTypeDropdown(ui_cool_type, isPrimary);
-
-    // Don't show HVAC types/makeup when secondary is selected, managed by the primary
-    objSetVisibility(!isSecondary, ui_heat_type_container);
-    objSetVisibility(!isSecondary, ui_cool_type_container);
-    objSetVisibility(!isSecondary, ui_makeup_air_container);
-}
-
 void UIManager::updateTempLimits(uint8_t maxHeatDeg, uint8_t minCoolDeg) {
     maxHeatDeg_ = maxHeatDeg;
     minCoolDeg_ = minCoolDeg;
@@ -495,25 +446,6 @@ void UIManager::updateUIForEquipment() {
     // Hide AC buttons if we don't have active cooling
     objSetFlag(equipment_.coolType == Config::HVACType::None, ui_ac_button_container,
                LV_OBJ_FLAG_HIDDEN);
-
-    bool isSecondary = equipment_.controllerType == Config::ControllerType::Secondary;
-
-    // Disable some controls on the secondary controller to simplify communications
-    objSetVisibility(!isSecondary, ui_ac_button_container);
-    objSetVisibility(!isSecondary, ui_power_button_container);
-    objSetVisibility(!isSecondary, ui_fan_override_container);
-    objSetVisibility(
-        !isSecondary,
-        ui_comp_get_child(ui_fan_setting_header,
-                          UI_COMP_SETTING_HEADER_SETTING_ACCEPT_BUTTON_SETTING_ACCEPT_LABEL));
-    objSetVisibility(isSecondary, ui_fan_override_secondary_container);
-
-    // Settings
-    objSetVisibility(!isSecondary, ui_heat_type_container);
-    objSetVisibility(!isSecondary, ui_cool_type_container);
-    objSetVisibility(!isSecondary, ui_makeup_air_container);
-    objSetVisibility(!isSecondary, ui_fan_offset_container);
-    objSetVisibility(!isSecondary, ui_fan_offset_divider);
 }
 
 void UIManager::onCancelMsg(uint8_t msgID) {
@@ -556,9 +488,6 @@ UIManager::UIManager(ControllerDomain::Config config, size_t nMsgIds, eventCb_t 
         ui_message_container); // Delete the message container we created with Squareline for design purposes
     msgMgr_ = new MessageManager(nMsgIds, ui_Footer, &ui_font_MaterialSymbols24,
                                  new cancelCbFn_t([this](uint8_t msgID) { onCancelMsg(msgID); }));
-
-    restartTimer_ = lv_timer_create(restartCb, RESTART_DELAY_MS, NULL);
-    lv_timer_pause(restartTimer_);
 
     clkTimer_ = lv_timer_create(updateClkCb, 1000, this);
     updateClk();

@@ -13,7 +13,6 @@
 
 using FanSpeed = ControllerDomain::FanSpeed;
 using FancoilSpeed = ControllerDomain::FancoilSpeed;
-using FancoilID = ControllerDomain::FancoilID;
 using FreshAirState = ControllerDomain::FreshAirState;
 using SensorData = ControllerDomain::SensorData;
 
@@ -22,15 +21,13 @@ static const char *TAG = "MBC";
 enum class CID {
     FreshAirState,
     FreshAirSpeed,
-    PrimFancoilMode,
-    SecFancoilMode,
+    FancoilMode,
     MakeupDemandState,
 };
 
 enum class SlaveID {
     FreshAir = 0x11,
-    PrimFancoil = 0x20,
-    SecFancoil = 0x21,
+    Fancoil = 0x20,
     MakeupDemand = 0x22,
 };
 
@@ -45,8 +42,7 @@ struct RegisterDef {
 RegisterDef registers_[] = {
     {CID::FreshAirState, "FreshAirState", SlaveID::FreshAir, MB_PARAM_INPUT, 0x00, 4},
     {CID::FreshAirSpeed, "FreshAirSpeed", SlaveID::FreshAir, MB_PARAM_HOLDING, 0x10, 1},
-    {CID::PrimFancoilMode, "PrimFancoilMode", SlaveID::PrimFancoil, MB_PARAM_HOLDING, 0x10, 1},
-    {CID::SecFancoilMode, "SecFancoilMode", SlaveID::SecFancoil, MB_PARAM_HOLDING, 0x10, 1},
+    {CID::FancoilMode, "FancoilMode", SlaveID::Fancoil, MB_PARAM_HOLDING, 0x10, 1},
     {CID::MakeupDemandState, "MakeupDemandState", SlaveID::MakeupDemand, MB_PARAM_INPUT, 0x00, 1},
 };
 
@@ -185,33 +181,7 @@ esp_err_t ModbusClient::getMakeupDemand(bool *demand) {
     return err;
 }
 
-esp_err_t ModbusClient::setFancoil(FancoilID id,
-                                   ControllerDomain::DemandRequest::FancoilRequest req) {
+esp_err_t ModbusClient::setFancoil(const ControllerDomain::DemandRequest::FancoilRequest req) {
     uint16_t v = (static_cast<uint16_t>(req.speed) << 1) | (req.cool && 0x01);
-    CID cid;
-    switch (id) {
-    case FancoilID::Prim:
-        cid = CID::PrimFancoilMode;
-        break;
-    case FancoilID::Sec:
-        cid = CID::SecFancoilMode;
-        break;
-    default:
-        assert(false);
-    }
-
-    return setParam(cid, (uint8_t *)&v);
-}
-
-esp_err_t ModbusClient::getSecondaryControllerState(ControllerDomain::SensorData *sensorData,
-                                                    ControllerDomain::Setpoints *setpoints) {
-    // TODO: (secondary controller) Implement this
-    return ESP_ERR_NOT_SUPPORTED;
-}
-
-esp_err_t ModbusClient::setSecondaryControllerData(ControllerDomain::FanSpeed fanSpeed,
-                                                   ControllerDomain::HVACState hvacState,
-                                                   double outTempC, bool systemOn) {
-    // TODO: (secondary controller) Implement this
-    return ESP_ERR_NOT_SUPPORTED;
+    return setParam(CID::FancoilMode, (uint8_t *)&v);
 }

@@ -6,12 +6,11 @@
 #include "NVSConfigStore.h"
 #include "wifi_credentials.h"
 
-#define APP_CONFIG_VERSION 0
 #define APP_CONFIG_NAMESPACE "config"
 
 class AppConfigStore : public NVSConfigStore<ControllerDomain::Config> {
   public:
-    AppConfigStore() : NVSConfigStore(APP_CONFIG_VERSION, APP_CONFIG_NAMESPACE){};
+    AppConfigStore() : NVSConfigStore(CONTROLLER_CONFIG_VERSION, APP_CONFIG_NAMESPACE){};
 
   protected:
     using Config = ControllerDomain::Config;
@@ -20,7 +19,6 @@ class AppConfigStore : public NVSConfigStore<ControllerDomain::Config> {
         Config cfg{
             .equipment =
                 {
-                    .controllerType = Config::ControllerType::Only,
                     .heatType = Config::HVACType::Fancoil,
                     .coolType = Config::HVACType::Fancoil,
                     .hasMakeupDemand = false,

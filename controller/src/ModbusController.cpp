@@ -22,28 +22,20 @@ void ModbusController::task() {
             freshAirSpeedErr_ = err;
             xSemaphoreGive(mutex_);
         }
-        if (bits &
-            (requestBits(RequestType::SetFancoilPrim) | requestBits(RequestType::SetFancoilSec))) {
-            FancoilID id;
-            if (bits & requestBits(RequestType::SetFancoilPrim)) {
-                id = FancoilID::Prim;
-            } else {
-                id = FancoilID::Sec;
-            }
-
+        if (bits & requestBits(RequestType::SetFancoil)) {
             xSemaphoreTake(mutex_, portMAX_DELAY);
-            ControllerDomain::DemandRequest::FancoilRequest req = requestFancoil_;
+            FancoilRequest req = requestFancoil_;
             xSemaphoreGive(mutex_);
 
-            err = client_.setFancoil(id, req);
+            err = client_.setFancoil(req);
             xSemaphoreTake(mutex_, portMAX_DELAY);
             setFancoilErr_ = err;
             xSemaphoreGive(mutex_);
         }
 
-        // We fetch updated data and push data to the secondary controller on every turn
-        // through the loop even though this happens both at the poll interval and on
-        // every set* request. Extra queries are harmless and it makes the code simpler.
+        // We fetch updated data on every turn through the loop even though this happens
+        // both at the poll interval and on every set* request. Extra queries are harmless
+        // and it makes the code simpler.
         if (hasMakeupDemand_) {
             bool makeupDemand;
 
@@ -66,38 +58,6 @@ void ModbusController::task() {
         if (freshAirStateErr_ == ESP_OK) {
             freshAirState_ = freshAirState;
             lastFreshAirState_ = now;
-        }
-        xSemaphoreGive(mutex_);
-
-        SensorData sensorData;
-        Setpoints setpoints;
-        esp_err_t getErr = client_.getSecondaryControllerState(&sensorData, &setpoints);
-
-        xSemaphoreTake(mutex_, portMAX_DELAY);
-        if (getErr == ESP_OK) {
-            secondarySensorData_ = sensorData;
-            secondarySetpoints_ = setpoints;
-        }
-
-        // Don't write data to the secondary unless it has been written
-        // by the main loop
-        if (!(speedSet_ && hvacStateSet_ && outTempSet_ && systemOnSet_)) {
-            xSemaphoreGive(mutex_);
-            continue;
-        }
-
-        FanSpeed speed = requestFreshAirSpeed_;
-        HVACState hvacState = hvacState_;
-        double outTempC = outTempC_;
-        bool systemOn = systemOn_;
-        xSemaphoreGive(mutex_);
-
-        err = client_.setSecondaryControllerData(speed, hvacState, outTempC, systemOn);
-        xSemaphoreTake(mutex_, portMAX_DELAY);
-        if (err != ESP_OK) {
-            secondaryControllerErr_ = err;
-        } else {
-            secondaryControllerErr_ = getErr;
         }
         xSemaphoreGive(mutex_);
     }
@@ -134,41 +94,19 @@ esp_err_t ModbusController::getMakeupDemand(bool *demand,
     return err;
 }
 
-esp_err_t ModbusController::getSecondaryControllerState(ControllerDomain::SensorData *sensorData,
-                                                        ControllerDomain::Setpoints *setpoints) {
-    xSemaphoreTake(mutex_, portMAX_DELAY);
-    esp_err_t err = secondaryControllerErr_;
-    if (err == ESP_OK) {
-        *sensorData = secondarySensorData_;
-        *setpoints = secondarySetpoints_;
-    }
-    xSemaphoreGive(mutex_);
-
-    return err;
-}
-
 void ModbusController::setFreshAirSpeed(FanSpeed speed) {
     xSemaphoreTake(mutex_, portMAX_DELAY);
     requestFreshAirSpeed_ = speed;
-    speedSet_ = true;
     xSemaphoreGive(mutex_);
 
     makeRequest(RequestType::SetFreshAirSpeed);
 }
-void ModbusController::setFancoil(FancoilID id,
-                                  ControllerDomain::DemandRequest::FancoilRequest req) {
-    if (xSemaphoreTake(mutex_, portMAX_DELAY) != pdTRUE) {
-        return;
-    }
-
+void ModbusController::setFancoil(const FancoilRequest req) {
+    xSemaphoreTake(mutex_, portMAX_DELAY);
     requestFancoil_ = req;
     xSemaphoreGive(mutex_);
 
-    if (id == FancoilID::Prim) {
-        makeRequest(RequestType::SetFancoilPrim);
-    } else {
-        makeRequest(RequestType::SetFancoilSec);
-    }
+    makeRequest(RequestType::SetFancoil);
 }
 
 void ModbusController::makeRequest(RequestType request) {
@@ -177,25 +115,6 @@ void ModbusController::makeRequest(RequestType request) {
 
 EventBits_t ModbusController::requestBits(RequestType request) {
     return 0x01 << static_cast<size_t>(request);
-}
-
-void ModbusController::reportHVACState(HVACState hvacState) {
-    xSemaphoreTake(mutex_, portMAX_DELAY);
-    hvacState_ = hvacState;
-    hvacStateSet_ = true;
-    xSemaphoreGive(mutex_);
-}
-void ModbusController::reportSystemPower(bool systemOn) {
-    xSemaphoreTake(mutex_, portMAX_DELAY);
-    systemOn_ = systemOn;
-    systemOnSet_ = true;
-    xSemaphoreGive(mutex_);
-}
-void ModbusController::reportOutdoorTemp(double outTempC) {
-    xSemaphoreTake(mutex_, portMAX_DELAY);
-    outTempC_ = outTempC;
-    outTempSet_ = true;
-    xSemaphoreGive(mutex_);
 }
 
 esp_err_t ModbusController::lastFreshAirSpeedErr() {

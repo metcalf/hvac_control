@@ -16,7 +16,6 @@ class UIManager : public AbstractUIManager {
   public:
     UIManager(ControllerDomain::Config config, size_t nMsgIds, eventCb_t eventCb);
     ~UIManager() {
-        lv_timer_del(restartTimer_);
         lv_timer_del(clkTimer_);
         delete msgMgr_;
         delete sleepMgr_;
@@ -67,7 +66,6 @@ class UIManager : public AbstractUIManager {
     void eSaveWifiSettings();
     void eTempOffsetChanged();
     void eWifiTextarea(lv_event_t *e);
-    void eControllerTypeSelectionChanged();
 
     void eHomeLoadStart();
     void eHomeUnloadStart();
@@ -102,7 +100,7 @@ class UIManager : public AbstractUIManager {
     MessageManager *msgMgr_;
     SleepManager *sleepMgr_;
 
-    lv_timer_t *restartTimer_, *clkTimer_;
+    lv_timer_t *clkTimer_;
     eventCb_t eventCb_;
     bool booted_ = false;
 

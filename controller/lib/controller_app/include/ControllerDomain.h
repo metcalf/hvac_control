@@ -10,12 +10,13 @@
 #define REL_C_TO_F(t) (t * 9.0 / 5.0)
 #define ABS_C_TO_F(t) (REL_C_TO_F(t) + 32)
 
+#define CONTROLLER_CONFIG_VERSION 1
+
 namespace ControllerDomain {
 typedef uint8_t FanSpeed;
 
 enum class HVACState { Off, Heat, FanCool, ACCool };
 enum class FancoilSpeed { Off, Low, Med, High };
-enum class FancoilID { Prim, Sec };
 
 struct FreshAirState {
     double tempC, humidity;
@@ -53,9 +54,7 @@ struct Config {
         int16_t startMinOfDay() { return startHr * 60 + startMin; }
     };
     enum class HVACType { None, Fancoil, Valve };
-    enum class ControllerType { Only, Primary, Secondary };
     struct Equipment {
-        ControllerType controllerType;
         HVACType heatType, coolType;
         bool hasMakeupDemand;
     };
