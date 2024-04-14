@@ -3,8 +3,13 @@
 #include <algorithm>
 #include <cstring>
 
-#include "esp_err.h"
 #include "esp_log.h"
+#if defined(ESP_PLATFORM)
+#include "esp_err.h"
+#else
+typedef int esp_err_t;
+#define ESP_OK 0
+#endif
 
 #define SCHEDULE_TIME_STR_ARGS(s) (s.startHr - 1) % 12 + 1, s.startMin, s.startHr < 12 ? 'a' : 'p'
 
@@ -27,7 +32,7 @@
 // Ignore makeup demand requests older than this
 #define MAKEUP_MAX_AGE std::chrono::minutes(5)
 
-#define MAKEUP_FAN_SPEED (FanSpeed)80
+#define MAKEUP_FAN_SPEED (FanSpeed)120
 #define MIN_FAN_SPEED_VALUE (FanSpeed)10
 #define MIN_FAN_RUNNING_RPM 900
 
@@ -82,6 +87,7 @@ void ControllerApp::updateACMode(const DemandRequest &request) {
 
 FanSpeed ControllerApp::computeFanSpeed(const DemandRequest &request) {
     FanSpeed fanSpeed = 0;
+    fanSpeedReason_ = "off";
 
     if (!config_.systemOn) {
         clearMessage(MsgID::FanOverride);
@@ -97,32 +103,26 @@ FanSpeed ControllerApp::computeFanSpeed(const DemandRequest &request) {
         }
         fanSpeedReason_ = "override";
     } else {
-        // for (int i = 0; i < nControllers_; i++) {
-        //     targetVent = std::max(targetVent, requests[i].targetVent);
-        //     maxVent = std::min(maxVent, requests[i].maxFanVenting);
-        //     maxTargetCool = std::max(targetCool, requests[i].targetFanCooling);
-        //     targetCool = std::max(
-        //         targetCool, std::min(requests[i].targetFanCooling, requests[i].maxFanCooling));
-        // }
-        // TODO: This is complicated... revisit with a clearer head
-        ControllerDomain::FanSpeed maxTargetCool = 0;
-        ControllerDomain::FanSpeed target = std::max(request.targetVent, request.targetFanCooling);
+        ControllerDomain::FanSpeed fanCool =
+            std::min(request.targetFanCooling, request.maxFanCooling);
+        ControllerDomain::FanSpeed target = std::max(request.targetVent, fanCool);
         if (request.maxFanVenting < target) {
             fanSpeedReason_ = "vent_limit";
             fanSpeed = request.maxFanVenting;
         } else {
             fanSpeed = target;
-            if (request.targetFanCooling > request.targetVent) {
-                if (request.targetFanCooling > request.maxFanCooling) {
-                    fanSpeedReason_ = "cool_temp_limited";
-                } else {
-                    fanSpeedReason_ = "cool";
-                }
-            } else {
-                if (maxTargetCool > request.targetVent) {
+            if (request.targetVent > fanCool) {
+                if (request.targetFanCooling > request.targetVent) {
+                    // Would be cooling more if not limited by outdoor temp
                     fanSpeedReason_ = "vent_cool_temp_limited";
                 } else {
                     fanSpeedReason_ = "vent";
+                }
+            } else {
+                if (request.targetFanCooling > request.maxFanCooling) {
+                    fanSpeedReason_ = "cool_temp_limited";
+                } else if (request.targetFanCooling > 0) {
+                    fanSpeedReason_ = "cool";
                 }
             }
         }
@@ -646,7 +646,7 @@ void ControllerApp::task(bool firstTime) {
     ControllerDomain::FreshAirState freshAirState{};
     handleFreshAirState(&freshAirState);
 
-    DemandRequest request;
+    DemandRequest request{};
 
     Setpoints setpoints = getCurrentSetpoints();
     uiManager_->setCurrentSetpoints(setpoints.heatTempC, setpoints.coolTempC);
@@ -661,7 +661,6 @@ void ControllerApp::task(bool firstTime) {
         uiManager_->setInTempC(sensorData.tempC);
         uiManager_->setInCO2(sensorData.co2);
     } else {
-        // TODO: Do we really want to use an empty DemandRequest after this branch?
         ESP_LOGE(TAG, "%s", sensorData.errMsg);
         setMessage(MsgID::SensorErr, false, sensorData.errMsg);
     }

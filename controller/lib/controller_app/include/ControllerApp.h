@@ -47,6 +47,9 @@ class ControllerApp {
         return std::chrono::system_clock::now();
     }
 
+    const char *setpointReason_ = "";
+    const char *fanSpeedReason_ = "";
+
   private:
     using FancoilSpeed = ControllerDomain::FancoilSpeed;
     using SensorData = ControllerDomain::SensorData;
@@ -162,9 +165,6 @@ class ControllerApp {
     bool fanIsOn_ = false;
     FanSpeed fanOverrideSpeed_;
     std::chrono::steady_clock::time_point fanOverrideUntil_, fanLastStarted_;
-
-    const char *setpointReason_ = "";
-    const char *fanSpeedReason_ = "";
 
     std::chrono::steady_clock::time_point lastStatusLog_;
 };
