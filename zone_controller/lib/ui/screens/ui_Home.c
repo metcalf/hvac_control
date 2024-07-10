@@ -203,7 +203,7 @@ ui_zone_label_2 = lv_label_create(ui_zone_container_2);
 lv_obj_set_width( ui_zone_label_2, LV_SIZE_CONTENT);  /// 1
 lv_obj_set_height( ui_zone_label_2, LV_SIZE_CONTENT);   /// 1
 lv_obj_set_align( ui_zone_label_2, LV_ALIGN_LEFT_MID );
-lv_label_set_text(ui_zone_label_2,"1F E");
+lv_label_set_text(ui_zone_label_2,"1F W");
 lv_obj_set_style_text_font(ui_zone_label_2, &lv_font_montserrat_18, LV_PART_MAIN| LV_STATE_DEFAULT);
 
 ui_tstat_state_2 = lv_label_create(ui_zone_container_2);

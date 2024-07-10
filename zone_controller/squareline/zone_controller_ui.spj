@@ -1571,7 +1571,7 @@
                   {
                     "disabled": false,
                     "nid": 478111503,
-                    "strtype": "LABEL/EventHandler",
+                    "strtype": "_event/EventHandler",
                     "strval": "CLICKED",
                     "childs": [
                       {
@@ -1594,7 +1594,7 @@
                       },
                       {
                         "nid": 604583028,
-                        "strtype": "_custom/action",
+                        "strtype": "_event/action",
                         "strval": "MODIFY FLAG",
                         "childs": [
                           {
@@ -3849,7 +3849,7 @@
                       {
                         "nid": -1387495555,
                         "strtype": "LABEL/Text",
-                        "strval": "1F E",
+                        "strval": "1F W",
                         "InheritedType": 10
                       },
                       {
@@ -3882,7 +3882,8 @@
                         "InheritedType": 2
                       }
                     ],
-                    "saved_objtypeKey": "LABEL"
+                    "saved_objtypeKey": "LABEL",
+                    "tree_closed": true
                   },
                   {
                     "guid": "GUID93202231-410197S70387",
@@ -15016,7 +15017,7 @@
                   {
                     "disabled": false,
                     "nid": -2073731952,
-                    "strtype": "BUTTON/EventHandler",
+                    "strtype": "_event/EventHandler",
                     "strval": "CLICKED",
                     "childs": [
                       {
@@ -15039,7 +15040,7 @@
                       },
                       {
                         "nid": 1893972108,
-                        "strtype": "_custom/action",
+                        "strtype": "_event/action",
                         "strval": "MODIFY FLAG",
                         "childs": [
                           {
@@ -15083,7 +15084,7 @@
                       },
                       {
                         "nid": 1803210271,
-                        "strtype": "_custom/action",
+                        "strtype": "_event/action",
                         "strval": "MODIFY FLAG",
                         "childs": [
                           {
@@ -15127,7 +15128,7 @@
                       },
                       {
                         "nid": 245117725,
-                        "strtype": "_custom/action",
+                        "strtype": "_event/action",
                         "strval": "MODIFY FLAG",
                         "childs": [
                           {
@@ -15171,7 +15172,7 @@
                       },
                       {
                         "nid": 1691403753,
-                        "strtype": "_custom/action",
+                        "strtype": "_event/action",
                         "strval": "MODIFY FLAG",
                         "childs": [
                           {
@@ -18774,7 +18775,7 @@
               {
                 "disabled": false,
                 "nid": -1983081050,
-                "strtype": "CONTAINER/EventHandler",
+                "strtype": "_event/EventHandler",
                 "strval": "CLICKED",
                 "childs": [
                   {
@@ -18797,7 +18798,7 @@
                   },
                   {
                     "nid": -288109818,
-                    "strtype": "_custom/action",
+                    "strtype": "_event/action",
                     "strval": "MODIFY FLAG",
                     "childs": [
                       {

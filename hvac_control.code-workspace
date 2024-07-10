@@ -34,6 +34,9 @@
     {
       "name": "controller",
       "path": "controller"
+    },
+    {
+      "path": "pid_simulator"
     }
   ],
   "settings": {
