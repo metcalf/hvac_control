@@ -1,0 +1,138 @@
+from collections import namedtuple
+import math
+import matplotlib.pyplot as plt
+import conversions
+
+DataPoint = namedtuple(
+    "DataPoint",
+    (
+        "datetime",
+        "outdoor_temp_c",
+        "room_temp_c",
+        "heat_setpoint_c",
+        "cool_setpoint_c",
+        "construction_temp_c",
+        "energy_j",
+    ),
+)
+Stats = namedtuple(
+    "Stats",
+    (
+        "heating_energy_kj",
+        "cooling_energy_kj",
+        "rms_temp_error",
+        "night_rms_temp_error",
+    ),
+)
+
+
+class Simulator:
+    def __init__(
+        self,
+        outdoor_temp_input,
+        room,
+        setpoint_schedule,
+        hvac_system,
+        max_interval_min=60,
+    ):
+        self._outdoor_temp_input = outdoor_temp_input
+        self._room = room
+        self._setpoint_schedule = setpoint_schedule
+        self._hvac_system = hvac_system
+        self._max_interval_s = max_interval_min * 60
+        self._data = []
+        self._heating_energy_j = 0
+        self._cooling_energy_j = 0
+
+    def run(self):
+        prev_energy_w = None
+
+        for dt, tc in self._outdoor_temp_input:
+            heat_setpoint_c, cool_setpoint_c = self._setpoint_schedule.get(dt)
+            energy_w = self._hvac_system.get_energy(
+                self._room.temp_c, tc, heat_setpoint_c, cool_setpoint_c
+            )
+
+            if prev_energy_w is not None:
+
+                delta_s = (dt - prev_dt).total_seconds()
+                # Limit the maximum time we apply the energy to avoid runaway issues
+                # if there's a big gap in outdoor temp data
+                energy_j = prev_energy_w * min(delta_s, self._max_interval_s)
+                self._room.update(delta_s, tc, energy_j)
+
+                if energy_j > 0:
+                    self._heating_energy_j += energy_j
+                else:
+                    self._cooling_energy_j += -energy_j
+            else:
+                energy_j = 0
+
+            self._data.append(
+                DataPoint(
+                    dt,
+                    tc,
+                    self._room.temp_c,
+                    heat_setpoint_c,
+                    cool_setpoint_c,
+                    self._room.construction_temp_c,
+                    energy_j,
+                )
+            )
+
+            prev_dt = dt
+            prev_energy_w = energy_w
+
+    def stats(self):
+        sq_temp_err = 0
+        night_sq_temp_err = 0
+        night_cnt = 0
+        for dp in self._data:
+            if dp.room_temp_c > dp.cool_setpoint_c:
+                err = dp.room_temp_c - dp.cool_setpoint_c
+            elif dp.room_temp_c < dp.heat_setpoint_c:
+                err = dp.room_temp_c - dp.heat_setpoint_c
+            else:
+                err = 0
+
+            sq_err = err**2
+            sq_temp_err += sq_err
+            if dp.datetime.hour < 7 or dp.datetime.hour > 8:
+                night_sq_temp_err += sq_err
+                night_cnt += 1
+
+        return Stats(
+            self._heating_energy_j / 1000.0,
+            self._cooling_energy_j / 1000.0,  # TODO: Split out fan cooling from A/C
+            math.sqrt(sq_temp_err / len(self._data)),
+            math.sqrt(night_sq_temp_err / night_cnt),
+        )
+
+    def plot(self):
+        dts = [dp.datetime for dp in self._data]
+        out_tfs = [conversions.c_to_f(dp.outdoor_temp_c) for dp in self._data]
+        room_tfs = [conversions.c_to_f(dp.room_temp_c) for dp in self._data]
+        heat_set_tfs = [conversions.c_to_f(dp.heat_setpoint_c) for dp in self._data]
+        cool_set_tfs = [conversions.c_to_f(dp.cool_setpoint_c) for dp in self._data]
+        construction_tfs = [
+            conversions.c_to_f(dp.construction_temp_c) for dp in self._data
+        ]
+        energy_js = [conversions.c_to_f(dp.energy_j) for dp in self._data]
+
+        fig, temp_ax = plt.subplots()
+
+        (construction_l,) = temp_ax.plot(
+            dts, construction_tfs, label="Construction", color="darkgrey"
+        )
+        (heat_set_l,) = temp_ax.plot(dts, heat_set_tfs, label="Heat", color="red")
+        (cool_set_l,) = temp_ax.plot(dts, cool_set_tfs, label="Cool", color="blue")
+        (room_l,) = temp_ax.plot(dts, room_tfs, label="Room")
+        (out_l,) = temp_ax.plot(dts, out_tfs, label="Outdoor")
+
+        energy_ax = temp_ax.twinx()
+        energy_ax.scatter(dts, energy_js, s=5)
+
+        temp_ax.set_ylabel("Temp(F)")
+        temp_ax.legend()
+
+        plt.show()

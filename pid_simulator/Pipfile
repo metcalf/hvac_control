@@ -1,0 +1,9 @@
+[[source]]
+url = "https://pypi.org/simple"
+verify_ssl = true
+name = "pypi"
+
+[packages]
+matplotlib = "~=3.9.1"
+ipython = "*"
+ipdb = "*"
