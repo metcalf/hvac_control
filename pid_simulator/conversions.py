@@ -20,3 +20,7 @@ def rel_f_to_c(temp_f):
 
 def btuhr_to_w(pwr):
     return pwr * 0.2930710702
+
+
+def lb_to_kg(lb):
+    return lb * 0.453592

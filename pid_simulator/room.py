@@ -1,5 +1,5 @@
 AIR_HEAT_CAPACITY_J_M3K = 1200
-CONSTRUCTION_U_VALUE = 1  # Total guess, hopefully not sensitive
+CONSTRUCTION_U_VALUE = 1.5  # Mostly a guess
 CONSTRUCTION_HEAT_CAPACITY_J_KGK = 1020  # ~drywall
 CONSTRUCTION_DENSITY_KG_M3 = 750  # ~drywall
 
@@ -13,12 +13,13 @@ class Room:
         self,
         volume_m3,
         transmittance_rate_w_k,
+        surfaces_thermal_mass_j_k,
+        surfaces_transmittance_rate_w_k,
         construction_area=None,
         construction_thermal_mass_j_k=None,
     ):
         self._air_thermal_mass_j_k = volume_m3 * AIR_HEAT_CAPACITY_J_M3K
-        self._construction_thermal_mass_j_k = construction_thermal_mass_j_k
-        self._temp_c = None
+        self._air_temp_c = None
         self._construction_temp_c = None
 
         if construction_area is None:
@@ -34,14 +35,16 @@ class Room:
             construction_thermal_mass_j_k = CONSTRUCTION_HEAT_CAPACITY_J_KGK * mass
         self._construction_thermal_mass_j_k = construction_thermal_mass_j_k
 
-        self._transmittance_rate_w_k = transmittance_rate_w_k
+        self._surfaces_thermal_mass_j_k = surfaces_thermal_mass_j_k
 
-        self._room_transmittance_rate_w_k = (
+        self._room_surfaces_transmittance_rate_w_k = surfaces_transmittance_rate_w_k
+        self._room_construction_transmittance_rate_w_k = (
             CONSTRUCTION_U_VALUE * self._construction_area
         )
-        # Resistivitat
-        self._construction_transmittance_rate_w_k = 1 / (
-            1.0 / transmittance_rate_w_k - 1.0 / self._room_transmittance_rate_w_k
+        # Resistivity is additive so take the inverse, operate, then invert again
+        self._construction_out_transmittance_rate_w_k = 1 / (
+            1.0 / transmittance_rate_w_k
+            - 1.0 / self._room_construction_transmittance_rate_w_k
         )
 
     @staticmethod
@@ -51,37 +54,52 @@ class Room:
 
     # Positive energy is heating, negative energy is cooling
     def update(self, time_s, out_temp_c, input_energy_j):
-
-        if self._temp_c is None:
+        if self._air_temp_c is None:
             raise Exception("Must call init_temp_c first")
 
-        room_j = time_s * compute_watts(
-            self._temp_c,
+        room_construction_j = time_s * compute_watts(
+            self._air_temp_c,
             self._construction_temp_c,
-            self._room_transmittance_rate_w_k,
+            self._room_construction_transmittance_rate_w_k,
         )
-        construction_j = time_s * compute_watts(
+        construction_out_j = time_s * compute_watts(
             self._construction_temp_c,
             out_temp_c,
-            self._construction_transmittance_rate_w_k,
+            self._construction_out_transmittance_rate_w_k,
+        )
+        room_surfaces_j = time_s * compute_watts(
+            self._air_temp_c,
+            self._surfaces_temp_c,
+            self._room_surfaces_transmittance_rate_w_k,
         )
 
-        self._temp_c = (
-            self._temp_c + (room_j + input_energy_j) / self._air_thermal_mass_j_k
+        self._air_temp_c = (
+            self._air_temp_c
+            + (room_construction_j + room_surfaces_j + input_energy_j)
+            / self._air_thermal_mass_j_k
         )
         self._construction_temp_c = (
             self._construction_temp_c
-            + (construction_j - room_j) / self._construction_thermal_mass_j_k
+            + (construction_out_j - room_construction_j)
+            / self._construction_thermal_mass_j_k
+        )
+        self._surfaces_temp_c = (
+            self._surfaces_temp_c - room_surfaces_j / self._surfaces_thermal_mass_j_k
         )
 
     def init_temp_c(self, init_t_c):
-        self._temp_c = init_t_c
+        self._air_temp_c = init_t_c
         self._construction_temp_c = init_t_c
+        self._surfaces_temp_c = init_t_c
 
     @property
-    def temp_c(self):
-        return self._temp_c
+    def air_temp_c(self):
+        return self._air_temp_c
 
     @property
     def construction_temp_c(self):
         return self._construction_temp_c
+
+    @property
+    def surfaces_temp_c(self):
+        return self._surfaces_temp_c
