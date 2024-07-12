@@ -1,57 +1,51 @@
 from enum import Enum
 
 
-class HysteresisThermostat:
-    class State(Enum):
-        OFF = 1
-        HEAT = 2
-        COOL = 3
+class System:
+    def __init__(self, components):
+        self._components = components
 
-    def __init__(self, heat_w, cool_w, hysteresis_c=0.5):
-        self._heat_w = heat_w
-        self._cool_w = cool_w
-        self._hysteresis_c = hysteresis_c / 2.0
-        self._state = self.State.OFF
-
-    def get_energy(self, in_temp_c, out_temp_c, heat_setpoint_c, cool_setpoint_c):
-        if in_temp_c > (cool_setpoint_c + self._hysteresis_c):
-            self._state = self.State.COOL
-        elif in_temp_c < (heat_setpoint_c - self._hysteresis_c):
-            self._state = self.State.HEAT
-        elif (
-            self._state == self.State.HEAT
-            and in_temp_c > (heat_setpoint_c + self._hysteresis_c)
-        ) or (
-            self._state == self.State.COOL
-            and in_temp_c < (cool_setpoint_c - self._hysteresis_c)
-        ):
-            self._state = self.State.OFF
-
-        if self._state == self.State.OFF:
-            return 0
-        elif self._state == self.State.HEAT:
-            return self._heat_w
-        else:
-            return -self._cool_w
-
-        if in_temp_c > cool_setpoint_c:
-            return -self._cool_w
-        elif in_temp_c < heat_setpoint_c:
-            return self._heat_w
-        else:
-            return 0
+    def get_energy(self, *args):
+        return sum(c.get_energy(*args) for c in self._components)
 
 
 class SimpleThermostat:
-    def __init__(self, heat_w, cool_w):
-        self._heat_w = heat_w
-        self._cool_w = cool_w
+    def __init__(self, power_w, is_heater):
+        self._power_w = power_w * (1 if is_heater else -1)
+        self._is_heater = is_heater
 
     def get_energy(self, in_temp_c, out_temp_c, heat_setpoint_c, cool_setpoint_c):
-        if in_temp_c > cool_setpoint_c:
-            return -self._cool_w
-        elif in_temp_c < heat_setpoint_c:
-            return self._heat_w
+        if self._is_heater:
+            on = heat_setpoint_c > in_temp_c
+        else:
+            on = in_temp_c > cool_setpoint_c
+
+        if on:
+            return self._power_w
+        else:
+            return 0
+
+
+class HysteresisThermostat:
+    def __init__(self, power_w, is_heater, hysteresis_c=0.5):
+        self._power_w = power_w * (1 if is_heater else -1)
+        self._is_heater = is_heater
+        self._hysteresis_c = hysteresis_c
+        self._is_on = False
+
+    def get_energy(self, in_temp_c, out_temp_c, heat_setpoint_c, cool_setpoint_c):
+        if self._is_heater:
+            delta = heat_setpoint_c - in_temp_c
+        else:
+            delta = in_temp_c - cool_setpoint_c
+
+        if delta > self._hysteresis_c:
+            self._is_on = True
+        elif delta < -self._hysteresis_c:
+            self._is_on = False
+
+        if self._is_on:
+            return self._power_w
         else:
             return 0
 

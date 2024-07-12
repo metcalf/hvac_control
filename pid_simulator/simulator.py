@@ -3,6 +3,7 @@ import math
 import matplotlib.pyplot as plt
 import conversions
 import datetime
+from enum import Enum
 
 DataPoint = namedtuple(
     "DataPoint",
@@ -25,11 +26,26 @@ Stats = namedtuple(
         "rms_temp_error",
         "night_rms_temp_error",
         "state_changes",
+        "mode_changes",
     ),
 )
 
 
 class Simulator:
+    class HVACMode(Enum):
+        COOL = -1
+        OFF = 0
+        HEAT = 1
+
+        @classmethod
+        def from_energy(cls, e):
+            if e > 0:
+                return cls.HEAT
+            elif e < 0:
+                return cls.COOL
+            else:
+                return cls.OFF
+
     def __init__(
         self,
         outdoor_temp_input,
@@ -47,9 +63,11 @@ class Simulator:
         self._heating_energy_j = 0
         self._cooling_energy_j = 0
         self._state_changes = 0
+        self._mode_changes = 0
+        self._hvac_mode = self.HVACMode.OFF
 
     def run(self, step_s=1, plot_all=False):
-        prev_energy_w = None
+        prev_energy_w = 0
         prev_dt = None
 
         for dt, tc in self._outdoor_temp_input:
@@ -57,7 +75,10 @@ class Simulator:
             energy_w = self._hvac_system.get_energy(
                 self._room.air_temp_c, tc, heat_setpoint_c, cool_setpoint_c
             )
-
+            mode = self.HVACMode.from_energy(energy_w)
+            if mode != self._hvac_mode:
+                self._hvac_mode = mode
+                self._mode_changes += 1
             if energy_w != prev_energy_w:
                 self._state_changes += 1
 
@@ -136,6 +157,7 @@ class Simulator:
             math.sqrt(sq_temp_err / len(self._data)),
             math.sqrt(night_sq_temp_err / night_cnt),
             self._state_changes,
+            self._mode_changes,
         )
 
     def plot(self):
@@ -158,7 +180,7 @@ class Simulator:
             dts, construction_tfs, label="Construction", color="darkgrey"
         )
         (surfaces_l,) = temp_ax.plot(
-            dts, surfaces_tfs, label="SURFACES Fixtures", color="lightgrey"
+            dts, surfaces_tfs, label="Surfaces", color="lightgrey"
         )
         (heat_set_l,) = temp_ax.plot(dts, heat_set_tfs, label="Heat", color="red")
         (cool_set_l,) = temp_ax.plot(dts, cool_set_tfs, label="Cool", color="blue")

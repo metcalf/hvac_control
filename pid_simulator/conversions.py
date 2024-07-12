@@ -24,3 +24,7 @@ def btuhr_to_w(pwr):
 
 def lb_to_kg(lb):
     return lb * 0.453592
+
+
+def j_to_wh(j):
+    return j * 0.000277778

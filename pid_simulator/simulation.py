@@ -8,11 +8,12 @@ import hvac
 
 
 def print_stats(stats):
-    print("Heating energy (kJ): %d" % stats.heating_energy_kj)
-    print("Cooling energy (kJ): %d" % stats.cooling_energy_kj)
+    print("Heating energy (kwh): %d" % conversions.j_to_wh(stats.heating_energy_kj))
+    print("Cooling energy (kwh): %d" % conversions.j_to_wh(stats.cooling_energy_kj))
     print("Temp error: %.1f" % stats.rms_temp_error)
     print("Night temp error: %.1f" % stats.night_rms_temp_error)
     print("State changes: %d" % stats.state_changes)
+    print("Mode changes: %d" % stats.mode_changes)
 
 
 mbr = Room(
@@ -32,7 +33,7 @@ mbr.init_temp_c(conversions.f_to_c(70))
 
 temps = WeatherInput.from_csv(
     "./weather/KCASANFR1969.csv",
-    after=datetime.datetime(2024, 6, 1),
+    after=datetime.datetime(2024, 7, 1),
 )
 # temps = FixedInput(conversions.f_to_c(70), duration=datetime.timedelta(hours=1))
 # temps = SineInput(conversions.f_to_c(60), conversions.rel_f_to_c(12))
@@ -41,8 +42,13 @@ setpoint_schedule = setpoints.FixedSetpoint(
     conversions.f_to_c(67), conversions.f_to_c(72)
 )
 # hvac_system = hvac.FixedOutput(250)
-# hvac_system = hvac.SimpleThermostat(heat_w=500, cool_w=500)
-hvac_system = hvac.HysteresisThermostat(heat_w=500, cool_w=500)
+hvac_system = hvac.System(
+    (
+        hvac.HysteresisThermostat(power_w=500, is_heater=True),
+        hvac.HysteresisThermostat(power_w=500, is_heater=False),
+    )
+)
+
 
 print("starting run")
 sim = Simulator(temps, mbr, setpoint_schedule, hvac_system)
