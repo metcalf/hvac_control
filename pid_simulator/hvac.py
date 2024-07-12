@@ -1,4 +1,4 @@
-from enum import Enum
+import room
 
 
 class System:
@@ -7,6 +7,18 @@ class System:
 
     def get_energy(self, *args):
         return sum(c.get_energy(*args) for c in self._components)
+
+
+class SimpleFanCooling:
+    def __init__(self, cmm):
+        self._cms = cmm / 60
+
+    # TODO: Add composable hysteresis?
+    def get_energy(self, in_temp_c, out_temp_c, heat_setpoint_c, cool_setpoint_c):
+        if in_temp_c < cool_setpoint_c or out_temp_c >= in_temp_c:
+            return 0
+
+        return room.AIR_HEAT_CAPACITY_J_M3K * (out_temp_c - in_temp_c) * self._cms
 
 
 class SimpleThermostat:

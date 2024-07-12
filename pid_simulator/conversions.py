@@ -28,3 +28,7 @@ def lb_to_kg(lb):
 
 def j_to_wh(j):
     return j * 0.000277778
+
+
+def ft3_to_m3(ft3):
+    return ft3 * 0.0283168

@@ -187,8 +187,8 @@ class Simulator:
         (room_l,) = temp_ax.plot(dts, room_tfs, label="Room")
         (out_l,) = temp_ax.plot(dts, out_tfs, label="Outdoor")
 
-        # energy_ax = temp_ax.twinx()
-        # energy_ax.scatter(dts, energy_js, s=5)
+        energy_ax = temp_ax.twinx()
+        energy_ax.scatter(dts, energy_js, s=5)
 
         temp_ax.set_ylabel("Temp(F)")
         temp_ax.legend()

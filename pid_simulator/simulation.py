@@ -10,8 +10,9 @@ import hvac
 def print_stats(stats):
     print("Heating energy (kwh): %d" % conversions.j_to_wh(stats.heating_energy_kj))
     print("Cooling energy (kwh): %d" % conversions.j_to_wh(stats.cooling_energy_kj))
-    print("Temp error: %.1f" % stats.rms_temp_error)
-    print("Night temp error: %.1f" % stats.night_rms_temp_error)
+    print("Temp error: %.3f" % conversions.rel_c_to_f(stats.rms_temp_error))
+    print("Night temp error: %.3f" % conversions.rel_c_to_f(stats.night_rms_temp_error))
+    # TODO: Maybe want state/mode changes per component?
     print("State changes: %d" % stats.state_changes)
     print("Mode changes: %d" % stats.mode_changes)
 
@@ -45,7 +46,8 @@ setpoint_schedule = setpoints.FixedSetpoint(
 hvac_system = hvac.System(
     (
         hvac.HysteresisThermostat(power_w=500, is_heater=True),
-        hvac.HysteresisThermostat(power_w=500, is_heater=False),
+        # hvac.HysteresisThermostat(power_w=500, is_heater=False),
+        hvac.SimpleFanCooling(conversions.ft3_to_m3(150)),
     )
 )
 
