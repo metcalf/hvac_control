@@ -8,10 +8,9 @@ import hvac
 
 
 def print_stats(stats):
-    print("Heating energy (kwh): %d" % conversions.j_to_wh(stats.heating_energy_kj))
-    print("Cooling energy (kwh): %d" % conversions.j_to_wh(stats.cooling_energy_kj))
-    print("Temp error: %.3f" % conversions.rel_c_to_f(stats.rms_temp_error))
-    print("Night temp error: %.3f" % conversions.rel_c_to_f(stats.night_rms_temp_error))
+    print("Energy (kwh): %s" % stats.total_energy)
+    print("Temp error: %s" % stats.rms_temp_error)
+    print("Night temp error: %s" % stats.night_rms_temp_error)
     # TODO: Maybe want state/mode changes per component?
     print("State changes: %d" % stats.state_changes)
     print("Mode changes: %d" % stats.mode_changes)
@@ -39,18 +38,27 @@ temps = WeatherInput.from_csv(
 # temps = FixedInput(conversions.f_to_c(70), duration=datetime.timedelta(hours=1))
 # temps = SineInput(conversions.f_to_c(60), conversions.rel_f_to_c(12))
 
-setpoint_schedule = setpoints.FixedSetpoint(
-    conversions.f_to_c(67), conversions.f_to_c(72)
+# setpoint_schedule = setpoints.FixedSetpoint(
+#     conversions.f_to_c(67), conversions.f_to_c(72)
+# )
+setpoint_schedule = setpoints.DayNightSetpoint(
+    day_heat=conversions.f_to_c(67),
+    day_cool=conversions.f_to_c(72),
+    night_heat=conversions.f_to_c(66),
+    night_cool=conversions.f_to_c(68),
+    precool_rate_c_hr=conversions.rel_f_to_c(1),
 )
 # hvac_system = hvac.FixedOutput(250)
 hvac_system = hvac.System(
-    (
-        hvac.HysteresisThermostat(power_w=500, is_heater=True),
-        # hvac.HysteresisThermostat(power_w=500, is_heater=False),
-        hvac.SimpleFanCooling(conversions.ft3_to_m3(150)),
-    )
+    {
+        "heat": hvac.HysteresisThermostat(power_w=500, is_heater=True),
+        "ac": hvac.TempDelay(
+            temp_delay_c=conversions.rel_f_to_c(4),
+            component=hvac.HysteresisThermostat(power_w=500, is_heater=False),
+        ),
+        "fan": hvac.SimpleFanCooling(conversions.ft3_to_m3(150)),
+    }
 )
-
 
 print("starting run")
 sim = Simulator(temps, mbr, setpoint_schedule, hvac_system)

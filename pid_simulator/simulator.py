@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 import conversions
 import datetime
 from enum import Enum
+import hvac
 
 DataPoint = namedtuple(
     "DataPoint",
@@ -15,20 +16,46 @@ DataPoint = namedtuple(
         "cool_setpoint_c",
         "construction_temp_c",
         "surfaces_temp_c",
-        "energy_j",
+        "system_energy",
     ),
 )
 Stats = namedtuple(
     "Stats",
     (
-        "heating_energy_kj",
-        "cooling_energy_kj",
+        "total_energy",
         "rms_temp_error",
         "night_rms_temp_error",
         "state_changes",
         "mode_changes",
     ),
 )
+
+
+class RMSTempError:
+    def __init__(self):
+        self._sq_temp_errs = [0, 0, 0]
+        self._cnt = 0
+
+    def record(self, datapoint):
+        if datapoint.room_temp_c > datapoint.cool_setpoint_c:
+            err = (datapoint.room_temp_c - datapoint.cool_setpoint_c) ** 2
+            self._sq_temp_errs[2] += err
+        elif datapoint.room_temp_c < datapoint.heat_setpoint_c:
+            err = (datapoint.room_temp_c - datapoint.heat_setpoint_c) ** 2
+            self._sq_temp_errs[1] += err
+        else:
+            err = 0
+
+        self._sq_temp_errs[0] += err
+        self._cnt += 1
+
+    def rms(self):
+        return [math.sqrt(e / self._cnt) for e in self._sq_temp_errs]
+
+    def __str__(self):
+        return "{:.3f} (heat: {:.3f}, cool: {:.3f})".format(
+            *(conversions.rel_c_to_f(t) for t in self.rms())
+        )
 
 
 class Simulator:
@@ -38,10 +65,10 @@ class Simulator:
         HEAT = 1
 
         @classmethod
-        def from_energy(cls, e):
-            if e > 0:
+        def from_power(cls, p):
+            if p > 0:
                 return cls.HEAT
-            elif e < 0:
+            elif p < 0:
                 return cls.COOL
             else:
                 return cls.OFF
@@ -60,29 +87,27 @@ class Simulator:
         self._hvac_system = hvac_system
         self._max_interval_s = max_interval_min * 60
         self._data = []
-        self._heating_energy_j = 0
-        self._cooling_energy_j = 0
         self._state_changes = 0
         self._mode_changes = 0
         self._hvac_mode = self.HVACMode.OFF
 
     def run(self, step_s=1, plot_all=False):
-        prev_energy_w = 0
+        prev_power_w = 0
         prev_dt = None
 
         for dt, tc in self._outdoor_temp_input:
             heat_setpoint_c, cool_setpoint_c = self._setpoint_schedule.get(dt)
-            energy_w = self._hvac_system.get_energy(
+            system_power = self._hvac_system.get_power(
                 self._room.air_temp_c, tc, heat_setpoint_c, cool_setpoint_c
             )
-            mode = self.HVACMode.from_energy(energy_w)
+            mode = self.HVACMode.from_power(system_power.total_power_w)
             if mode != self._hvac_mode:
                 self._hvac_mode = mode
                 self._mode_changes += 1
-            if energy_w != prev_energy_w:
+            if system_power.total_power_w != prev_power_w:
                 self._state_changes += 1
 
-            total_energy_j = 0
+            total_energy = hvac.SystemEnergy()
             if prev_dt is not None:
                 total_delta_s = (dt - prev_dt).total_seconds()
                 curr_dt = dt
@@ -90,14 +115,11 @@ class Simulator:
                     curr_delta_s = min(total_delta_s, step_s)
                     # Limit the maximum time we apply the energy to avoid runaway issues
                     # if there's a big gap in outdoor temp data
-                    energy_j = energy_w * min(curr_delta_s, self._max_interval_s)
-                    total_energy_j += energy_j
-                    self._room.update(curr_delta_s, tc, energy_j)
-
-                    if energy_j > 0:
-                        self._heating_energy_j += energy_j
-                    else:
-                        self._cooling_energy_j += -energy_j
+                    system_energy = system_power.energy(
+                        min(curr_delta_s, self._max_interval_s)
+                    )
+                    total_energy += system_energy
+                    self._room.update(curr_delta_s, tc, system_energy.net_energy_j)
 
                     if plot_all:
                         self._data.append(
@@ -109,7 +131,7 @@ class Simulator:
                                 cool_setpoint_c,
                                 self._room.construction_temp_c,
                                 self._room.surfaces_temp_c,
-                                energy_j,
+                                system_energy,
                             )
                         )
                         curr_dt += datetime.timedelta(seconds=curr_delta_s)
@@ -126,36 +148,28 @@ class Simulator:
                         cool_setpoint_c,
                         self._room.construction_temp_c,
                         self._room.surfaces_temp_c,
-                        total_energy_j,
+                        total_energy,
                     )
                 )
 
             prev_dt = dt
-            prev_energy_w = energy_w
+            prev_power_w = system_power.total_power_w
 
     def stats(self):
-        sq_temp_err = 0
-        night_sq_temp_err = 0
-        night_cnt = 0
+        all_err = RMSTempError()
+        night_err = RMSTempError()
+        total_energy = hvac.SystemEnergy()
         for dp in self._data:
-            if dp.room_temp_c > dp.cool_setpoint_c:
-                err = dp.room_temp_c - dp.cool_setpoint_c
-            elif dp.room_temp_c < dp.heat_setpoint_c:
-                err = dp.room_temp_c - dp.heat_setpoint_c
-            else:
-                err = 0
+            all_err.record(dp)
+            if dp.datetime.hour < 7 or dp.datetime.hour > 21:
+                night_err.record(dp)
 
-            sq_err = err**2
-            sq_temp_err += sq_err
-            if dp.datetime.hour < 7 or dp.datetime.hour > 8:
-                night_sq_temp_err += sq_err
-                night_cnt += 1
+            total_energy += dp.system_energy
 
         return Stats(
-            self._heating_energy_j / 1000.0,
-            self._cooling_energy_j / 1000.0,  # TODO: Split out fan cooling from A/C
-            math.sqrt(sq_temp_err / len(self._data)),
-            math.sqrt(night_sq_temp_err / night_cnt),
+            total_energy,
+            all_err,
+            night_err,
             self._state_changes,
             self._mode_changes,
         )
@@ -172,16 +186,18 @@ class Simulator:
             conversions.c_to_f(dp.construction_temp_c) for dp in self._data
         ]
         surfaces_tfs = [conversions.c_to_f(dp.surfaces_temp_c) for dp in self._data]
-        energy_js = [conversions.c_to_f(dp.energy_j) for dp in self._data]
+        energy_js = [
+            conversions.c_to_f(dp.system_energy.net_energy_j) for dp in self._data
+        ]
 
         fig, temp_ax = plt.subplots()
 
-        (construction_l,) = temp_ax.plot(
-            dts, construction_tfs, label="Construction", color="darkgrey"
-        )
-        (surfaces_l,) = temp_ax.plot(
-            dts, surfaces_tfs, label="Surfaces", color="lightgrey"
-        )
+        # (construction_l,) = temp_ax.plot(
+        #     dts, construction_tfs, label="Construction", color="darkgrey"
+        # )
+        # (surfaces_l,) = temp_ax.plot(
+        #     dts, surfaces_tfs, label="Surfaces", color="lightgrey"
+        # )
         (heat_set_l,) = temp_ax.plot(dts, heat_set_tfs, label="Heat", color="red")
         (cool_set_l,) = temp_ax.plot(dts, cool_set_tfs, label="Cool", color="blue")
         (room_l,) = temp_ax.plot(dts, room_tfs, label="Room")
