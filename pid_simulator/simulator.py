@@ -59,20 +59,6 @@ class RMSTempError:
 
 
 class Simulator:
-    class HVACMode(Enum):
-        COOL = -1
-        OFF = 0
-        HEAT = 1
-
-        @classmethod
-        def from_power(cls, p):
-            if p > 0:
-                return cls.HEAT
-            elif p < 0:
-                return cls.COOL
-            else:
-                return cls.OFF
-
     def __init__(
         self,
         outdoor_temp_input,
@@ -89,7 +75,7 @@ class Simulator:
         self._data = []
         self._state_changes = 0
         self._mode_changes = 0
-        self._hvac_mode = self.HVACMode.OFF
+        self._hvac_mode = hvac.HVACMode.OFF
 
     def run(self, step_s=1, plot_all=False):
         prev_power_w = 0
@@ -100,7 +86,7 @@ class Simulator:
             system_power = self._hvac_system.get_power(
                 self._room.air_temp_c, tc, heat_setpoint_c, cool_setpoint_c
             )
-            mode = self.HVACMode.from_power(system_power.total_power_w)
+            mode = hvac.HVACMode.from_power(system_power.total_power_w)
             if mode != self._hvac_mode:
                 self._hvac_mode = mode
                 self._mode_changes += 1
@@ -186,9 +172,7 @@ class Simulator:
             conversions.c_to_f(dp.construction_temp_c) for dp in self._data
         ]
         surfaces_tfs = [conversions.c_to_f(dp.surfaces_temp_c) for dp in self._data]
-        energy_js = [
-            conversions.c_to_f(dp.system_energy.net_energy_j) for dp in self._data
-        ]
+        energy_js = [dp.system_energy.net_energy_j for dp in self._data]
 
         fig, temp_ax = plt.subplots()
 
@@ -201,10 +185,11 @@ class Simulator:
         (heat_set_l,) = temp_ax.plot(dts, heat_set_tfs, label="Heat", color="red")
         (cool_set_l,) = temp_ax.plot(dts, cool_set_tfs, label="Cool", color="blue")
         (room_l,) = temp_ax.plot(dts, room_tfs, label="Room")
-        (out_l,) = temp_ax.plot(dts, out_tfs, label="Outdoor")
+        # (out_l,) = temp_ax.plot(dts, out_tfs, label="Outdoor")
 
         energy_ax = temp_ax.twinx()
         energy_ax.scatter(dts, energy_js, s=5)
+        energy_ax.set_ylabel("Power(J)")
 
         temp_ax.set_ylabel("Temp(F)")
         temp_ax.legend()

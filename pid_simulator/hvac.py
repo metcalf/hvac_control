@@ -1,10 +1,25 @@
 import room
 from functools import cached_property
 import conversions
-import math
+from enum import Enum
 
 # Fan cooling needs to know temps
 # Temp delay needs to know temps
+
+
+class HVACMode(Enum):
+    COOL = -1
+    OFF = 0
+    HEAT = 1
+
+    @classmethod
+    def from_power(cls, p):
+        if p > 0:
+            return cls.HEAT
+        elif p < 0:
+            return cls.COOL
+        else:
+            return cls.OFF
 
 
 class SystemEnergy:
@@ -55,10 +70,10 @@ class SystemPower:
         return sum(p for p in self._component_power_w.values())
 
     def __str__(self):
-        return "%.1f (%s)" % (
+        return "%.2f (%s)" % (
             (self.total_power_w / 1000.0),
             ", ".join(
-                "%s:%.1f" % (n, p / 1000.0) for n, p in self._component_power_w.items()
+                "%s:%.2f" % (n, p / 1000.0) for n, p in self._component_power_w.items()
             ),
         )
 
@@ -81,28 +96,48 @@ class PIDSystem:
         self._components_by_name = components_by_name
         self._p_range_c = float(p_range_c)
         self._i = 0.0
-        self._t_i = 10
-        self._last_setpoint_c = None
+        self._t_i = 2
+        self._i_mode = HVACMode.OFF
 
     def get_power(self, in_temp_c, out_temp_c, heat_setpoint_c, cool_setpoint_c):
-        setpoint_c = None
+        p_setpoint_c = None
+        i_setpoint_c = None
         sign = 1
+
         if in_temp_c > cool_setpoint_c:
-            setpoint_c = cool_setpoint_c
+            p_setpoint_c = cool_setpoint_c
+            self._i_mode = HVACMode.COOL
             sign = -1
         elif in_temp_c < heat_setpoint_c:
-            setpoint_c = heat_setpoint_c
+            p_setpoint_c = heat_setpoint_c
+            self._i_mode = HVACMode.HEAT
 
-        if setpoint_c is not None:
-            abs_p_err = abs(setpoint_c - in_temp_c) / self._p_range_c
-            i_err = sign * abs_p_err
-            self._last_setpoint_c = setpoint_c
+        if self._i_mode == HVACMode.COOL:
+            i_setpoint_c = cool_setpoint_c
+        elif self._i_mode == HVACMode.HEAT:
+            i_setpoint_c = heat_setpoint_c
+
+        if p_setpoint_c is not None:
+            abs_p_err = abs(p_setpoint_c - in_temp_c) / self._p_range_c
         else:
             abs_p_err = 0
-            i_err = ((self._last_setpoint_c or in_temp_c) - in_temp_c) / self._p_range_c
+
+        if i_setpoint_c is not None:
+            i_err = (i_setpoint_c - in_temp_c) / self._p_range_c
+        else:
+            i_err = 0
 
         # TODO: Integral error should be based on the last setpoint we
         # exceeded, not the same error as proportional
+
+        # If integral is positive (heating), compute error on heat setpoint
+        # If integral is negative (cooling), compute error on the cool setpoint
+        # If integral is zero, base it on the proportional setpoint
+        # We need to avoid discontinuity when the integral crosses zero
+
+        # If last proportional error was positive (heating), integral can only be positive
+        # If last proportional error was negative (cooling), integral can only be negative
+        # Need to account for setpoint changes so don't just store the last one
 
         p_demand = sign * abs_p_err
         self._i += i_err
@@ -124,12 +159,12 @@ class PIDSystem:
         p_demand = self._clamp(p_demand)
 
         # TODO: Should we clamp integral to never be opposite proportional?
-        upper = 1
-        lower = -1
+        upper = 1 if self._i_mode == HVACMode.HEAT else 0
+        lower = -1 if self._i_mode == HVACMode.COOL else 0
         if p_demand > 0:
-            upper = upper - p_demand
+            upper = max(0, upper - p_demand)
         else:
-            lower = lower - p_demand
+            lower = min(0, lower - p_demand)
 
         # If clamped p_demand is:
         # 1, clamp _i=[-1*t_i, 0*_t_i]
@@ -137,7 +172,16 @@ class PIDSystem:
         # 0, clamp _i=[1*-t_i, 1*_t_i]
         # -0.5, clamp _i=[-0.5*_t_, 1*_t_i]
         # -1, clamp, _i=[0*_t_i, 1*_t_i]
-        self._i = self._clamp(self._i, lower * self._t_i, upper * self._t_i)
+
+        # Concept here was to limit the range of i further but doesn't seem to help
+        # much with overshoot
+        i_demand_max = 1
+
+        self._i = self._clamp(
+            self._i,
+            max(-i_demand_max, lower) * self._t_i,
+            min(i_demand_max, upper) * self._t_i,
+        )
 
     def _clamp(self, value, min_value=-1, max_value=1):
         return max(min_value, min(value, max_value))
@@ -146,6 +190,19 @@ class PIDSystem:
 class FanCooling:
     def __init__(self, m3_m):
         self._m3_s = m3_m / 60.0
+
+    def _get_power_for_delta(self, delta_c):
+        if delta_c >= 0:
+            return 0
+
+        return room.AIR_HEAT_CAPACITY_J_M3K * delta_c * self._m3_s
+
+    def get_available(self, in_temp_c, out_temp_c):
+        delta = out_temp_c - in_temp_c
+        return (
+            self._get_power_for_delta(delta),
+            self._get_power_for_delta(min(-10, delta)),
+        )
 
     def get_power(self, in_temp_c, out_temp_c, heat_setpoint_c, cool_setpoint_c):
         demand = -1 if in_temp_c > cool_setpoint_c else 0
@@ -172,6 +229,10 @@ class Thermostat:
         self._power_w = power_w
         self._is_heater = is_heater
 
+    def get_available(self, *args):
+        pwr = self._power_w * (1 if self._is_heater else -1)
+        return (pwr, pwr)
+
     def get_power(self, in_temp_c, out_temp_c, heat_setpoint_c, cool_setpoint_c):
         if in_temp_c > cool_setpoint_c:
             demand = -1
@@ -187,7 +248,7 @@ class Thermostat:
     def get_power_with_demand(
         self, demand, in_temp_c, out_temp_c, heat_setpoint_c, cool_setpoint_c
     ):
-        if self._is_heater and demand < 0:
+        if (self._is_heater and demand < 0) or (not self._is_heater and demand > 0):
             return 0
 
         return demand * self._power_w
@@ -223,12 +284,22 @@ class TempDelay:
         self._component = component
         self._is_on = False
 
+    def get_available(self, *args):
+        res = self._component.get_available(*args)
+        if not self._is_on:
+            res[0] = 0
+
+        return res
+
     def _handle_power(self, power, in_temp_c, heat_setpoint_c, cool_setpoint_c):
         if power == 0:
             self._is_on = False
-            return power
-
-        if (
+        elif (power < 0 and in_temp_c < cool_setpoint_c) or (
+            power > 0 and in_temp_c > heat_setpoint_c
+        ):
+            # Turn off when we reach setpoin
+            self.is_on = False
+        elif (
             max(heat_setpoint_c - in_temp_c, in_temp_c - cool_setpoint_c)
             > self._temp_delay_c
         ):
@@ -262,6 +333,9 @@ class DiscreteLevels:
         self._level_i = levels.index(0)
         self._max_level_i = len(self._levels) - 1
 
+    def get_available(self, *args):
+        return self._component.get_available(*args)
+
     def get_power_with_demand(
         self, demand, in_temp_c, out_temp_c, heat_setpoint_c, cool_setpoint_c
     ):
@@ -275,8 +349,6 @@ class DiscreteLevels:
             self._level_i += 1
 
         delta = demand - self._levels[self._level_i]
-        if abs(delta) > 0.001:
-            breakpoint()
 
         return self._component.get_power_with_demand(
             self._levels[self._level_i],

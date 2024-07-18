@@ -37,8 +37,7 @@ def create_room():
 
 temps = WeatherInput.from_csv(
     "./weather/KCASANFR1969.csv",
-    after=datetime.datetime(2024, 7, 2),
-    before=datetime.datetime(2024, 7, 6),
+    after=datetime.datetime(2024, 7, 1),
 )
 # temps = FixedInput(conversions.f_to_c(70), duration=datetime.timedelta(hours=1))
 # temps = SineInput(
@@ -73,8 +72,6 @@ fancoil_levels = [
     1,  # H
 ]
 
-fancoil_levels = [n / 1000.0 for n in range(-1000, 1001)]
-
 on_off_system = hvac.System(
     {
         "heat": hvac.HysteresisThermostat(power_w=500, is_heater=True),
@@ -94,7 +91,7 @@ p_system = hvac.PIDSystem(
         ),
         "fan": hvac.FanCooling(conversions.ft3_to_m3(150)),
     },
-    p_range_c=1,
+    p_range_c=conversions.rel_f_to_c(2),
 )
 fancoil_system = hvac.PIDSystem(
     {
@@ -110,11 +107,23 @@ fancoil_system = hvac.PIDSystem(
         ),
         "fan": hvac.FanCooling(conversions.ft3_to_m3(150)),
     },
-    p_range_c=1,
+    p_range_c=conversions.rel_f_to_c(2),
+)
+no_fan_system = hvac.PIDSystem(
+    {
+        "heat": hvac.DiscreteLevels(
+            hvac.Thermostat(power_w=500, is_heater=True), fancoil_levels
+        ),
+        "ac": hvac.DiscreteLevels(
+            hvac.Thermostat(power_w=500, is_heater=False),
+            fancoil_levels,
+        ),
+    },
+    p_range_c=conversions.rel_f_to_c(2),
 )
 hvac_system = p_system
 
-for hvac_system in [p_system, fancoil_system]:
+for hvac_system in [fancoil_system]:
     print("starting run")
     mbr = create_room()
     sim = Simulator(temps, mbr, setpoint_schedule, hvac_system)
