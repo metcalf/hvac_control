@@ -16,27 +16,37 @@ def print_stats(stats):
     print("Mode changes: %d" % stats.mode_changes)
 
 
-mbr = Room(
-    conversions.f3_to_m3(2100),
-    Room.est_transmittance_rate(
-        outdoor_temp_c=conversions.f_to_c(40),
-        design_temp_c=conversions.f_to_c(69),
-        load_watts=conversions.btuhr_to_w(1722),
-    ),
-    surfaces_thermal_mass_j_k=conversions.lb_to_kg(1300)
-    * 1500,  # 1500 J/kg*K is somewhere between cotton and wood
-    # Wow is this number made up to provide enough damping to make the air temp
-    # data look realistic
-    surfaces_transmittance_rate_w_k=2000,
-)
-mbr.init_temp_c(conversions.f_to_c(70))
+def create_room():
+    mbr = Room(
+        conversions.f3_to_m3(2100),
+        Room.est_transmittance_rate(
+            outdoor_temp_c=conversions.f_to_c(40),
+            design_temp_c=conversions.f_to_c(69),
+            load_watts=conversions.btuhr_to_w(1722),
+        ),
+        surfaces_thermal_mass_j_k=conversions.lb_to_kg(1300)
+        * 1500,  # 1500 J/kg*K is somewhere between cotton and wood
+        # Wow is this number made up to provide enough damping to make the air temp
+        # data look realistic
+        surfaces_transmittance_rate_w_k=2000,
+    )
+    mbr.init_temp_c(conversions.f_to_c(70))
+
+    return mbr
+
 
 temps = WeatherInput.from_csv(
     "./weather/KCASANFR1969.csv",
-    after=datetime.datetime(2024, 7, 1),
+    after=datetime.datetime(2024, 7, 2),
+    before=datetime.datetime(2024, 7, 6),
 )
 # temps = FixedInput(conversions.f_to_c(70), duration=datetime.timedelta(hours=1))
-# temps = SineInput(conversions.f_to_c(60), conversions.rel_f_to_c(12))
+# temps = SineInput(
+#     conversions.f_to_c(60),
+#     conversions.rel_f_to_c(12),
+#     duration=datetime.timedelta(days=7),
+#     interval=datetime.timedelta(minutes=5),
+# )
 
 # setpoint_schedule = setpoints.FixedSetpoint(
 #     conversions.f_to_c(67), conversions.f_to_c(72)
@@ -49,21 +59,67 @@ setpoint_schedule = setpoints.DayNightSetpoint(
     precool_rate_c_hr=conversions.rel_f_to_c(1),
 )
 # hvac_system = hvac.FixedOutput(250)
-hvac_system = hvac.System(
+
+# These are based on the fan power consumption at various levels adjusted up a bit since
+# lower speeds produce more output per CFM.
+fancoil_levels = [
+    -1,  # H
+    -0.8,  # M
+    -0.7,  # L
+    0,
+    0.5,  # ultra-low... wild guess
+    0.7,  # L
+    0.8,  # M
+    1,  # H
+]
+
+fancoil_levels = [n / 1000.0 for n in range(-1000, 1001)]
+
+on_off_system = hvac.System(
     {
         "heat": hvac.HysteresisThermostat(power_w=500, is_heater=True),
         "ac": hvac.TempDelay(
             temp_delay_c=conversions.rel_f_to_c(4),
             component=hvac.HysteresisThermostat(power_w=500, is_heater=False),
         ),
-        "fan": hvac.SimpleFanCooling(conversions.ft3_to_m3(150)),
+        "fan": hvac.FanCooling(conversions.ft3_to_m3(150)),
     }
 )
+p_system = hvac.PIDSystem(
+    {
+        "heat": hvac.Thermostat(power_w=500, is_heater=True),
+        "ac": hvac.TempDelay(
+            temp_delay_c=conversions.rel_f_to_c(4),
+            component=hvac.Thermostat(power_w=500, is_heater=False),
+        ),
+        "fan": hvac.FanCooling(conversions.ft3_to_m3(150)),
+    },
+    p_range_c=1,
+)
+fancoil_system = hvac.PIDSystem(
+    {
+        "heat": hvac.DiscreteLevels(
+            hvac.Thermostat(power_w=500, is_heater=True), fancoil_levels
+        ),
+        "ac": hvac.DiscreteLevels(
+            hvac.TempDelay(
+                temp_delay_c=conversions.rel_f_to_c(4),
+                component=hvac.Thermostat(power_w=500, is_heater=False),
+            ),
+            fancoil_levels,
+        ),
+        "fan": hvac.FanCooling(conversions.ft3_to_m3(150)),
+    },
+    p_range_c=1,
+)
+hvac_system = p_system
 
-print("starting run")
-sim = Simulator(temps, mbr, setpoint_schedule, hvac_system)
-sim.run(step_s=20, plot_all=False)
-print("ran")
+for hvac_system in [p_system, fancoil_system]:
+    print("starting run")
+    mbr = create_room()
+    sim = Simulator(temps, mbr, setpoint_schedule, hvac_system)
+    sim.run(step_s=20, plot_all=False)
+    print("ran")
 
-print_stats(sim.stats())
-sim.plot()
+    print_stats(sim.stats())
+    sim.plot()

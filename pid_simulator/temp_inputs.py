@@ -9,12 +9,16 @@ SECS_PER_DAY = 60 * 60 * 24
 
 class FixedInput:
     def __init__(self, temp, duration, interval=datetime.timedelta(seconds=30)):
+        self.reset()
         self._temp = temp
-        self._current = FIXED_START
         self._end = self._current + duration
         self._interval = interval
 
+    def reset(self):
+        self._current = FIXED_START
+
     def __iter__(self):
+        self.reset()
         return self
 
     def __next__(self):
@@ -39,6 +43,7 @@ class SineInput:
         self._amplitude_c = amplitude_c
 
     def __iter__(self):
+        self._fixed_input.reset()
         return self
 
     def __next__(self):
