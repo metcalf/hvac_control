@@ -66,12 +66,12 @@ class SystemPower:
         return SystemEnergy({n: time_s * p for n, p in self._component_power_w.items()})
 
     @cached_property
-    def total_power_w(self):
+    def net_power_w(self):
         return sum(p for p in self._component_power_w.values())
 
     def __str__(self):
         return "%.2f (%s)" % (
-            (self.total_power_w / 1000.0),
+            (self.net_power_w / 1000.0),
             ", ".join(
                 "%s:%.2f" % (n, p / 1000.0) for n, p in self._component_power_w.items()
             ),
@@ -92,11 +92,11 @@ class System:
 
 
 class PIDSystem:
-    def __init__(self, components_by_name, p_range_c=1):
+    def __init__(self, components_by_name, p_range_c, t_i):
         self._components_by_name = components_by_name
         self._p_range_c = float(p_range_c)
         self._i = 0.0
-        self._t_i = 2
+        self._t_i = t_i
         self._i_mode = HVACMode.OFF
 
     def get_power(self, in_temp_c, out_temp_c, heat_setpoint_c, cool_setpoint_c):

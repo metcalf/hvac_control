@@ -1,5 +1,5 @@
 from room import Room
-from temp_inputs import WeatherInput, FixedInput, SineInput
+from temp_inputs import WeatherInput, FixedInput, SineInput, InterpolatedInput
 import conversions
 import datetime
 import setpoints
@@ -12,7 +12,7 @@ def print_stats(stats):
     print("Temp error: %s" % stats.rms_temp_error)
     print("Night temp error: %s" % stats.night_rms_temp_error)
     # TODO: Maybe want state/mode changes per component?
-    print("State changes: %d" % stats.state_changes)
+    # print("State changes: %d" % stats.state_changes)
     print("Mode changes: %d" % stats.mode_changes)
 
 
@@ -35,16 +35,20 @@ def create_room():
     return mbr
 
 
-temps = WeatherInput.from_csv(
-    "./weather/KCASANFR1969.csv",
-    after=datetime.datetime(2024, 7, 1),
+temps = InterpolatedInput(
+    WeatherInput.from_csv(
+        "./weather/KCASANFR1934.csv",
+        # after=datetime.datetime(2023, 7, 1),
+        # before=datetime.datetime(2024, 2, 1),
+    ),
+    interval=datetime.timedelta(minutes=1),
 )
 # temps = FixedInput(conversions.f_to_c(70), duration=datetime.timedelta(hours=1))
 # temps = SineInput(
 #     conversions.f_to_c(60),
 #     conversions.rel_f_to_c(12),
 #     duration=datetime.timedelta(days=7),
-#     interval=datetime.timedelta(minutes=5),
+#     interval=datetime.timedelta(minutes=1),
 # )
 
 # setpoint_schedule = setpoints.FixedSetpoint(
@@ -92,22 +96,7 @@ p_system = hvac.PIDSystem(
         "fan": hvac.FanCooling(conversions.ft3_to_m3(150)),
     },
     p_range_c=conversions.rel_f_to_c(2),
-)
-fancoil_system = hvac.PIDSystem(
-    {
-        "heat": hvac.DiscreteLevels(
-            hvac.Thermostat(power_w=500, is_heater=True), fancoil_levels
-        ),
-        "ac": hvac.DiscreteLevels(
-            hvac.TempDelay(
-                temp_delay_c=conversions.rel_f_to_c(4),
-                component=hvac.Thermostat(power_w=500, is_heater=False),
-            ),
-            fancoil_levels,
-        ),
-        "fan": hvac.FanCooling(conversions.ft3_to_m3(150)),
-    },
-    p_range_c=conversions.rel_f_to_c(2),
+    t_i=2,
 )
 no_fan_system = hvac.PIDSystem(
     {
@@ -120,15 +109,36 @@ no_fan_system = hvac.PIDSystem(
         ),
     },
     p_range_c=conversions.rel_f_to_c(2),
+    t_i=2,
 )
 hvac_system = p_system
 
-for hvac_system in [fancoil_system]:
+
+def fancoil_system(t_i=1):
+    return hvac.PIDSystem(
+        {
+            "heat": hvac.DiscreteLevels(
+                hvac.Thermostat(power_w=500, is_heater=True), fancoil_levels
+            ),
+            "ac": hvac.DiscreteLevels(
+                hvac.TempDelay(
+                    temp_delay_c=conversions.rel_f_to_c(4),
+                    component=hvac.Thermostat(power_w=500, is_heater=False),
+                ),
+                fancoil_levels,
+            ),
+            "fan": hvac.FanCooling(conversions.ft3_to_m3(150)),
+        },
+        p_range_c=conversions.rel_f_to_c(2),
+        t_i=t_i,
+    )
+
+
+for hvac_system in [fancoil_system(t_i) for t_i in (2, 4, 6, 8)]:
     print("starting run")
     mbr = create_room()
     sim = Simulator(temps, mbr, setpoint_schedule, hvac_system)
     sim.run(step_s=20, plot_all=False)
-    print("ran")
 
     print_stats(sim.stats())
-    sim.plot()
+    # sim.plot()

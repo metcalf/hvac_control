@@ -7,28 +7,53 @@ FIXED_START = datetime.datetime(2000, 1, 1)
 SECS_PER_DAY = 60 * 60 * 24
 
 
-class FixedInput:
-    def __init__(self, temp, duration, interval=datetime.timedelta(seconds=30)):
-        self.reset()
-        self._temp = temp
-        self._end = self._current + duration
+class InterpolatedInput:
+    # TODO: Implement max_jump
+    def __init__(self, input, interval=datetime.timedelta(minutes=1)):
+        if interval.microseconds != 0:
+            raise ValueError("microsecond intervals not supported")
+
+        self._input = input
         self._interval = interval
 
-    def reset(self):
-        self._current = FIXED_START
+    def __iter__(self):
+        prev_dt = None
+        prev_tc = None
+
+        for in_dt, in_tc in self._input:
+            if prev_dt is None:
+                prev_dt = in_dt
+                prev_tc = in_tc
+                continue
+
+            yield (prev_dt, prev_tc)
+
+            curr_dt = prev_dt.replace()  # Copy
+            curr_tc = prev_tc
+            curr_slope = float(in_tc - prev_tc) / (in_dt - prev_dt).total_seconds()
+
+            while curr_dt < in_dt:
+                yield (curr_dt, curr_tc)
+                curr_dt += self._interval
+                curr_tc += curr_slope * self._interval.total_seconds()
+
+            prev_dt = in_dt
+            prev_tc = in_tc
+
+
+class FixedInput:
+    def __init__(self, temp, duration, interval=datetime.timedelta(seconds=30)):
+        self._temp = temp
+        self._duration = duration
+        self._interval = interval
 
     def __iter__(self):
-        self.reset()
-        return self
+        current = FIXED_START
+        end = current + self._duration
 
-    def __next__(self):
-        if self._current > self._end:
-            raise StopIteration
-
-        dt = self._current
-        self._current += self._interval
-
-        return (dt, self._temp)
+        while current <= end:
+            yield (current, self._temp)
+            current += self._interval
 
 
 class SineInput:
@@ -43,21 +68,17 @@ class SineInput:
         self._amplitude_c = amplitude_c
 
     def __iter__(self):
-        self._fixed_input.reset()
-        return self
-
-    def __next__(self):
-        dt, offset = next(self._fixed_input)
-
-        return dt, offset + self._amplitude_c * math.sin(
-            2 * math.pi * (dt - FIXED_START).total_seconds() / float(SECS_PER_DAY)
-        )
+        for dt, offset in self._fixed_input:
+            yield dt, offset + self._amplitude_c * math.sin(
+                2 * math.pi * (dt - FIXED_START).total_seconds() / float(SECS_PER_DAY)
+            )
 
 
 class WeatherInput:
     @staticmethod
     def from_csv(path, after=None, before=None):
         data = []
+        seen_dts = set()
 
         with open(path) as csvfile:
             reader = csv.reader(csvfile)
@@ -68,14 +89,20 @@ class WeatherInput:
                     continue
                 if before is not None and before < dt:
                     continue
+                if dt in seen_dts:
+                    print("duplicate weather data: ", dt)
+                    continue
+                seen_dts.add(dt)
 
                 data.append((dt, float(tc)))
+
+        print("Read %d weater measurements" % len(data))
 
         return WeatherInput(sorted(data))
 
     def __init__(self, data):
         self._data = data
-        self._iter = iter(data)
 
     def __iter__(self):
+
         return iter(self._data)

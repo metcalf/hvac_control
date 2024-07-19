@@ -17,6 +17,7 @@ DataPoint = namedtuple(
         "construction_temp_c",
         "surfaces_temp_c",
         "system_energy",
+        "system_power",
     ),
 )
 Stats = namedtuple(
@@ -73,30 +74,24 @@ class Simulator:
         self._hvac_system = hvac_system
         self._max_interval_s = max_interval_min * 60
         self._data = []
+
         self._state_changes = 0
         self._mode_changes = 0
         self._hvac_mode = hvac.HVACMode.OFF
+        self._prev_power_w = None
 
     def run(self, step_s=1, plot_all=False):
-        prev_power_w = 0
         prev_dt = None
 
         for dt, tc in self._outdoor_temp_input:
             heat_setpoint_c, cool_setpoint_c = self._setpoint_schedule.get(dt)
-            system_power = self._hvac_system.get_power(
-                self._room.air_temp_c, tc, heat_setpoint_c, cool_setpoint_c
-            )
-            mode = hvac.HVACMode.from_power(system_power.total_power_w)
-            if mode != self._hvac_mode:
-                self._hvac_mode = mode
-                self._mode_changes += 1
-            if system_power.total_power_w != prev_power_w:
-                self._state_changes += 1
+            system_power = self._update_power(tc, heat_setpoint_c, cool_setpoint_c)
 
             total_energy = hvac.SystemEnergy()
             if prev_dt is not None:
                 total_delta_s = (dt - prev_dt).total_seconds()
                 curr_dt = dt
+                # TODO: We could tweak this logic to avoid uneven intervals
                 while total_delta_s > 0:
                     curr_delta_s = min(total_delta_s, step_s)
                     # Limit the maximum time we apply the energy to avoid runaway issues
@@ -135,11 +130,11 @@ class Simulator:
                         self._room.construction_temp_c,
                         self._room.surfaces_temp_c,
                         total_energy,
+                        system_power,
                     )
                 )
 
             prev_dt = dt
-            prev_power_w = system_power.total_power_w
 
     def stats(self):
         all_err = RMSTempError()
@@ -172,7 +167,7 @@ class Simulator:
             conversions.c_to_f(dp.construction_temp_c) for dp in self._data
         ]
         surfaces_tfs = [conversions.c_to_f(dp.surfaces_temp_c) for dp in self._data]
-        energy_js = [dp.system_energy.net_energy_j for dp in self._data]
+        power_ws = [dp.system_power.net_power_w for dp in self._data]
 
         fig, temp_ax = plt.subplots()
 
@@ -182,16 +177,34 @@ class Simulator:
         # (surfaces_l,) = temp_ax.plot(
         #     dts, surfaces_tfs, label="Surfaces", color="lightgrey"
         # )
-        (heat_set_l,) = temp_ax.plot(dts, heat_set_tfs, label="Heat", color="red")
-        (cool_set_l,) = temp_ax.plot(dts, cool_set_tfs, label="Cool", color="blue")
-        (room_l,) = temp_ax.plot(dts, room_tfs, label="Room")
-        # (out_l,) = temp_ax.plot(dts, out_tfs, label="Outdoor")
+        temp_ax.plot(dts, heat_set_tfs, label="Heat", color="red")
+        temp_ax.plot(dts, cool_set_tfs, label="Cool", color="blue")
+        temp_ax.plot(dts, room_tfs, label="Room")
+        # temp_ax.plot(dts, out_tfs, label="Outdoor")
 
-        energy_ax = temp_ax.twinx()
-        energy_ax.scatter(dts, energy_js, s=5)
-        energy_ax.set_ylabel("Power(J)")
+        # power_ax = temp_ax.twinx()
+        # power_ax.scatter(dts, power_ws, s=5)
+        # power_ax.set_ylabel("Power(J)")
 
         temp_ax.set_ylabel("Temp(F)")
         temp_ax.legend()
 
         plt.show()
+
+    def _update_power(self, out_t_c, heat_setpoint_c, cool_setpoint_c):
+        system_power = self._hvac_system.get_power(
+            self._room.air_temp_c, out_t_c, heat_setpoint_c, cool_setpoint_c
+        )
+        mode = hvac.HVACMode.from_power(system_power.net_power_w)
+        if self._hvac_mode is not None and mode != self._hvac_mode:
+            self._hvac_mode = mode
+            self._mode_changes += 1
+        if (
+            self._prev_power_w is not None
+            and system_power.net_power_w != self._prev_power_w
+        ):
+            self._state_changes += 1
+
+        self._prev_power_w = system_power
+
+        return system_power
