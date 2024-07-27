@@ -112,6 +112,11 @@ class PIDSystem:
             p_setpoint_c = heat_setpoint_c
             self._i_mode = HVACMode.HEAT
 
+        # Integral error is based on the last setpoint we exceeded to avoid a persistent
+        # integral term when we're in the deadband. Otherwise you get behavior like
+        # cooling to the cool setpoint and then the integral continuing cooling (wasting
+        # energy) until you go below the heat setpoint. `_clamp_integral` works together
+        # with this logic.
         if self._i_mode == HVACMode.COOL:
             i_setpoint_c = cool_setpoint_c
         elif self._i_mode == HVACMode.HEAT:
@@ -126,18 +131,6 @@ class PIDSystem:
             i_err = (i_setpoint_c - in_temp_c) / self._p_range_c
         else:
             i_err = 0
-
-        # TODO: Integral error should be based on the last setpoint we
-        # exceeded, not the same error as proportional
-
-        # If integral is positive (heating), compute error on heat setpoint
-        # If integral is negative (cooling), compute error on the cool setpoint
-        # If integral is zero, base it on the proportional setpoint
-        # We need to avoid discontinuity when the integral crosses zero
-
-        # If last proportional error was positive (heating), integral can only be positive
-        # If last proportional error was negative (cooling), integral can only be negative
-        # Need to account for setpoint changes so don't just store the last one
 
         p_demand = sign * abs_p_err
         self._i += i_err
@@ -158,29 +151,22 @@ class PIDSystem:
     def _clamp_integral(self, p_demand):
         p_demand = self._clamp(p_demand)
 
-        # TODO: Should we clamp integral to never be opposite proportional?
+        # Ensure the integral only acts in the direction we last had a proportional signal
+        # this allows us to move between heat and cool setpoints as the load changes and
+        # avoid wasting energy both heating and cooling to tightly track a single
+        # setpoint.
         upper = 1 if self._i_mode == HVACMode.HEAT else 0
         lower = -1 if self._i_mode == HVACMode.COOL else 0
+
         if p_demand > 0:
             upper = max(0, upper - p_demand)
         else:
             lower = min(0, lower - p_demand)
 
-        # If clamped p_demand is:
-        # 1, clamp _i=[-1*t_i, 0*_t_i]
-        # 0.5, clamp _i=[-1*t_i, 0.5*_t_i]
-        # 0, clamp _i=[1*-t_i, 1*_t_i]
-        # -0.5, clamp _i=[-0.5*_t_, 1*_t_i]
-        # -1, clamp, _i=[0*_t_i, 1*_t_i]
-
-        # Concept here was to limit the range of i further but doesn't seem to help
-        # much with overshoot
-        i_demand_max = 1
-
         self._i = self._clamp(
             self._i,
-            max(-i_demand_max, lower) * self._t_i,
-            min(i_demand_max, upper) * self._t_i,
+            lower * self._t_i,
+            upper * self._t_i,
         )
 
     def _clamp(self, value, min_value=-1, max_value=1):
@@ -216,6 +202,9 @@ class FanCooling:
         if demand >= 0 or out_temp_c >= in_temp_c:
             return 0
 
+        # TODO: It's possible we should run the fan at higher settings when the delta to
+        # outdoor temp is lower to somewhat even out the power. In practice this probably
+        # doesn't much matter in our climate.
         return (
             -demand
             * room.AIR_HEAT_CAPACITY_J_M3K
