@@ -36,6 +36,11 @@ struct Setpoints {
     double heatTempC, coolTempC;
     uint16_t co2;
 };
+
+struct Demand {
+    float heat_cool, vent;
+};
+
 struct DemandRequest {
     struct FancoilRequest {
         FancoilSpeed speed;
