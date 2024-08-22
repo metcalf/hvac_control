@@ -2,8 +2,6 @@
 
 #include <unordered_map>
 
-#define CX_CTR_BASE
-
 // Adapted from https://github.com/gonzojive/heatpump/edit/main/cx34/cx34_registers.go
 enum class CxRegister {
     SwitchOnOff = 140, // 0 = off, 1 = on
