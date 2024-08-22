@@ -3,7 +3,7 @@
 #include "esp_log.h"
 
 #define NEGATIVE_TEMP_MASK (1 << 15)
-#define TEMP_UNSIGNED_MASK ~NEGATIVE_TEMP_BIT
+#define TEMP_UNSIGNED_MASK ~NEGATIVE_TEMP_MASK
 
 static const char *TAG = "CXIC";
 
@@ -20,8 +20,7 @@ std::unordered_map<CxiRegister, CxiRegDef> cxi_registers_ = {
     {CxiRegister::MinSetTemperature,
      {"MinSetTemperature", 28309, MB_PARAM_HOLDING, CxiRegisterFormat::Unsigned, 0}},
     {CxiRegister::CoolingSetTemperature,
-     {"CoolingSetTemperature", 28310, CxiRcegisterType::Holding, CxiRegisterFormat::Temperature,
-      0}},
+     {"CoolingSetTemperature", 28310, MB_PARAM_HOLDING, CxiRegisterFormat::Temperature, 0}},
     {CxiRegister::HeatingSetTemperature,
      {"HeatingSetTemperature", 28311, MB_PARAM_HOLDING, CxiRegisterFormat::Temperature, 0}},
     {CxiRegister::CoolingSetTemperatureAuto,
@@ -79,7 +78,7 @@ void cxi_client_init(mb_parameter_descriptor_t *deviceParameters, uint startIdx)
     uint i = startIdx;
     for (auto &[reg, def] : cxi_registers_) {
         def.idx = i;
-        deviceParameters_[i] = {
+        deviceParameters[i] = {
             def.idx,
             def.name,
             NULL, // Units (ignored)
@@ -100,11 +99,11 @@ void cxi_client_init(mb_parameter_descriptor_t *deviceParameters, uint startIdx)
 void cxi_client_read_and_print(CxiRegDef def) {
     uint8_t type = 0; // throwaway
     uint16_t value;
-    esp_err_t err = mbc_master_get_parameter(def.idx, (char *)def.name, &value, &type);
+    esp_err_t err = mbc_master_get_parameter(def.idx, (char *)def.name, (uint8_t *)&value, &type);
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "Get failed %s(%d), err = 0x%x (%s)", def.name, def.idx, (int)err,
                  (char *)esp_err_to_name(err));
-        continue;
+        return;
     }
 
     switch (def.format) {

@@ -37,6 +37,10 @@
     },
     {
       "path": "pid_simulator"
+    },
+    {
+      "name": "fancoil_tester",
+      "path": "manual_testing/fancoil_tester"
     }
   ],
   "settings": {
