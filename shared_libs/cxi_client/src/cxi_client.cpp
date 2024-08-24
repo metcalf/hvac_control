@@ -83,7 +83,7 @@ void cxi_client_init(mb_parameter_descriptor_t *deviceParameters, uint startIdx)
             def.name,
             NULL, // Units (ignored)
             CXI_ADDRESS,
-            MB_PARAM_HOLDING,
+            def.registerType,
             def.address,        // Start register address
             1,                  // Number of registers
             0,                  // Instance offset (ignored)
@@ -96,15 +96,95 @@ void cxi_client_init(mb_parameter_descriptor_t *deviceParameters, uint startIdx)
     }
 }
 
-void cxi_client_read_and_print(CxiRegDef def) {
+esp_err_t cxi_client_get_param(CxiRegDef def, uint16_t *value) {
     uint8_t type = 0; // throwaway
-    uint16_t value;
-    esp_err_t err = mbc_master_get_parameter(def.idx, (char *)def.name, (uint8_t *)&value, &type);
+
+    esp_err_t err = mbc_master_get_parameter(def.idx, (char *)def.name, (uint8_t *)value, &type);
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "Get failed %s(%d), err = 0x%x (%s)", def.name, def.idx, (int)err,
                  (char *)esp_err_to_name(err));
-        return;
     }
+
+    return err;
+}
+
+esp_err_t cxi_client_get_param(CxiRegister reg, uint16_t *value) {
+    return cxi_client_get_param(cxi_registers_.at(reg), value);
+}
+
+esp_err_t cxi_client_get_temp_param(CxiRegister reg, double *value) {
+    uint16_t raw;
+    esp_err_t err = cxi_client_get_param(reg, &raw);
+    if (err == ESP_OK) {
+        *value = parse_temp(raw);
+    }
+
+    return err;
+}
+
+esp_err_t cxi_client_set_param(CxiRegDef def, uint16_t value) {
+    uint8_t type = 0; // throwaway
+
+    esp_err_t err = mbc_master_set_parameter(def.idx, (char *)def.name, (uint8_t *)&value, &type);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Set failed %s(%d), err = 0x%x (%s)", def.name, def.idx, (int)err,
+                 (char *)esp_err_to_name(err));
+    }
+
+    return err;
+}
+
+esp_err_t cxi_client_set_param(CxiRegister reg, uint16_t value) {
+    return cxi_client_set_param(cxi_registers_.at(reg), value);
+}
+
+esp_err_t cxi_client_set_temp_param(CxiRegister reg, double value) {
+    uint16_t raw = (uint16_t)(value * 10);
+    if (value < 0) {
+        raw |= NEGATIVE_TEMP_MASK;
+    }
+
+    return cxi_client_set_param(reg, raw);
+}
+
+esp_err_t cxi_client_set_speed_artificial(bool heat, CxiSpeed speed) {
+    if (speed == CxiSpeed::Off) {
+        return cxi_client_set_param(CxiRegister::OnOff, 0);
+    }
+
+    esp_err_t err;
+
+    double roomTempC;
+    err = cxi_client_get_temp_param(CxiRegister::RoomTemperature, &roomTempC);
+    if (err != ESP_OK) {
+        return err;
+    }
+
+    // TODO: This probably isn't quite right
+    double setpointC = roomTempC + (heat ? -1 : 1) * static_cast<int>(speed);
+    err = cxi_client_set_temp_param(
+        heat ? CxiRegister::HeatingSetTemperature : CxiRegister::CoolingSetTemperature, setpointC);
+    if (err != ESP_OK) {
+        return err;
+    }
+
+    err = cxi_client_set_param(CxiRegister::Mode,
+                               static_cast<uint16_t>(heat ? CxiMode::Heat : CxiMode::Cool));
+    if (err != ESP_OK) {
+        return err;
+    }
+
+    err = cxi_client_set_param(CxiRegister::OnOff, 1);
+    if (err != ESP_OK) {
+        return err;
+    }
+
+    return ESP_OK;
+}
+
+void cxi_client_read_and_print(CxiRegDef def) {
+    uint16_t value;
+    cxi_client_get_param(def, &value);
 
     switch (def.format) {
     case CxiRegisterFormat::Unsigned:
@@ -123,5 +203,6 @@ void cxi_client_read_and_print(CxiRegister reg) {
 void cxi_client_read_and_print_all() {
     for (auto &[reg, def] : cxi_registers_) {
         cxi_client_read_and_print(def);
+        vTaskDelay(pdMS_TO_TICKS(10)); // Reading too fast results in periodic timeouts
     }
 };

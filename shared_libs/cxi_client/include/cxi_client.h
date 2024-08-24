@@ -4,7 +4,7 @@
 
 #include <unordered_map>
 
-#define CXI_ADDRESS 16 // Unsure... may be 15, depends on this add one business
+#define CXI_ADDRESS 15
 
 enum class CxiRegister {
     // ENUM = Address	Function Code	Content	Description
@@ -50,6 +50,22 @@ enum class CxiRegisterFormat {
     Temperature,
 };
 
+enum class CxiSpeed {
+    Off,
+    Ultralow,
+    Low,
+    Med,
+    High,
+};
+
+enum class CxiMode {
+    Auto = 0,
+    Cool = 1,
+    Dehumidify = 2,
+    Vent = 3,
+    Heat = 4,
+};
+
 struct CxiRegDef {
     const char *name;
     unsigned short address;
@@ -61,6 +77,13 @@ struct CxiRegDef {
 extern std::unordered_map<CxiRegister, CxiRegDef> cx_registers_;
 
 void cxi_client_init(mb_parameter_descriptor_t *deviceParameters, uint startIdx);
+
+esp_err_t cxi_client_get_param(CxiRegister reg, uint16_t *value);
+esp_err_t cxi_client_get_temp_param(CxiRegister reg, double *value);
+esp_err_t cxi_client_set_param(CxiRegister reg, uint16_t value);
+esp_err_t cxi_client_set_temp_param(CxiRegister reg, double value);
+
+esp_err_t cxi_client_set_speed_artificial(bool heat, CxiSpeed speed);
 
 void cxi_client_read_and_print(CxiRegDef def);
 void cxi_client_read_and_print(CxiRegister reg);
