@@ -136,10 +136,7 @@ FanSpeed ControllerApp::computeFanSpeed(const DemandRequest &request) {
             }
         }
 
-        if (fanSpeed < MIN_FAN_SPEED_VALUE &&
-            AbstractDemandController::isFanCoolingTempLimited(request) &&
-            (std::isnan(rawOutdoorTempC_) ||
-             (now - lastOutdoorTempUpdate_) > OUTDOOR_TEMP_UPDATE_INTERVAL)) {
+        if (!config_.equipment.useWeather && shouldPollOutdoorTemp(request)) {
             // If we're waiting for the outdoor temperature to drop for cooling and
             // we haven't updated the outdoor temperature recently, run the fan until
             // we get an update.
@@ -410,6 +407,13 @@ uint16_t ControllerApp::localMinOfDay() {
     localtime_r(&nowUTC, &nowLocalTm);
 
     return nowLocalTm.tm_hour * 60 + nowLocalTm.tm_min;
+}
+
+bool ControllerApp::shouldPollOutdoorTemp(const DemandRequest &request) {
+    return (fanSpeed < MIN_FAN_SPEED_VALUE &&
+            AbstractDemandController::isFanCoolingTempLimited(request) &&
+            (std::isnan(rawOutdoorTempC_) ||
+             (steadyNow() - lastOutdoorTempUpdate_) > OUTDOOR_TEMP_UPDATE_INTERVAL));
 }
 
 void ControllerApp::logState(const ControllerDomain::FreshAirState &freshAirState,

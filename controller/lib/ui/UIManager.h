@@ -93,6 +93,7 @@ class UIManager : public AbstractUIManager {
     void updateTempLimits(uint8_t maxHeatDeg, uint8_t minCoolDeg);
     void updateUIForEquipment();
     void onCancelMsg(uint8_t msgID);
+    void initExtraWidgets();
 
     inline static UIManager *eventsInst_;
 

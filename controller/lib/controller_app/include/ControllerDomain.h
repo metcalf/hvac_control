@@ -56,7 +56,7 @@ struct Config {
     enum class HVACType { None, Fancoil, Valve };
     struct Equipment {
         HVACType heatType, coolType;
-        bool hasMakeupDemand;
+        bool hasMakeupDemand, useWeather;
     };
     struct Wifi {
         // NB: These are 1 byte longer than the ESP32 structs so we can

@@ -135,7 +135,7 @@ class ControllerApp {
     Setpoints getCurrentSetpoints();
     void setTempOverride(AbstractUIManager::TempOverride);
     uint16_t localMinOfDay();
-
+    bool shouldPollOutdoorTemp(const DemandRequest &request);
     void logState(const ControllerDomain::FreshAirState &freshAirState,
                   const ControllerDomain::SensorData &sensorData,
                   const ControllerDomain::DemandRequest &request,
