@@ -66,6 +66,13 @@ class ModbusController : public AbstractModbusController {
               freshAirSpeedErr_ = ESP_OK;
     std::chrono::steady_clock::time_point lastFreshAirState_, lastMakeupDemand_;
 
+    bool fancoilConfigured_ = false;
+
     void makeRequest(RequestType request);
     EventBits_t requestBits(RequestType request);
+
+    void doMakeup();
+    void doSetFreshAir();
+    void doGetFreshAir();
+    void doFancoil();
 };

@@ -96,7 +96,8 @@ class DemandController : public AbstractDemandController {
     // e.g. when heating, the amount by which the indoor temp is below the setpoint
     static constexpr FancoilCutoff hvac_temp_cutoffs_[] = {
         FancoilCutoff{FancoilSpeed::Off, REL_F_TO_C(-0.5)},
-        FancoilCutoff{FancoilSpeed::Low, REL_F_TO_C(0.5)},
+        FancoilCutoff{FancoilSpeed::Min, REL_F_TO_C(0.2)},
+        FancoilCutoff{FancoilSpeed::Low, REL_F_TO_C(0.6)},
         FancoilCutoff{FancoilSpeed::Med, REL_F_TO_C(1.0)},
         FancoilCutoff{FancoilSpeed::High, REL_F_TO_C(2.0)}};
     FancoilSetpointHandler hvac_temp_;

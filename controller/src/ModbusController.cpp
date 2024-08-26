@@ -4,62 +4,90 @@
 
 #define POLL_INTERVAL_SECS 5
 
+void ModbusController::doMakeup() {
+    bool makeupDemand;
+
+    esp_err_t err = client_.getMakeupDemand(&makeupDemand);
+
+    xSemaphoreTake(mutex_, portMAX_DELAY);
+    makeupDemandErr_ = err;
+    if (makeupDemandErr_ == ESP_OK) {
+        makeupDemand_ = makeupDemand;
+        lastMakeupDemand_ = std::chrono::steady_clock::now();
+    }
+    xSemaphoreGive(mutex_);
+}
+
+void ModbusController::doSetFreshAir() {
+    xSemaphoreTake(mutex_, portMAX_DELAY);
+    FanSpeed speed = requestFreshAirSpeed_;
+    xSemaphoreGive(mutex_);
+
+    esp_err_t err = client_.setFreshAirSpeed(speed);
+    xSemaphoreTake(mutex_, portMAX_DELAY);
+    freshAirSpeedErr_ = err;
+    xSemaphoreGive(mutex_);
+}
+
+void ModbusController::doGetFreshAir() {
+    FreshAirState freshAirState;
+    esp_err_t err = client_.getFreshAirState(&freshAirState);
+
+    xSemaphoreTake(mutex_, portMAX_DELAY);
+    freshAirStateErr_ = err;
+    if (freshAirStateErr_ == ESP_OK) {
+        freshAirState_ = freshAirState;
+        lastFreshAirState_ = std::chrono::steady_clock::now();
+    }
+    xSemaphoreGive(mutex_);
+}
+
+void ModbusController::doFancoil() {
+    esp_err_t err;
+
+    if (!fancoilConfigured_) {
+        err = client_.configureFancoil();
+        if (err != ESP_OK) {
+            xSemaphoreTake(mutex_, portMAX_DELAY);
+            setFancoilErr_ = err;
+            xSemaphoreGive(mutex_);
+            return;
+        }
+
+        fancoilConfigured_ = true;
+    }
+
+    xSemaphoreTake(mutex_, portMAX_DELAY);
+    FancoilRequest req = requestFancoil_;
+    xSemaphoreGive(mutex_);
+
+    err = client_.setFancoil(req);
+    xSemaphoreTake(mutex_, portMAX_DELAY);
+    setFancoilErr_ = err;
+    xSemaphoreGive(mutex_);
+}
+
 void ModbusController::task() {
     while (1) {
         esp_err_t err;
         EventBits_t bits = xEventGroupWaitBits(requests_, 0xff, pdTRUE, pdFALSE,
                                                pdMS_TO_TICKS(POLL_INTERVAL_SECS * 1000));
 
-        std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now();
-
         if (bits & requestBits(RequestType::SetFreshAirSpeed)) {
-            xSemaphoreTake(mutex_, portMAX_DELAY);
-            FanSpeed speed = requestFreshAirSpeed_;
-            xSemaphoreGive(mutex_);
-
-            err = client_.setFreshAirSpeed(speed);
-            xSemaphoreTake(mutex_, portMAX_DELAY);
-            freshAirSpeedErr_ = err;
-            xSemaphoreGive(mutex_);
+            doSetFreshAir();
         }
         if (bits & requestBits(RequestType::SetFancoil)) {
-            xSemaphoreTake(mutex_, portMAX_DELAY);
-            FancoilRequest req = requestFancoil_;
-            xSemaphoreGive(mutex_);
-
-            err = client_.setFancoil(req);
-            xSemaphoreTake(mutex_, portMAX_DELAY);
-            setFancoilErr_ = err;
-            xSemaphoreGive(mutex_);
+            doFancoil();
         }
 
         // We fetch updated data on every turn through the loop even though this happens
         // both at the poll interval and on every set* request. Extra queries are harmless
         // and it makes the code simpler.
         if (hasMakeupDemand_) {
-            bool makeupDemand;
-
-            err = client_.getMakeupDemand(&makeupDemand);
-
-            xSemaphoreTake(mutex_, portMAX_DELAY);
-            makeupDemandErr_ = err;
-            if (makeupDemandErr_ == ESP_OK) {
-                makeupDemand_ = makeupDemand;
-                lastMakeupDemand_ = now;
-            }
-            xSemaphoreGive(mutex_);
+            doMakeup();
         }
 
-        FreshAirState freshAirState;
-        err = client_.getFreshAirState(&freshAirState);
-
-        xSemaphoreTake(mutex_, portMAX_DELAY);
-        freshAirStateErr_ = err;
-        if (freshAirStateErr_ == ESP_OK) {
-            freshAirState_ = freshAirState;
-            lastFreshAirState_ = now;
-        }
-        xSemaphoreGive(mutex_);
+        doGetFreshAir();
     }
 }
 

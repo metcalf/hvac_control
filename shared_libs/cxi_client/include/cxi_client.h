@@ -13,16 +13,16 @@ enum class CxiRegister {
     OnOff, // 28301 03/10	On/Off	0=off,1=on
     Mode, // 28302 03/10	Mode	0～auto；1～cooling;2～dehumidification；3～ventilate；4～heating；
     Fanspeed, // 28303 03/10	Fanspeed	"2～low speed；3～medium speed； 4～high speed； 6～auto"
-    TimerOff1,                         // 28306 03/10	Timer off
-    TimerOff2,                         // 28307 03/10	Timer off
+    OffTimer, // 28306 03/10	Timer off (number of hours after which to turn off, 1-11, 0 disables)
+    OnTimer,  // 28307 03/10	Timer on (number of hours after which to turn on, 1-11, 0 disables)
     MaxSetTemperature,                 // 28308 03/10	Max. set temperature	（-9～96）℃
     MinSetTemperature,                 // 28309 03/10	Min. set temperature	（-9～96）℃
     CoolingSetTemperature,             // 28310 03/10	Cooling set temperature
     HeatingSetTemperature,             // 28311 03/10	heating set temperature
     CoolingSetTemperatureAuto,         // 28312 03/10	Cooling set temperature at auto mode
     HeatingSetTemperatureAuto,         // 28313 03/10	heating set temperature at auto mode
-    AntiCoolingWindSettingTemperature, // 28314 03/10	Anti-cooling wind setting temperature	（5～40）℃
-    StartAntiHotWind,  // 28315 03/10	Whether to start anti-hot wind function	（1-Yes；0-No）
+    AntiCoolingWindSettingTemperature, // 28314 03/10	Anti-cooling wind setting temperature	（5～40）℃ (aka coil temp below which to turn off heat)
+    StartAntiHotWind, // 28315 03/10	Whether to start anti-hot wind function	（1-Yes；0-No）(aka don't cool if coil above 68F)
     StartUltraLowWind, // 28316 03/10	Whether to start ultra-low wind function	（1-Yes；0-No）
     UseValve,          // 28317 03/10	Whether to use vavle	（1-Yes；0-No）
     UseFloorHeating,   // 28318 03/10	Whether to use floor heating	（1-Yes；0-No）
@@ -50,13 +50,7 @@ enum class CxiRegisterFormat {
     Temperature,
 };
 
-enum class CxiSpeed {
-    Off,
-    Ultralow,
-    Low,
-    Med,
-    High,
-};
+enum class CxiFanspeedMode { Low = 2, Med = 3, High = 4, Auto = 6 };
 
 enum class CxiMode {
     Auto = 0,
@@ -80,10 +74,8 @@ void cxi_client_init(mb_parameter_descriptor_t *deviceParameters, uint startIdx)
 
 esp_err_t cxi_client_get_param(CxiRegister reg, uint16_t *value);
 esp_err_t cxi_client_get_temp_param(CxiRegister reg, double *value);
-esp_err_t cxi_client_set_param(CxiRegister reg, uint16_t value);
-esp_err_t cxi_client_set_temp_param(CxiRegister reg, double value);
-
-esp_err_t cxi_client_set_speed_artificial(bool heat, CxiSpeed speed);
+esp_err_t cxi_client_set_param(CxiRegister reg, uint16_t value, uint retries = 0);
+esp_err_t cxi_client_set_temp_param(CxiRegister reg, double value, uint retries = 0);
 
 void cxi_client_read_and_print(CxiRegDef def);
 void cxi_client_read_and_print(CxiRegister reg);

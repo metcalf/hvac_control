@@ -16,7 +16,16 @@ namespace ControllerDomain {
 typedef uint8_t FanSpeed;
 
 enum class HVACState { Off, Heat, FanCool, ACCool };
-enum class FancoilSpeed { Off, Low, Med, High };
+
+enum class FancoilSpeed {
+    // Values are explicit since they indicate the number of degrees C off setpoint
+    // to trigger this speed on the fancoil.
+    Off = 0,
+    Min = 1,
+    Low = 2,
+    Med = 3,
+    High = 4
+};
 
 struct FreshAirState {
     double tempC, humidity;

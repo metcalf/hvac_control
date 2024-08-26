@@ -2,6 +2,7 @@
 
 #include <unordered_map>
 
+#include "cxi_client.h"
 #include "driver/gpio.h"
 #include "esp_log.h"
 
@@ -21,7 +22,6 @@ static const char *TAG = "MBC";
 enum class CID {
     FreshAirState,
     FreshAirSpeed,
-    FancoilMode,
     MakeupDemandState,
 };
 
@@ -42,11 +42,12 @@ struct RegisterDef {
 RegisterDef registers_[] = {
     {CID::FreshAirState, "FreshAirState", SlaveID::FreshAir, MB_PARAM_INPUT, 0x00, 4},
     {CID::FreshAirSpeed, "FreshAirSpeed", SlaveID::FreshAir, MB_PARAM_HOLDING, 0x10, 1},
-    {CID::FancoilMode, "FancoilMode", SlaveID::Fancoil, MB_PARAM_HOLDING, 0x10, 1},
     {CID::MakeupDemandState, "MakeupDemandState", SlaveID::MakeupDemand, MB_PARAM_INPUT, 0x00, 1},
 };
 
-const uint16_t numDeviceParams_ = (sizeof(registers_) / sizeof(registers_[0]));
+const uint16_t numLocalRegisters_ = (sizeof(registers_) / sizeof(registers_[0]));
+const uint16_t numDeviceParams_ =
+    numLocalRegisters_ + static_cast<const uint16_t>(CxiRegister::_Count);
 mb_parameter_descriptor_t deviceParams_[numDeviceParams_];
 std::unordered_map<CID, const char *> registerNames_;
 
@@ -55,7 +56,7 @@ void initParams() {
         return;
     }
 
-    for (int i = 0; i < numDeviceParams_; i++) {
+    for (int i = 0; i < numLocalRegisters_; i++) {
         RegisterDef regDef = registers_[i];
 
         // NB: Units, Instance Offset, Data Type, Data Size, Parameter Options, Access Mode,  are just passed through to the application so are safe to ignore
@@ -84,6 +85,8 @@ void initParams() {
 
         registerNames_[regDef.cid] = regDef.name;
     }
+
+    cxi_client_init(deviceParams_, numLocalRegisters_);
 }
 
 esp_err_t getParam(CID cid, uint8_t *buf) {
@@ -182,6 +185,97 @@ esp_err_t ModbusClient::getMakeupDemand(bool *demand) {
 }
 
 esp_err_t ModbusClient::setFancoil(const ControllerDomain::DemandRequest::FancoilRequest req) {
-    uint16_t v = (static_cast<uint16_t>(req.speed) << 1) | (req.cool && 0x01);
-    return setParam(CID::FancoilMode, (uint8_t *)&v);
+    if (req.speed == FancoilSpeed::Off) {
+        return cxi_client_set_param(CxiRegister::OnOff, 0);
+    }
+
+    esp_err_t err;
+
+    double roomTempC;
+    err = cxi_client_get_temp_param(CxiRegister::RoomTemperature, &roomTempC);
+    if (err != ESP_OK) {
+        return err;
+    }
+
+    double setpointC = roomTempC;
+    if (req.cool) {
+        // The minimum supported speed when cooling is Low and all of the temperature thresholds
+        // shift by 1C.
+        if (req.speed == FancoilSpeed::Min) {
+            setpointC -= 1;
+        } else {
+            setpointC -= (static_cast<int>(req.speed) - 1);
+        }
+    } else {
+        setpointC += static_cast<int>(req.speed);
+    }
+    err = cxi_client_set_temp_param(req.cool ? CxiRegister::CoolingSetTemperature
+                                             : CxiRegister::HeatingSetTemperature,
+                                    setpointC, 1);
+    if (err != ESP_OK) {
+        return err;
+    }
+
+    err = cxi_client_set_param(CxiRegister::Mode,
+                               static_cast<uint16_t>(req.cool ? CxiMode::Cool : CxiMode::Heat), 1);
+    if (err != ESP_OK) {
+        return err;
+    }
+
+    cxi_client_set_param(CxiRegister::OnOff, 1, 1);
+    if (err != ESP_OK) {
+        return err;
+    }
+
+    // Setting a timer avoids the fancoil running forever if something goes wrong with the
+    // controller. We can only set the OffTimer when turned on and changing the value
+    // doesn't seem to reset the timer so we just set it for something long and accept
+    // that we might power cycle very briefly after 11 hours.
+    cxi_client_set_param(CxiRegister::OffTimer, 11, 1);
+    if (err != ESP_OK) {
+        return err;
+    }
+
+    return ESP_OK;
+}
+
+esp_err_t ModbusClient::configureFancoil() {
+    esp_err_t err;
+
+    err = cxi_client_set_param(CxiRegister::UseValve, 1, 2);
+    if (err != ESP_OK) {
+        return err;
+    }
+
+    err = cxi_client_set_param(CxiRegister::StartUltraLowWind, 1, 2);
+    if (err != ESP_OK) {
+        return err;
+    }
+
+    err = cxi_client_set_param(CxiRegister::StartAntiHotWind, 1, 2);
+    if (err != ESP_OK) {
+        return err;
+    }
+
+    err = cxi_client_set_param(CxiRegister::Fanspeed, static_cast<int>(CxiFanspeedMode::Auto));
+    if (err != ESP_OK) {
+        return err;
+    }
+
+    err = cxi_client_set_temp_param(CxiRegister::AntiCoolingWindSettingTemperature, 25, 2);
+    if (err != ESP_OK) {
+        return err;
+    }
+
+    // Configure the default min/max set temp since they work fine for our purposes
+    err = cxi_client_set_temp_param(CxiRegister::MaxSetTemperature, 30, 2);
+    if (err != ESP_OK) {
+        return err;
+    }
+    err = cxi_client_set_temp_param(CxiRegister::MinSetTemperature, 8, 2);
+    if (err != ESP_OK) {
+        return err;
+    }
+
+    return ESP_OK;
 }

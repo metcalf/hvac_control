@@ -5,12 +5,14 @@ const char *fancoilSpeedToS(FancoilSpeed speed) {
     switch (speed) {
     case FancoilSpeed::Off:
         return "OFF";
+    case FancoilSpeed::Min:
+        return "MIN";
     case FancoilSpeed::Low:
         return "LOW";
     case FancoilSpeed::Med:
         return "MED";
     case FancoilSpeed::High:
-        return "HIGH";
+        return "HI";
     }
 
     __builtin_unreachable();

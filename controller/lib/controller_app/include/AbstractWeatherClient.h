@@ -4,14 +4,14 @@
 
 class AbstractWeatherClient {
   public:
-    enum class WeatherError {
+    enum class Error {
         OK,
         NotRun,
     };
     struct WeatherResult {
         std::chrono::system_clock::time_point obsTime;
         double tempC;
-        WeatherError err;
+        Error err;
     };
 
     virtual ~AbstractWeatherClient() {}
@@ -21,5 +21,5 @@ class AbstractWeatherClient {
 
   protected:
     // Probably should have an error enum or something
-    WeatherResult lastResult_{.err = WeatherError::NotRun};
+    WeatherResult lastResult_{.err = Error::NotRun};
 };
