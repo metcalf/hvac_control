@@ -7,6 +7,9 @@ class AbstractWeatherClient {
     enum class Error {
         OK,
         NotRun,
+        FetchError,
+        ParseError,
+        Stale,
     };
     struct WeatherResult {
         std::chrono::system_clock::time_point obsTime;

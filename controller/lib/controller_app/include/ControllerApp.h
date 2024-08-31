@@ -9,6 +9,7 @@
 #include "AbstractSensors.h"
 #include "AbstractUIManager.h"
 #include "AbstractValveCtrl.h"
+#include "AbstractWeatherClient.h"
 #include "AbstractWifi.h"
 #include "ControllerDomain.h"
 
@@ -22,10 +23,10 @@ class ControllerApp {
                   AbstractModbusController *modbusController, AbstractSensors *sensors,
                   AbstractDemandController *demandController, AbstractValveCtrl *valveCtrl,
                   AbstractWifi *wifi, AbstractConfigStore<ControllerDomain::Config> *cfgStore,
-                  const uiEvtRcv_t &uiEvtRcv)
+                  AbstractWeatherClient *weatherCli, const uiEvtRcv_t &uiEvtRcv)
         : uiManager_(uiManager), modbusController_(modbusController), sensors_(sensors),
           demandController_(demandController), valveCtrl_(valveCtrl), wifi_(wifi),
-          cfgStore_(cfgStore), uiEvtRcv_(uiEvtRcv) {
+          cfgStore_(cfgStore), weatherCli_(weatherCli), uiEvtRcv_(uiEvtRcv) {
         setConfig(config);
     }
     void setConfig(ControllerDomain::Config config) { config_ = config; }
@@ -152,6 +153,7 @@ class ControllerApp {
     AbstractValveCtrl *valveCtrl_;
     AbstractWifi *wifi_;
     AbstractConfigStore<ControllerDomain::Config> *cfgStore_;
+    AbstractWeatherClient *weatherCli_;
     uiEvtRcv_t uiEvtRcv_;
 
     AbstractUIManager::TempOverride tempOverride_;

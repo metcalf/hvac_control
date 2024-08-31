@@ -12,6 +12,9 @@
 
 #define CONTROLLER_CONFIG_VERSION 1
 
+// Maximum age of outdoor temp to display in the UI before treating it as stale
+#define OUTDOOR_TEMP_MAX_AGE std::chrono::minutes(20)
+
 namespace ControllerDomain {
 typedef uint8_t FanSpeed;
 

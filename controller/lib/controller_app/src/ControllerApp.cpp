@@ -25,8 +25,6 @@ typedef int esp_err_t;
 // Interval between running the fan to get an updated outdoor temp when we're
 // waiting for the temp to drop to allow fan cooling
 #define OUTDOOR_TEMP_UPDATE_INTERVAL std::chrono::minutes(15)
-// Maximum age of outdoor temp to display in the UI before treating it as stale
-#define OUTDOOR_TEMP_MAX_AGE std::chrono::minutes(20)
 // Minimum time fan needs to run before we trust the outdoor temp reading
 #define OUTDOOR_TEMP_MIN_FAN_TIME std::chrono::seconds(60)
 // Ignore makeup demand requests older than this
