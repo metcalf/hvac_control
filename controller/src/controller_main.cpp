@@ -183,6 +183,8 @@ extern "C" void controller_main() {
     UIManager::setEventsInst(uiManager_);
     modbusController_ = new ModbusController(config.equipment.hasMakeupDemand);
     valveCtrl_.init();
+    weatherCli_.start();
+
     app_ = new ControllerApp(config, uiManager_, modbusController_, &sensors_, &demandController_,
                              &valveCtrl_, &wifi_, &appConfigStore_, &weatherCli_, uiEvtRcv);
     xTaskCreate(uiTask, "uiTask", UI_TASK_STACK_SIZE, uiManager_, UI_TASK_PRIO, NULL);

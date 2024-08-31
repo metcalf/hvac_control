@@ -4,7 +4,7 @@
 #include <chrono>
 #include <iterator>
 
-#include "esp_crt_bundle.h" // TODO: MENUCONFIG to include this
+#include "esp_crt_bundle.h"
 #include "esp_err.h"
 #include "esp_log.h"
 
@@ -105,7 +105,7 @@ esp_err_t WUndergroundClient::_handleHTTPEvent(esp_http_client_event_t *evt) {
         memcpy(outputBuffer_ + outputBufferPos_, evt->data, evt->data_len);
         outputBufferPos_ += evt->data_len;
         break;
-    case HTTP_EVENT_ON_FINISH:
+    case HTTP_EVENT_ON_FINISH: {
         ESP_LOGD(TAG, "HTTP_EVENT_ON_FINISH");
         WeatherResult r = parseResponse();
         setResult(r);
@@ -113,6 +113,7 @@ esp_err_t WUndergroundClient::_handleHTTPEvent(esp_http_client_event_t *evt) {
             return ESP_FAIL;
         }
         break;
+    }
     case HTTP_EVENT_DISCONNECTED:
         ESP_LOGI(TAG, "HTTP_EVENT_DISCONNECTED");
         break;
@@ -131,7 +132,7 @@ AbstractWeatherClient::WeatherResult WUndergroundClient::parseResponse() {
     // Null terminate for strstr
     outputBuffer_[outputBufferPos_] = 0;
 
-    const char *pos = strstr(outputBuffer_, EPOCH_KEY);
+    char *pos = strstr(outputBuffer_, EPOCH_KEY);
     if (pos != nullptr) {
         // Move the pointer to the start of the number
         pos += strlen(EPOCH_KEY);
@@ -152,7 +153,7 @@ AbstractWeatherClient::WeatherResult WUndergroundClient::parseResponse() {
         return result;
     }
 
-    const char *pos = strstr(outputBuffer_, EPOCH_KEY);
+    pos = strstr(outputBuffer_, EPOCH_KEY);
     if (pos != nullptr) {
         // Move the pointer to the start of the number
         pos += strlen(EPOCH_KEY);

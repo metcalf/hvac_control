@@ -400,6 +400,22 @@ void ControllerApp::checkModbusErrors() {
     }
 }
 
+void ControllerApp::handleWeather() {
+    AbstractWeatherClient::WeatherResult weather = weatherCli_->lastResult();
+    if (weather.err != AbstractWeatherClient::Error::OK) {
+        setMessage(MsgID::WeatherErr, false, "Error fetching weather");
+    } else {
+        clearMessage(MsgID::WeatherErr);
+        rawOutdoorTempC_ = weather.tempC;
+        lastOutdoorTempUpdate_ = steadyNow() + (realNow() - weather.obsTime);
+    }
+
+    if ((std::isnan(rawOutdoorTempC_) ||
+         (steadyNow() - lastOutdoorTempUpdate_) > OUTDOOR_TEMP_UPDATE_INTERVAL)) {
+        weatherCli_->runFetch();
+    }
+}
+
 uint16_t ControllerApp::localMinOfDay() {
     struct tm nowLocalTm;
     time_t nowUTC = std::chrono::system_clock::to_time_t(realNow());
@@ -484,6 +500,14 @@ void ControllerApp::checkWifiState() {
     }
 
     setMessageF(MsgID::Wifi, "Wifi %s%s%s", stateMsg, sep, wifiMsg_);
+}
+
+double ControllerApp::outdoorTempC() {
+    if (config_.equipment.useWeather) {
+        return rawOutdoorTempC_;
+    } else {
+        return rawOutdoorTempC_ + config_.outTempOffsetC;
+    }
 }
 
 int ControllerApp::getScheduleIdx(int offset) {
@@ -594,7 +618,8 @@ void ControllerApp::handleFreshAirState(ControllerDomain::FreshAirState *freshAi
         if (freshAirState->fanRpm > MIN_FAN_RUNNING_RPM) {
             if (fanLastStarted_ == std::chrono::steady_clock::time_point{}) {
                 fanLastStarted_ = fasTime;
-            } else if (now - fanLastStarted_ > OUTDOOR_TEMP_MIN_FAN_TIME) {
+            } else if (!config_.equipment.useWeather &&
+                       now - fanLastStarted_ > OUTDOOR_TEMP_MIN_FAN_TIME) {
                 rawOutdoorTempC_ = freshAirState->tempC;
                 uiManager_->setOutTempC(outdoorTempC());
                 lastOutdoorTempUpdate_ = fasTime;
@@ -645,6 +670,9 @@ void ControllerApp::clearMessage(MsgID msgID) {
 
 void ControllerApp::task(bool firstTime) {
     // TODO: Vacation? Other status info from zone controller?
+    if (config_.equipment.useWeather) {
+        handleWeather();
+    }
     ControllerDomain::FreshAirState freshAirState{};
     handleFreshAirState(&freshAirState);
 

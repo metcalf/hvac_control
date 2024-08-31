@@ -74,6 +74,7 @@ class ControllerApp {
         SetFreshAirSpeedErr,
         GetMakeupDemandErr,
         SetFancoilErr,
+        WeatherErr,
         _Last,
     };
 
@@ -112,6 +113,8 @@ class ControllerApp {
         case MsgID::SetFancoilErr:
             return "SetFancoilErr";
             break;
+        case MsgID::WeatherErr:
+            return "WeatherErr";
         case MsgID::_Last:
             return "";
             break;
@@ -131,6 +134,7 @@ class ControllerApp {
     void setMessage(MsgID msgID, bool allowCancel, const char *msg);
     void clearMessage(MsgID msgID);
     void checkModbusErrors();
+    void handleWeather();
     void handleFreshAirState(ControllerDomain::FreshAirState *);
     int getScheduleIdx(int offset);
     Setpoints getCurrentSetpoints();
@@ -143,7 +147,7 @@ class ControllerApp {
                   const ControllerDomain::Setpoints &setpoints,
                   const ControllerDomain::HVACState hvacState, const FanSpeed fanSpeed);
     void checkWifiState();
-    double outdoorTempC() { return rawOutdoorTempC_ + config_.outTempOffsetC; }
+    double outdoorTempC();
 
     Config config_;
     AbstractUIManager *uiManager_;
