@@ -21,6 +21,7 @@ static const char *TAG = "MBC";
 
 enum class CID {
     FreshAirState,
+    FreshAirModelId,
     FreshAirSpeed,
     MakeupDemandState,
 };
@@ -41,6 +42,7 @@ struct RegisterDef {
 
 RegisterDef registers_[] = {
     {CID::FreshAirState, "FreshAirState", SlaveID::FreshAir, MB_PARAM_INPUT, 0x00, 4},
+    {CID::FreshAirModelId, "FreshAirModelId", SlaveID::FreshAir, MB_PARAM_INPUT, 0x0A, 1},
     {CID::FreshAirSpeed, "FreshAirSpeed", SlaveID::FreshAir, MB_PARAM_HOLDING, 0x10, 1},
     {CID::MakeupDemandState, "MakeupDemandState", SlaveID::MakeupDemand, MB_PARAM_INPUT, 0x00, 1},
 };
@@ -179,6 +181,21 @@ esp_err_t ModbusClient::getMakeupDemand(bool *demand) {
 
     if (err == ESP_OK) {
         *demand = data;
+    }
+
+    return err;
+}
+
+esp_err_t ModbusClient::getFreshAirModelId(uint16_t *id) {
+    uint16_t data = 0;
+    esp_err_t err = getParam(CID::FreshAirModelId, (uint8_t *)&data);
+
+    if (err == ESP_OK) {
+        *id = data;
+    } else if (err == ESP_ERR_NOT_SUPPORTED) {
+        // Earlier versions of the S&P firmware did not respond to model ID requests
+        *id = 0x01;
+        return ESP_OK;
     }
 
     return err;

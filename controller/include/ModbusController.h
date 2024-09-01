@@ -29,6 +29,7 @@ class ModbusController : public AbstractModbusController {
 
     void setHasMakeupDemand(bool has) override { hasMakeupDemand_ = has; };
 
+    ControllerDomain::FreshAirModel getFreshAirModelId();
     esp_err_t getFreshAirState(ControllerDomain::FreshAirState *state,
                                std::chrono::steady_clock::time_point *time) override;
     esp_err_t getMakeupDemand(bool *demand, std::chrono::steady_clock::time_point *time) override;
@@ -59,6 +60,7 @@ class ModbusController : public AbstractModbusController {
     FancoilRequest requestFancoil_;
     FanSpeed requestFreshAirSpeed_;
 
+    uint16_t freshAirModelId_ = 0;
     FreshAirState freshAirState_ = {};
     bool makeupDemand_ = false;
 

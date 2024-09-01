@@ -1,9 +1,15 @@
 {
   "folders": [
     {
+      "name": "fresh_air_control",
       "path": "fresh_air_control"
     },
     {
+      "name": "fresh_air_control_broan",
+      "path": "fresh_air_control_broan"
+    },
+    {
+      "name": "shared_libs",
       "path": "shared_libs"
     },
     {
@@ -19,12 +25,15 @@
       "path": "zone_controller"
     },
     {
+      "name": "boards",
       "path": "boards"
     },
     {
+      "name": "components",
       "path": "components"
     },
     {
+      "name": "fresh_air_control_tester",
       "path": "manual_testing/fresh_air_control_tester"
     },
     {
@@ -36,6 +45,7 @@
       "path": "controller"
     },
     {
+      "name": "pid_simulator",
       "path": "pid_simulator"
     },
     {

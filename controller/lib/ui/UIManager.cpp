@@ -28,7 +28,6 @@ lv_obj_t **wifiContainers[] = {
     &ui_password_container,
     &ui_log_name_container,
 };
-lv_obj_t *ui_weather_switch;
 
 size_t nWifiTextareas = sizeof(wifiTextareas) / sizeof(wifiTextareas[0]);
 
@@ -289,7 +288,6 @@ void UIManager::eSaveEquipmentSettings() {
     equipment_.heatType = Config::HVACType(lv_dropdown_get_selected(ui_heat_type));
     equipment_.coolType = Config::HVACType(lv_dropdown_get_selected(ui_cool_type));
     equipment_.hasMakeupDemand = lv_obj_has_state(ui_makeup_air_switch, LV_STATE_CHECKED);
-    equipment_.useWeather = lv_obj_has_state(ui_weather_switch, LV_STATE_CHECKED);
 
     updateUIForEquipment();
 
@@ -384,12 +382,6 @@ void UIManager::eEquipmentSettingsLoadStart() {
     } else {
         lv_obj_clear_state(ui_makeup_air_switch, LV_STATE_CHECKED);
     }
-
-    if (equipment_.useWeather) {
-        lv_obj_add_state(ui_weather_switch, LV_STATE_CHECKED);
-    } else {
-        lv_obj_clear_state(ui_weather_switch, LV_STATE_CHECKED);
-    }
 }
 
 void UIManager::eTempLimitsLoadStart() {
@@ -463,29 +455,7 @@ void UIManager::onCancelMsg(uint8_t msgID) {
 
 // I ran out of allowed widgets in the free version of Squareline so this is
 // where I add new stuff until I come up with a better answer.
-void UIManager::initExtraWidgets() {
-    lv_obj_t *weatherContainer = lv_obj_create(ui_equipment_settings_container);
-    lv_obj_remove_style_all(weatherContainer);
-    lv_obj_set_width(weatherContainer, 300);
-    lv_obj_set_height(weatherContainer, 50);
-    lv_obj_set_align(weatherContainer, LV_ALIGN_CENTER);
-    lv_obj_clear_flag(weatherContainer, LV_OBJ_FLAG_SCROLLABLE); /// Flags
-
-    lv_obj_t *label = lv_label_create(weatherContainer);
-    lv_obj_set_width(label, 130);
-    lv_obj_set_height(label, LV_SIZE_CONTENT); /// 1
-    lv_obj_set_align(label, LV_ALIGN_LEFT_MID);
-    lv_label_set_text(label, "USE WEATHER");
-    lv_obj_set_style_text_align(label, LV_TEXT_ALIGN_RIGHT, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_text_font(label, &lv_font_montserrat_18, LV_PART_MAIN | LV_STATE_DEFAULT);
-
-    lv_obj_t *ui_weather_switch = lv_switch_create(weatherContainer);
-    lv_obj_set_width(ui_weather_switch, 50);
-    lv_obj_set_height(ui_weather_switch, 25);
-    lv_obj_set_x(ui_weather_switch, 150);
-    lv_obj_set_y(ui_weather_switch, 0);
-    lv_obj_set_align(ui_weather_switch, LV_ALIGN_LEFT_MID);
-}
+void UIManager::initExtraWidgets() {}
 
 UIManager::UIManager(ControllerDomain::Config config, size_t nMsgIds, eventCb_t eventCb)
     : eventCb_(eventCb) {

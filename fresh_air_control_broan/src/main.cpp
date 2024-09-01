@@ -9,13 +9,15 @@
 #include "modbus_client.h"
 #include "usart_debug.h"
 
-#define POWER_PIN_NUM PIN2_bm
-#define TACH_CLK F_CLK_PER / 2UL
+#define STATUS_LED_IN_PIN_NUM PIN5_bm // PORTA
+#define CTRL_OUT_PIN_NUM PIN2_bm      // PORTB
 #define MB_BAUD 9600
 #define MB_SLAVE_ID 0x11
 #define TICK_PERIOD_US 500UL
 #define PHT_READ_INTERVAL_TICKS (2UL * 1000 * 1000 / TICK_PERIOD_US)
+#define CTRL_INTERVAL_TICKS ((100 * 1000) / TICK_PERIOD_US)
 
+uint16_t last_ctrl_action_ticks_;
 uint16_t last_pht_read_ticks_;
 volatile uint16_t tick_; // 0.5ms tick period
 uint16_t last_speed_;
@@ -29,54 +31,28 @@ uint16_t getTick() {
     return tick;
 }
 
-void setSpeed(uint8_t speed) {
+void setSpeed(uint8_t speed, uint16_t now) {
+    // Don't do anything with the controls if we've handled them recently
+    if ((now - last_ctrl_action_ticks_) > CTRL_INTERVAL_TICKS) {
+        if (VPORTB.OUT & CTRL_OUT_PIN_NUM) {
+            // If we're currently pressing the button, unpress it
+            VPORTB.OUT &= ~(CTRL_OUT_PIN_NUM);
+            last_ctrl_action_ticks_ = now;
+        } else if (!!(VPORTA.IN & STATUS_LED_IN_PIN_NUM) != (last_speed_ != 0)) {
+            // If the LED state does not match the desired speed state, press the button.
+            // Note that we only read this state after CTRL_INTERVAL_TICKS have elapsed since
+            // releasing the button to give the host time to respond.
+            VPORTB.OUT |= CTRL_OUT_PIN_NUM;
+            last_ctrl_action_ticks_ = now;
+        }
+    }
+
     if (speed == last_speed_) {
         return;
     }
 
-    // Set PWM duty cycle we invert the pin and invert
-    // the duty cycle so that we can achieve 100% duty cycle
-    // on a split timer. We don't need the 0% duty cycle since
-    // we can just turn off the power pin.
-    TCA0.SPLIT.HCMP1 = (255 - speed);
-
-    //  PA4 for PWM, PB2 for power toggle
-    if (speed == 0) {
-        VPORTB.OUT &= ~BUTTON_PIN_NUM;
-    } else {
-        VPORTB.OUT |= BUTTON_PIN_NUM;
-    }
+    TCA0.SPLIT.HCMP1 = speed;
     last_speed_ = speed;
-}
-
-uint16_t getLastTachRPM() {
-    uint16_t period;
-    ATOMIC_BLOCK(ATOMIC_FORCEON) { period = tach_period_; }
-
-    if (period == 0) {
-        return 0; // Invalid value
-    }
-
-    // Integer rounding division to convert period to frequency per minute
-    uint32_t tach_rpm = (TACH_CLK * 60UL + period / 2) / period;
-    if (tach_rpm > UINT16_MAX) {
-        return UINT16_MAX; // Invalid value -- impossible RPM
-    }
-
-    return (uint16_t)tach_rpm;
-}
-
-void setupTachTimer() {
-    // Tachometer using frequency measurement on PA5 / TCB0
-    // Expect speeds ~500-3000RPM
-    PORTA.PIN5CTRL = PORT_PULLUPEN_bm;             // Enable pull up resistor
-    EVSYS.CHANNEL2 = EVSYS_CHANNEL2_PORTA_PIN5_gc; // Route pin PA5
-    EVSYS.USERTCB0CAPT = EVSYS_USER_CHANNEL2_gc;   // to TCB0
-    TCB0.CTRLB = TCB_CNTMODE_FRQ_gc;               // Frequency count mode
-    TCB0.EVCTRL = TCB_CAPTEI_bm | TCB_EDGE_bm;     // Measure frequency between falling edge events
-    TCB0.INTCTRL = TCB_CAPT_bm;
-    TCB0.CTRLA =
-        (TCB_ENABLE_bm | TCB_CLKSEL_DIV2_gc); // Configure tach frequency measurement @ ~156khz
 }
 
 int main(void) {
@@ -86,14 +62,14 @@ int main(void) {
     CLKCTRL.MCLKCTRLB = CLKCTRL_PEN_bm | CLKCTRL_PDIV_64X_gc; // Divide main clock by 64 = 312500hz
 
     USART_DEBUG_INIT();
-    setupTachTimer();
 
-    // PB2 output for power toggle
-    VPORTB.DIR |= BUTTON_PIN_NUM;
+    VPORTB.DIR |= CTRL_OUT_PIN_NUM;
+
+    // Invert status input (LED on -> opto conducts to ground)
+    PORTA.PIN5CTRL |= (PORT_INVEN_bm | PORT_PULLUPEN_bm);
 
     // Speed output on PA4, TCA WO4 (PWM).
     VPORTA.DIR |= PIN4_bm; // Output
-    PORTA.PIN4CTRL |= PORT_INVEN_bm;
     // Only single-slope supported with split-mode and we're using an output pin
     // that is only supported in split mode.
     // TCA0.SINGLE.CTRLB = TCA_SINGLE_WGMODE_SINGLESLOPE_gc;
@@ -111,20 +87,21 @@ int main(void) {
     TCA0.SPLIT.CTRLA = TCA_SPLIT_ENABLE_bm; // Run at ~1.2khz (16e6 / 64 prescaler / 256 range)
 
     bme280_init();
-    last_pht_read_ticks_ = getTick();
 
     uint16_t curr_speed = last_speed_;
     modbus_client_init(MB_SLAVE_ID, MB_BAUD, &last_data_, &curr_speed);
+
+    last_ctrl_action_ticks_ = last_pht_read_ticks_ = getTick();
 
     sei();
 
     while (1) {
         wdt_reset();
-        last_data_.tach_rpm = getLastTachRPM();
         modbus_poll();
-        setSpeed(curr_speed);
-
         uint16_t now = getTick();
+
+        setSpeed(curr_speed, now);
+
         if (now - last_pht_read_ticks_ > PHT_READ_INTERVAL_TICKS) {
             bme280_get_latest(&last_data_.temp, &last_data_.humidity, &last_data_.pressure);
             last_pht_read_ticks_ = now;
@@ -137,15 +114,4 @@ int main(void) {
 ISR(TCA0_LUNF_vect) {
     TCA0.SPLIT.INTFLAGS |= TCA_SPLIT_LUNF_bm;
     tick_++;
-}
-
-ISR(TCB0_INT_vect) {
-    if (TCB0.INTFLAGS & TCB_OVF_bm) {
-        // If we overflowed, clear both flags and set an invalid period
-        TCB0.INTFLAGS |= TCB_OVF_bm;
-        TCB0.INTFLAGS |= TCB_CAPT_bm;
-        tach_period_ = 0;
-    } else {
-        tach_period_ = TCB0.CCMP; // reading CCMP clears interrupt flag
-    }
 }

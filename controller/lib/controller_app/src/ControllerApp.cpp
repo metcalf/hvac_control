@@ -134,8 +134,8 @@ FanSpeed ControllerApp::computeFanSpeed(const DemandRequest &request) {
             }
         }
 
-        if (!config_.equipment.useWeather && fanSpeed < MIN_FAN_SPEED_VALUE &&
-            shouldPollOutdoorTemp(request)) {
+        if ((modbusController_->getFreshAirModelId() == ControllerDomain::FreshAirModel::SP) &&
+            fanSpeed < MIN_FAN_SPEED_VALUE && shouldPollOutdoorTemp(request)) {
             // If we're waiting for the outdoor temperature to drop for cooling and
             // we haven't updated the outdoor temperature recently, run the fan until
             // we get an update.
@@ -401,6 +401,10 @@ void ControllerApp::checkModbusErrors() {
 }
 
 void ControllerApp::handleWeather() {
+    if (modbusController_->getFreshAirModelId() != ControllerDomain::FreshAirModel::BROAN) {
+        return;
+    }
+
     AbstractWeatherClient::WeatherResult weather = weatherCli_->lastResult();
     if (weather.err != AbstractWeatherClient::Error::OK) {
         setMessage(MsgID::WeatherErr, false, "Error fetching weather");
@@ -502,13 +506,7 @@ void ControllerApp::checkWifiState() {
     setMessageF(MsgID::Wifi, "Wifi %s%s%s", stateMsg, sep, wifiMsg_);
 }
 
-double ControllerApp::outdoorTempC() {
-    if (config_.equipment.useWeather) {
-        return rawOutdoorTempC_;
-    } else {
-        return rawOutdoorTempC_ + config_.outTempOffsetC;
-    }
-}
+double ControllerApp::outdoorTempC() { return rawOutdoorTempC_ + config_.outTempOffsetC; }
 
 int ControllerApp::getScheduleIdx(int offset) {
     if (!clockReady()) {
@@ -618,7 +616,8 @@ void ControllerApp::handleFreshAirState(ControllerDomain::FreshAirState *freshAi
         if (freshAirState->fanRpm > MIN_FAN_RUNNING_RPM) {
             if (fanLastStarted_ == std::chrono::steady_clock::time_point{}) {
                 fanLastStarted_ = fasTime;
-            } else if (!config_.equipment.useWeather &&
+            } else if ((modbusController_->getFreshAirModelId() ==
+                        ControllerDomain::FreshAirModel::SP) &&
                        now - fanLastStarted_ > OUTDOOR_TEMP_MIN_FAN_TIME) {
                 rawOutdoorTempC_ = freshAirState->tempC;
                 uiManager_->setOutTempC(outdoorTempC());
@@ -670,9 +669,7 @@ void ControllerApp::clearMessage(MsgID msgID) {
 
 void ControllerApp::task(bool firstTime) {
     // TODO: Vacation? Other status info from zone controller?
-    if (config_.equipment.useWeather) {
-        handleWeather();
-    }
+    handleWeather();
     ControllerDomain::FreshAirState freshAirState{};
     handleFreshAirState(&freshAirState);
 

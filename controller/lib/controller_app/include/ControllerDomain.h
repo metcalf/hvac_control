@@ -30,6 +30,12 @@ enum class FancoilSpeed {
     High = 4
 };
 
+enum class FreshAirModel {
+    UNKNOWN = 0x00,
+    SP = 0x01,
+    BROAN = 0x02,
+};
+
 struct FreshAirState {
     double tempC, humidity;
     uint32_t pressurePa;
@@ -68,7 +74,7 @@ struct Config {
     enum class HVACType { None, Fancoil, Valve };
     struct Equipment {
         HVACType heatType, coolType;
-        bool hasMakeupDemand, useWeather;
+        bool hasMakeupDemand;
     };
     struct Wifi {
         // NB: These are 1 byte longer than the ESP32 structs so we can

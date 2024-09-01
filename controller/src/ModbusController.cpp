@@ -30,6 +30,10 @@ void ModbusController::doSetFreshAir() {
 }
 
 void ModbusController::doGetFreshAir() {
+    if (freshAirModelId_ == 0) {
+        client_.getFreshAirModelId(&freshAirModelId_);
+    }
+
     FreshAirState freshAirState;
     esp_err_t err = client_.getFreshAirState(&freshAirState);
 
@@ -89,6 +93,14 @@ void ModbusController::task() {
 
         doGetFreshAir();
     }
+}
+
+ControllerDomain::FreshAirModel ModbusController::getFreshAirModelId() {
+    xSemaphoreTake(mutex_, portMAX_DELAY);
+    uint16_t id = freshAirModelId_;
+    xSemaphoreGive(mutex_);
+
+    return (ControllerDomain::FreshAirModel)id;
 }
 
 esp_err_t ModbusController::getFreshAirState(FreshAirState *state,

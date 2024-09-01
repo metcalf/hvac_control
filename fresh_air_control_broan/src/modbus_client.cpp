@@ -2,7 +2,7 @@
 
 #include <stdint.h>
 
-#define MODEL_ID 0x01
+#define MODEL_ID 0x02
 #define ID_ADDRESS 0x0A
 #define SPEED_ADDRESS 0x10
 
