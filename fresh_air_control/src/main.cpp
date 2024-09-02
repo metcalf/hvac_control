@@ -10,14 +10,14 @@
 #include "usart_debug.h"
 
 #define POWER_PIN_NUM PIN2_bm
-#define TACH_CLK F_CLK_PER / 2UL
+#define TACH_CLK F_CLK_PER / 4UL
 #define MB_BAUD 9600
 #define MB_SLAVE_ID 0x11
-#define TICK_PERIOD_US 500UL
+#define TICK_PERIOD_US 819UL
 #define PHT_READ_INTERVAL_TICKS (2UL * 1000 * 1000 / TICK_PERIOD_US)
 
 uint16_t last_pht_read_ticks_;
-volatile uint16_t tick_; // 0.5ms tick period
+volatile uint16_t tick_;
 uint16_t last_speed_;
 volatile uint16_t tach_period_;
 
@@ -76,7 +76,7 @@ void setupTachTimer() {
     TCB0.EVCTRL = TCB_CAPTEI_bm | TCB_EDGE_bm;     // Measure frequency between falling edge events
     TCB0.INTCTRL = TCB_CAPT_bm;
     TCB0.CTRLA =
-        (TCB_ENABLE_bm | TCB_CLKSEL_DIV2_gc); // Configure tach frequency measurement @ ~156khz
+        (TCB_ENABLE_bm | TCB_CLKSEL_TCA0_gc); // Configure tach frequency measurement @ ~156khz
 }
 
 int main(void) {
@@ -106,9 +106,10 @@ int main(void) {
     // 20e6 CPU / 64 prescaler / 256
     // Low byte runs at ~2khz to act as a tick counter
     // 20e6 CPU / 64 prescaler / 156
-    TCA0.SPLIT.LPER = 156;
+    TCA0.SPLIT.LPER = 255;
 
-    TCA0.SPLIT.CTRLA = TCA_SPLIT_ENABLE_bm; // Run at ~1.2khz (16e6 / 64 prescaler / 256 range)
+    // Run at ~1.2khz (16e6 / 64 prescaler / 4 timer scaler / 256 range)
+    TCA0.SPLIT.CTRLA = TCA_SPLIT_ENABLE_bm | TCA_SPLIT_CLKSEL_DIV4_gc;
 
     bme280_init();
     last_pht_read_ticks_ = getTick();

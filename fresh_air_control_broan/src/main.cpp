@@ -103,8 +103,6 @@ int main(void) {
     // 20e6 CPU / 64 prescaler / 4 timer scaler / 256
     TCA0.SPLIT.LPER = 255;
 
-    // NB: We run the clock faster than the S&P code since we have more to do
-    // between modbus polls and can run out of time otherwise.
     TCA0.SPLIT.CTRLA =
         TCA_SPLIT_ENABLE_bm |
         TCA_SPLIT_CLKSEL_DIV4_gc; // Run at ~1.2khz (16e6 / 64 prescaler / 4 timer scaler / 256 range)

@@ -191,8 +191,10 @@ esp_err_t ModbusClient::getFreshAirModelId(uint16_t *id) {
     esp_err_t err = getParam(CID::FreshAirModelId, (uint8_t *)&data);
 
     if (err == ESP_OK) {
+        ESP_LOGI(TAG, "fresh air controller id: %#x");
         *id = data;
     } else if (err == ESP_ERR_NOT_SUPPORTED) {
+        ESP_LOGI(TAG, "fresh air controller does not support model ID, setting default");
         // Earlier versions of the S&P firmware did not respond to model ID requests
         *id = 0x01;
         return ESP_OK;

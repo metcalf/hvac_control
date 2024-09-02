@@ -26,12 +26,12 @@ eMBErrorCode eMBRegInputCB(UCHAR *pucRegBuffer, USHORT usAddress, USHORT usNRegs
     usAddress--; // Address is passed one-based but sent zero-based
 
     if (usAddress == ID_ADDRESS && usNRegs == 1) {
+        pucRegBuffer[0] = 0;
         pucRegBuffer[1] = MODEL_ID;
-        //pucRegBuffer[0] = 0;
         return MB_ENOERR;
     }
 
-    if (usAddress < 0 || (usAddress + usNRegs) * 2 > sizeof(LastData)) {
+    if ((usAddress + usNRegs) * 2 > sizeof(LastData)) {
         return MB_ENOREG;
     }
 
@@ -53,23 +53,15 @@ eMBErrorCode eMBRegHoldingCB(UCHAR *pucRegBuffer, USHORT usAddress, USHORT usNRe
         return MB_ENOREG;
     }
 
-    UCHAR *from, *to;
-
-    uint8_t *ptr = (uint8_t *)speed_ptr_;
     if (eMode == MB_REG_READ) {
-        _XFER_2_RD(pucRegBuffer, ptr);
+        // Adapted from _XFER_2_RD
+        *(uint8_t *)(pucRegBuffer + 0) = *(uint8_t *)(speed_ptr_ + 1);
+        *(uint8_t *)(pucRegBuffer + 1) = *(uint8_t *)(speed_ptr_ + 0);
     } else {
-        _XFER_2_WR(ptr, pucRegBuffer);
+        // Adapted from _XFER_2_WR
+        *(uint8_t *)(pucRegBuffer + 1) = *(uint8_t *)(speed_ptr_ + 0);
+        *(uint8_t *)(pucRegBuffer + 0) = *(uint8_t *)(speed_ptr_ + 1);
     }
 
     return MB_ENOERR;
-}
-
-eMBErrorCode eMBRegCoilsCB(UCHAR *pucRegBuffer, USHORT usAddress, USHORT usNCoils,
-                           eMBRegisterMode eMode) {
-    return MB_ENOREG;
-}
-
-eMBErrorCode eMBRegDiscreteCB(UCHAR *pucRegBuffer, USHORT usAddress, USHORT usNDiscrete) {
-    return MB_ENOREG;
 }
