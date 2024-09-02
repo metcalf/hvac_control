@@ -2,7 +2,6 @@
 
 #include <stdint.h>
 
-#define MODEL_ID 0x01
 #define ID_ADDRESS 0x0A
 #define SPEED_ADDRESS 0x10
 
@@ -31,7 +30,7 @@ eMBErrorCode eMBRegInputCB(UCHAR *pucRegBuffer, USHORT usAddress, USHORT usNRegs
         return MB_ENOERR;
     }
 
-    if ((usAddress + usNRegs) * 2 > sizeof(LastData)) {
+    if (usAddress < 0 || (usAddress + usNRegs) * 2 > sizeof(LastData)) {
         return MB_ENOREG;
     }
 
@@ -53,6 +52,7 @@ eMBErrorCode eMBRegHoldingCB(UCHAR *pucRegBuffer, USHORT usAddress, USHORT usNRe
         return MB_ENOREG;
     }
 
+    uint8_t *ptr = (uint8_t *)speed_ptr_;
     if (eMode == MB_REG_READ) {
         // Adapted from _XFER_2_RD
         *(uint8_t *)(pucRegBuffer + 0) = *(uint8_t *)(speed_ptr_ + 1);
@@ -64,4 +64,13 @@ eMBErrorCode eMBRegHoldingCB(UCHAR *pucRegBuffer, USHORT usAddress, USHORT usNRe
     }
 
     return MB_ENOERR;
+}
+
+eMBErrorCode eMBRegCoilsCB(UCHAR *pucRegBuffer, USHORT usAddress, USHORT usNCoils,
+                           eMBRegisterMode eMode) {
+    return MB_ENOREG;
+}
+
+eMBErrorCode eMBRegDiscreteCB(UCHAR *pucRegBuffer, USHORT usAddress, USHORT usNDiscrete) {
+    return MB_ENOREG;
 }

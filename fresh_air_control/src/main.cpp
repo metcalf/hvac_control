@@ -75,8 +75,7 @@ void setupTachTimer() {
     TCB0.CTRLB = TCB_CNTMODE_FRQ_gc;               // Frequency count mode
     TCB0.EVCTRL = TCB_CAPTEI_bm | TCB_EDGE_bm;     // Measure frequency between falling edge events
     TCB0.INTCTRL = TCB_CAPT_bm;
-    TCB0.CTRLA =
-        (TCB_ENABLE_bm | TCB_CLKSEL_TCA0_gc); // Configure tach frequency measurement @ ~156khz
+    TCB0.CTRLA = (TCB_ENABLE_bm | TCB_CLKSEL_TCA0_gc);
 }
 
 int main(void) {

@@ -1,0 +1,5 @@
+{
+  "name": "fresh_air_clients",
+  "version": "0.0.0",
+  "headers": ["bme280_client.h", "modbus_client.h"]
+}
