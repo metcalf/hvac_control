@@ -17,7 +17,7 @@ class AbstractModbusController {
 
     virtual void setHasMakeupDemand(bool has) = 0;
 
-    ControllerDomain::FreshAirModel getFreshAirModelId();
+    virtual ControllerDomain::FreshAirModel getFreshAirModelId() = 0;
     virtual esp_err_t getFreshAirState(ControllerDomain::FreshAirState *state,
                                        std::chrono::steady_clock::time_point *time) = 0;
     virtual esp_err_t getMakeupDemand(bool *demand,

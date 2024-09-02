@@ -29,7 +29,7 @@ class ModbusController : public AbstractModbusController {
 
     void setHasMakeupDemand(bool has) override { hasMakeupDemand_ = has; };
 
-    ControllerDomain::FreshAirModel getFreshAirModelId();
+    ControllerDomain::FreshAirModel getFreshAirModelId() override;
     esp_err_t getFreshAirState(ControllerDomain::FreshAirState *state,
                                std::chrono::steady_clock::time_point *time) override;
     esp_err_t getMakeupDemand(bool *demand, std::chrono::steady_clock::time_point *time) override;

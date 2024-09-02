@@ -26,8 +26,8 @@ eMBErrorCode eMBRegInputCB(UCHAR *pucRegBuffer, USHORT usAddress, USHORT usNRegs
     usAddress--; // Address is passed one-based but sent zero-based
 
     if (usAddress == ID_ADDRESS && usNRegs == 1) {
-        pucRegBuffer[0] = 0;
         pucRegBuffer[1] = MODEL_ID;
+        //pucRegBuffer[0] = 0;
         return MB_ENOERR;
     }
 

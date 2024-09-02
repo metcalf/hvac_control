@@ -42,9 +42,9 @@ void setSpeed(uint8_t speed) {
 
     //  PA4 for PWM, PB2 for power toggle
     if (speed == 0) {
-        VPORTB.OUT &= ~BUTTON_PIN_NUM;
+        VPORTB.OUT &= ~POWER_PIN_NUM;
     } else {
-        VPORTB.OUT |= BUTTON_PIN_NUM;
+        VPORTB.OUT |= POWER_PIN_NUM;
     }
     last_speed_ = speed;
 }
@@ -89,7 +89,7 @@ int main(void) {
     setupTachTimer();
 
     // PB2 output for power toggle
-    VPORTB.DIR |= BUTTON_PIN_NUM;
+    VPORTB.DIR |= POWER_PIN_NUM;
 
     // Speed output on PA4, TCA WO4 (PWM).
     VPORTA.DIR |= PIN4_bm; // Output

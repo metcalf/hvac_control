@@ -11,7 +11,7 @@ typedef int esp_err_t;
 #define ESP_OK 0
 #endif
 
-#define SCHEDULE_TIME_STR_ARGS(s) (s.startHr - 1) % 12 + 1, s.startMin, s.startHr < 12 ? 'a' : 'p'
+#define SCHEDULE_TIME_STR_ARGS(s) (s.startHr - 1) % 12 + 1, s.startMin, s.startHr < 12 ? "AM" : "PM"
 
 #define APP_LOOP_INTERVAL_SECS 5
 #define STATUS_LOG_INTERVAL std::chrono::seconds(60)
@@ -252,16 +252,23 @@ bool ControllerApp::pollUIEvent(bool wait) {
         wifi_->updateSTA(config_.wifi.ssid, config_.wifi.password);
         // TODO: Update remote logger with name when we have it
         break;
-    case EventType::FanOverride:
+    case EventType::FanOverride: {
         fanOverrideSpeed_ = uiEvent.payload.fanOverride.speed;
         fanOverrideUntil_ =
             steadyNow() + std::chrono::minutes{uiEvent.payload.fanOverride.timeMins};
         ESP_LOGI(TAG, "FanOveride:\tspeed=%u\tmins=%u", fanOverrideSpeed_,
                  uiEvent.payload.fanOverride.timeMins);
         // TODO: Implement "until" in this message
-        setMessageF(MsgID::FanOverride, true, "Fan set to %u%%",
-                    (uint8_t)(fanOverrideSpeed_ / 255.0 * 100));
+
+        struct tm nowLocalTm;
+        time_t nowUTC = std::chrono::system_clock::to_time_t(realNow());
+        localtime_r(&nowUTC, &nowLocalTm);
+
+        setMessageF(MsgID::FanOverride, true, "Fan set to %u%% until %02d:%02d%s",
+                    (uint8_t)(fanOverrideSpeed_ / 255.0 * 100), (nowLocalTm.tm_hour % 12) + 1,
+                    nowLocalTm.tm_min, nowLocalTm.tm_hour < 11 ? "AM" : "PM");
         break;
+    }
     case EventType::TempOverride: {
         ESP_LOGI(TAG, "TempOverride:\theat=%.1f\tcool=%.1f", uiEvent.payload.tempOverride.heatC,
                  uiEvent.payload.tempOverride.coolC);
@@ -577,7 +584,7 @@ Setpoints ControllerApp::getCurrentSetpoints() {
             if (precoolC < setpoints.coolTempC) {
                 setpointReason_ = "precooling";
                 setpoints.coolTempC = precoolC;
-                setMessageF(MsgID::Precooling, true, "Cooling to %d by %02d:%02d%c",
+                setMessageF(MsgID::Precooling, true, "Cooling to %d by %02d:%02d%s",
                             ABS_C_TO_F(setpoints.coolTempC), SCHEDULE_TIME_STR_ARGS(nextSchedule));
 
                 return setpoints;
@@ -603,7 +610,7 @@ void ControllerApp::setTempOverride(AbstractUIManager::TempOverride to) {
         tempOverrideUntilScheduleIdx_ = idx;
         Config::Schedule schedule = config_.schedules[tempOverrideUntilScheduleIdx_];
 
-        setMessageF(MsgID::TempOverride, true, "Hold %d/%d until %02d:%02d%c",
+        setMessageF(MsgID::TempOverride, true, "Hold %d/%d until %02d:%02d%s",
                     ABS_C_TO_F(tempOverride_.heatC), ABS_C_TO_F(tempOverride_.coolC),
                     SCHEDULE_TIME_STR_ARGS(schedule));
     }
