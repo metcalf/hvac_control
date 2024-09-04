@@ -48,8 +48,7 @@ RegisterDef registers_[] = {
 };
 
 const uint16_t numLocalRegisters_ = (sizeof(registers_) / sizeof(registers_[0]));
-const uint16_t numDeviceParams_ =
-    numLocalRegisters_ + static_cast<const uint16_t>(CxiRegister::_Count);
+const uint16_t numDeviceParams_ = numLocalRegisters_ + static_cast<uint16_t>(CxiRegister::_Count);
 mb_parameter_descriptor_t deviceParams_[numDeviceParams_];
 std::unordered_map<CID, const char *> registerNames_;
 
@@ -191,7 +190,7 @@ esp_err_t ModbusClient::getFreshAirModelId(uint16_t *id) {
     esp_err_t err = getParam(CID::FreshAirModelId, (uint8_t *)&data);
 
     if (err == ESP_OK) {
-        ESP_LOGI(TAG, "fresh air controller id: %#x");
+        ESP_LOGI(TAG, "fresh air controller id: %#x", data);
         *id = data;
     } else if (err == ESP_ERR_NOT_SUPPORTED) {
         ESP_LOGI(TAG, "fresh air controller does not support model ID, setting default");

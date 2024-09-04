@@ -32,9 +32,10 @@ class ModbusController : public AbstractModbusController {
     ControllerDomain::FreshAirModel getFreshAirModelId() override;
     esp_err_t getFreshAirState(ControllerDomain::FreshAirState *state,
                                std::chrono::steady_clock::time_point *time) override;
+    esp_err_t getLastFreshAirSpeed(ControllerDomain::FanSpeed *speed,
+                                   std::chrono::steady_clock::time_point *time) override;
     esp_err_t getMakeupDemand(bool *demand, std::chrono::steady_clock::time_point *time) override;
 
-    esp_err_t lastFreshAirSpeedErr() override;
     esp_err_t lastSetFancoilErr() override;
 
     void setFreshAirSpeed(ControllerDomain::FanSpeed speed) override;
@@ -62,11 +63,12 @@ class ModbusController : public AbstractModbusController {
 
     uint16_t freshAirModelId_ = 0;
     FreshAirState freshAirState_ = {};
+    FanSpeed freshAirSpeed_;
     bool makeupDemand_ = false;
 
     esp_err_t freshAirStateErr_ = ESP_OK, makeupDemandErr_ = ESP_OK, setFancoilErr_ = ESP_OK,
               freshAirSpeedErr_ = ESP_OK;
-    std::chrono::steady_clock::time_point lastFreshAirState_, lastMakeupDemand_;
+    std::chrono::steady_clock::time_point lastFreshAirState_, lastMakeupDemand_, lastFreshAirSpeed_;
 
     bool fancoilConfigured_ = false;
 

@@ -20,10 +20,11 @@ class AbstractModbusController {
     virtual ControllerDomain::FreshAirModel getFreshAirModelId() = 0;
     virtual esp_err_t getFreshAirState(ControllerDomain::FreshAirState *state,
                                        std::chrono::steady_clock::time_point *time) = 0;
+    virtual esp_err_t getLastFreshAirSpeed(ControllerDomain::FanSpeed *speed,
+                                           std::chrono::steady_clock::time_point *time) = 0;
     virtual esp_err_t getMakeupDemand(bool *demand,
                                       std::chrono::steady_clock::time_point *time) = 0;
 
-    virtual esp_err_t lastFreshAirSpeedErr() = 0;
     virtual esp_err_t lastSetFancoilErr() = 0;
 
     virtual void setFreshAirSpeed(ControllerDomain::FanSpeed speed) = 0;

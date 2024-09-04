@@ -170,7 +170,9 @@ class ControllerApp {
 
     bool fanIsOn_ = false;
     FanSpeed fanOverrideSpeed_;
-    std::chrono::steady_clock::time_point fanOverrideUntil_, fanLastStarted_;
+    uint32_t stoppedPressurePa_ = 0;
+    std::chrono::steady_clock::time_point fanOverrideUntil_{}, fanLastStarted_{}, fanLastStopped_{},
+        fanMaxSpeedStarted_{};
 
-    std::chrono::steady_clock::time_point lastStatusLog_;
+    std::chrono::steady_clock::time_point lastStatusLog_{};
 };

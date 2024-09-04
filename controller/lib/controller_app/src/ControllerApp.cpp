@@ -27,6 +27,9 @@ typedef int esp_err_t;
 #define OUTDOOR_TEMP_UPDATE_INTERVAL std::chrono::minutes(15)
 // Minimum time fan needs to run before we trust the outdoor temp reading
 #define OUTDOOR_TEMP_MIN_FAN_TIME std::chrono::seconds(60)
+// Minimum time fan needs to run at maximum before we read static pressure.
+// We set this pretty high because the Broan fan takes awhile start up and stabilize.
+#define STATIC_PRESSURE_MIN_FAN_TIME std::chrono::seconds(60)
 // Ignore makeup demand requests older than this
 #define MAKEUP_MAX_AGE std::chrono::minutes(5)
 
@@ -392,14 +395,7 @@ ControllerDomain::HVACState ControllerApp::setHVAC(const DemandRequest &request)
 }
 
 void ControllerApp::checkModbusErrors() {
-    esp_err_t err = modbusController_->lastFreshAirSpeedErr();
-    if (err == ESP_OK) {
-        clearMessage(MsgID::SetFreshAirSpeedErr);
-    } else {
-        setMessageF(MsgID::SetFreshAirSpeedErr, false, "Error setting fan speed: %d", err);
-    }
-
-    err = modbusController_->lastSetFancoilErr();
+    esp_err_t err = modbusController_->lastSetFancoilErr();
     if (err == ESP_OK) {
         clearMessage(MsgID::SetFancoilErr);
     } else {
@@ -622,6 +618,7 @@ void ControllerApp::handleFreshAirState(ControllerDomain::FreshAirState *freshAi
     if (err == ESP_OK) {
         if (freshAirState->fanRpm > MIN_FAN_RUNNING_RPM) {
             if (fanLastStarted_ == std::chrono::steady_clock::time_point{}) {
+                fanLastStopped_ = {};
                 fanLastStarted_ = fasTime;
             } else if ((modbusController_->getFreshAirModelId() ==
                         ControllerDomain::FreshAirModel::SP) &&
@@ -630,12 +627,41 @@ void ControllerApp::handleFreshAirState(ControllerDomain::FreshAirState *freshAi
                 uiManager_->setOutTempC(outdoorTempC());
                 lastOutdoorTempUpdate_ = fasTime;
             }
-        } else {
-            fanLastStarted_ = {};
+        } else if (freshAirState->fanRpm == 0) {
+            if (fanLastStopped_ == std::chrono::steady_clock::time_point{}) {
+                fanLastStopped_ = fanLastStarted_ = fasTime;
+                fanLastStarted_ = {};
+            }
+            stoppedPressurePa_ = freshAirState->pressurePa;
         }
         clearMessage(MsgID::GetFreshAirStateErr);
     } else {
         setErrMessageF(MsgID::GetFreshAirStateErr, false, "Error getting fresh air state: %d", err);
+    }
+
+    FanSpeed speed;
+    std::chrono::steady_clock::time_point speedT;
+    err = modbusController_->getLastFreshAirSpeed(&speed, &speedT);
+    if (err == ESP_OK) {
+        if (speed == UINT8_MAX) {
+            if (fanMaxSpeedStarted_ == std::chrono::steady_clock::time_point{}) {
+                fanMaxSpeedStarted_ = speedT;
+            } else if (speedT - fanMaxSpeedStarted_ > STATIC_PRESSURE_MIN_FAN_TIME &&
+                       stoppedPressurePa_ > 0) {
+                if (stoppedPressurePa_ > freshAirState->pressurePa) {
+                    ESP_LOGW(TAG, "est fresh air static pressure (pa): %lu",
+                             (stoppedPressurePa_ - freshAirState->pressurePa));
+                } else {
+                    ESP_LOGE(TAG, "Unexpected negative static pressure estimate");
+                }
+
+                stoppedPressurePa_ = 0;
+            }
+        }
+        clearMessage(MsgID::SetFreshAirSpeedErr);
+    } else {
+        fanMaxSpeedStarted_ = {};
+        setMessageF(MsgID::SetFreshAirSpeedErr, false, "Error setting fan speed: %d", err);
     }
 
     if (now - lastOutdoorTempUpdate_ > OUTDOOR_TEMP_MAX_AGE) {
