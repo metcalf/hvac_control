@@ -149,7 +149,10 @@
       "controller_main.h": "c",
       "sensirion_common.h": "c",
       "sensirion_config.h": "c",
-      "__memory": "cpp"
+      "__memory": "cpp",
+      "__locale": "cpp",
+      "__split_buffer": "cpp",
+      "__tree": "cpp"
     }
   }
 }

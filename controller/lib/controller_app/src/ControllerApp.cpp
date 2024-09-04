@@ -32,6 +32,7 @@ typedef int esp_err_t;
 #define STATIC_PRESSURE_MIN_FAN_TIME std::chrono::seconds(60)
 // Ignore makeup demand requests older than this
 #define MAKEUP_MAX_AGE std::chrono::minutes(5)
+#define COIL_COLD_TEMP_C ABS_F_TO_C(60.0)
 
 #define MAKEUP_FAN_SPEED (FanSpeed)120
 #define MIN_FAN_SPEED_VALUE (FanSpeed)10
@@ -53,13 +54,25 @@ void ControllerApp::updateACMode(const DemandRequest &request) {
         clearMessage(MsgID::ACMode);
     }
 
+    bool coilIsCold = false;
+    FancoilState fcState;
+    std::chrono::steady_clock::time_point _t;
+    esp_err_t err = modbusController_->getFancoilState(&fcState, &_t);
+    if (err == ESP_OK) {
+        coilIsCold = (fcState.coilTempC < COIL_COLD_TEMP_C);
+        ESP_LOGD(TAG, "fancoil is cold");
+    } else {
+        ESP_LOGE(TAG, "Error getting fancoil state: %d", err);
+    }
+
     DemandRequest::FancoilRequest fc = request.fancoil;
     switch (acMode_) {
     case ACMode::Off:
         break;
     case ACMode::Standby:
-        // If we're demanding HIGH A/C, turn the A/C on
-        if (fc.cool && fc.speed == FancoilSpeed::High) {
+        // If we're demanding HIGH A/C or the coil is cold anyway, turn the A/C on
+        if (fc.cool &&
+            (fc.speed == FancoilSpeed::High || (fc.speed != FancoilSpeed::Off && coilIsCold))) {
             acMode_ = ACMode::On;
         }
         break;

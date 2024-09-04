@@ -36,6 +36,10 @@ enum class FreshAirModel {
     BROAN = 0x02,
 };
 
+struct FancoilState {
+    double coilTempC;
+};
+
 struct FreshAirState {
     double tempC, humidity;
     uint32_t pressurePa;

@@ -54,6 +54,7 @@ class ControllerApp {
   private:
     using FancoilSpeed = ControllerDomain::FancoilSpeed;
     using SensorData = ControllerDomain::SensorData;
+    using FancoilState = ControllerDomain::FancoilState;
     using FreshAirState = ControllerDomain::FreshAirState;
     using DemandRequest = ControllerDomain::DemandRequest;
     using Setpoints = ControllerDomain::Setpoints;

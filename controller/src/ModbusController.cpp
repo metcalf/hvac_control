@@ -50,7 +50,7 @@ void ModbusController::doGetFreshAir() {
     xSemaphoreGive(mutex_);
 }
 
-void ModbusController::doFancoil() {
+void ModbusController::doSetFancoil() {
     esp_err_t err;
 
     if (!fancoilConfigured_) {
@@ -75,9 +75,20 @@ void ModbusController::doFancoil() {
     xSemaphoreGive(mutex_);
 }
 
+void ModbusController::doGetFancoil() {
+    FancoilState state;
+    esp_err_t err = client_.getFancoilState(&state);
+    xSemaphoreTake(mutex_, portMAX_DELAY);
+    fancoilStateErr_ = err;
+    if (fancoilStateErr_ == ESP_OK) {
+        fancoilState_ = state;
+        lastFancoilState_ = std::chrono::steady_clock::now();
+    }
+    xSemaphoreGive(mutex_);
+}
+
 void ModbusController::task() {
     while (1) {
-        esp_err_t err;
         EventBits_t bits = xEventGroupWaitBits(requests_, 0xff, pdTRUE, pdFALSE,
                                                pdMS_TO_TICKS(POLL_INTERVAL_SECS * 1000));
 
@@ -85,7 +96,7 @@ void ModbusController::task() {
             doSetFreshAir();
         }
         if (bits & requestBits(RequestType::SetFancoil)) {
-            doFancoil();
+            doSetFancoil();
         }
 
         // We fetch updated data on every turn through the loop even though this happens
@@ -96,6 +107,7 @@ void ModbusController::task() {
         }
 
         doGetFreshAir();
+        doGetFancoil();
     }
 }
 
@@ -105,6 +117,19 @@ ControllerDomain::FreshAirModel ModbusController::getFreshAirModelId() {
     xSemaphoreGive(mutex_);
 
     return (ControllerDomain::FreshAirModel)id;
+}
+
+esp_err_t ModbusController::getFancoilState(ControllerDomain::FancoilState *state,
+                                            std::chrono::steady_clock::time_point *time) {
+    xSemaphoreTake(mutex_, portMAX_DELAY);
+    esp_err_t err = fancoilStateErr_;
+    if (err == ESP_OK) {
+        *state = fancoilState_;
+        *time = lastFancoilState_;
+    }
+    xSemaphoreGive(mutex_);
+
+    return err;
 }
 
 esp_err_t ModbusController::getFreshAirState(FreshAirState *state,
