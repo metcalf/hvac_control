@@ -82,7 +82,7 @@ int main(void) {
     wdt_enable(0x8); // 1 second (note the constants in avr/wdt are wrong for this chip)
 
     CPU_CCP = CCP_IOREG_gc; /* Enable writing to protected register MCLKCTRLB */
-    CLKCTRL.MCLKCTRLB = CLKCTRL_PEN_bm | CLKCTRL_PDIV_64X_gc; // Divide main clock by 64 = 312500hz
+    CLKCTRL.MCLKCTRLB = CLKCTRL_PEN_bm | CLKCTRL_PDIV_16X_gc; // Divide main clock by 16 = 1.25mhz
 
     USART_DEBUG_INIT();
     setupTachTimer();
@@ -107,7 +107,7 @@ int main(void) {
     // 20e6 CPU / 64 prescaler / 156
     TCA0.SPLIT.LPER = 255;
 
-    // Run at ~1.2khz (16e6 / 64 prescaler / 4 timer scaler / 256 range)
+    // Run at ~1.2khz (20e6 / 16 prescaler / 4 timer scaler / 256 range)
     TCA0.SPLIT.CTRLA = TCA_SPLIT_ENABLE_bm | TCA_SPLIT_CLKSEL_DIV4_gc;
 
     bme280_init();

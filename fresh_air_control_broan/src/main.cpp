@@ -25,7 +25,7 @@
 uint16_t last_ctrl_action_ticks_;
 uint16_t last_pht_read_ticks_;
 uint16_t last_on_ticks_;
-volatile uint16_t tick_; // 0.5ms tick period
+volatile uint16_t tick_;
 
 uint16_t last_speed_;
 LastData last_data_;

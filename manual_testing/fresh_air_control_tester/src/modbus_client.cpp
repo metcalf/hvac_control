@@ -189,12 +189,22 @@ esp_err_t read_fresh_air_data() {
     uint8_t type = 0; // throwaway
 
     uint16_t id;
+    uint16_t speed;
     uint16_t data[4];
 
     err = mbc_master_get_parameter(CID_FAN_ID, (char *)MB_NAME_FAN_ID, (uint8_t *)&id, &type);
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "Characteristic #%u (%s) read fail, err = 0x%x (%s).", CID_FAN_ID,
                  MB_NAME_FAN_ID, (int)err, (char *)esp_err_to_name(err));
+        return err;
+    }
+
+    err = mbc_master_get_parameter(CID_FAN_CONTROL_SPEED, (char *)MB_NAME_FAN_CONTROL_SPEED,
+                                   (uint8_t *)&speed, &type);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Characteristic #%u (%s) read fail, err = 0x%x (%s).", CID_FAN_CONTROL_SPEED,
+                 MB_NAME_FAN_CONTROL_SPEED, (int)err, (char *)esp_err_to_name(err));
+        return err;
     }
 
     err = mbc_master_get_parameter(CID_FAN_CONTROL_INPUTS, (char *)MB_NAME_FAN_CONTROL_INPUTS,
@@ -205,8 +215,8 @@ esp_err_t read_fresh_air_data() {
         uint32_t pressure = data[2] + 87000;
         uint16_t tach_rpm = data[3];
 
-        ESP_LOGI(TAG, "FC data: id=%#x t=%.2fC\th=%.2f%%\tp=%luPa\trpm=%u", id, temp, humidity,
-                 pressure, tach_rpm);
+        ESP_LOGI(TAG, "FC data: id=%#x t=%.2fC\th=%.2f%%\tp=%luPa\trpm=%u speed=%u", id, temp,
+                 humidity, pressure, tach_rpm, speed);
     } else {
         ESP_LOGE(TAG, "Characteristic #%u (%s) read fail, err = 0x%x (%s).", CID_FAN_CONTROL_INPUTS,
                  MB_NAME_FAN_CONTROL_INPUTS, (int)err, (char *)esp_err_to_name(err));

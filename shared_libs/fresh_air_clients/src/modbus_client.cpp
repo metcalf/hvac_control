@@ -55,12 +55,12 @@ eMBErrorCode eMBRegHoldingCB(UCHAR *pucRegBuffer, USHORT usAddress, USHORT usNRe
     uint8_t *ptr = (uint8_t *)speed_ptr_;
     if (eMode == MB_REG_READ) {
         // Adapted from _XFER_2_RD
-        *(uint8_t *)(pucRegBuffer + 0) = *(uint8_t *)(speed_ptr_ + 1);
-        *(uint8_t *)(pucRegBuffer + 1) = *(uint8_t *)(speed_ptr_ + 0);
+        *(pucRegBuffer + 1) = *((uint8_t *)speed_ptr_ + 0);
+        *(pucRegBuffer + 0) = *((uint8_t *)speed_ptr_ + 1);
     } else {
         // Adapted from _XFER_2_WR
-        *(uint8_t *)(pucRegBuffer + 1) = *(uint8_t *)(speed_ptr_ + 0);
-        *(uint8_t *)(pucRegBuffer + 0) = *(uint8_t *)(speed_ptr_ + 1);
+        *((uint8_t *)speed_ptr_ + 0) = *(uint8_t *)(pucRegBuffer + 1);
+        *((uint8_t *)speed_ptr_ + 1) = *(uint8_t *)(pucRegBuffer + 0);
     }
 
     return MB_ENOERR;
