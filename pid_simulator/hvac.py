@@ -91,91 +91,51 @@ class System:
         )
 
 
-class PIDSystem:
-    def __init__(self, components_by_name, p_range_c, t_i):
-        self._components_by_name = components_by_name
+class Component:
+    @property
+    def is_heater(self):
+        return self._is_heater
+
+
+class PIDComponent(Component):
+    def __init__(self, component, p_range_c, t_i):
+        self._component = component
         self._p_range_c = float(p_range_c)
         self._i = 0.0
         self._t_i = t_i
-        self._i_mode = HVACMode.OFF
+        self._is_heater = component.is_heater
 
     def get_power(self, in_temp_c, out_temp_c, heat_setpoint_c, cool_setpoint_c):
-        p_setpoint_c = None
-        i_setpoint_c = None
-        sign = 1
+        setpoint_c = heat_setpoint_c if self.is_heater else cool_setpoint_c
+        err = (setpoint_c - in_temp_c) / self._p_range_c
 
-        if in_temp_c > cool_setpoint_c:
-            p_setpoint_c = cool_setpoint_c
-            self._i_mode = HVACMode.COOL
-            sign = -1
-        elif in_temp_c < heat_setpoint_c:
-            p_setpoint_c = heat_setpoint_c
-            self._i_mode = HVACMode.HEAT
-
-        # Integral error is based on the last setpoint we exceeded to avoid a persistent
-        # integral term when we're in the deadband. Otherwise you get behavior like
-        # cooling to the cool setpoint and then the integral continuing cooling (wasting
-        # energy) until you go below the heat setpoint. `_clamp_integral` works together
-        # with this logic.
-        if self._i_mode == HVACMode.COOL:
-            i_setpoint_c = cool_setpoint_c
-        elif self._i_mode == HVACMode.HEAT:
-            i_setpoint_c = heat_setpoint_c
-
-        if p_setpoint_c is not None:
-            abs_p_err = abs(p_setpoint_c - in_temp_c) / self._p_range_c
-        else:
-            abs_p_err = 0
-
-        if i_setpoint_c is not None:
-            i_err = (i_setpoint_c - in_temp_c) / self._p_range_c
-        else:
-            i_err = 0
-
-        p_demand = sign * abs_p_err
-        self._i += i_err
-        self._clamp_integral(p_demand)
+        self._i += err
+        self._clamp_integral(err)
         i_demand = self._i / self._t_i
+        demand = self._clamp(err + i_demand)
 
-        demand = self._clamp(p_demand + i_demand)
-
-        return SystemPower(
-            {
-                n: c.get_power_with_demand(
-                    demand, in_temp_c, out_temp_c, heat_setpoint_c, cool_setpoint_c
-                )
-                for n, c in self._components_by_name.items()
-            }
+        return self._component.get_power_with_demand(
+            demand, in_temp_c, out_temp_c, heat_setpoint_c, cool_setpoint_c
         )
 
     def _clamp_integral(self, p_demand):
         p_demand = self._clamp(p_demand)
 
-        # Ensure the integral only acts in the direction we last had a proportional signal
-        # this allows us to move between heat and cool setpoints as the load changes and
-        # avoid wasting energy both heating and cooling to tightly track a single
-        # setpoint.
-        upper = 1 if self._i_mode == HVACMode.HEAT else 0
-        lower = -1 if self._i_mode == HVACMode.COOL else 0
-
-        if p_demand > 0:
-            upper = max(0, upper - p_demand)
-        else:
-            lower = min(0, lower - p_demand)
-
+        # Clamping to zero slightly improves response.
         self._i = self._clamp(
             self._i,
-            lower * self._t_i,
-            upper * self._t_i,
+            -self._t_i if not self.is_heater else 0,
+            self._t_i if self.is_heater else 0,
         )
 
     def _clamp(self, value, min_value=-1, max_value=1):
         return max(min_value, min(value, max_value))
 
 
-class FanCooling:
+class FanCooling(Component):
     def __init__(self, m3_m):
         self._m3_s = m3_m / 60.0
+        self._is_heater = False
 
     def _get_power_for_delta(self, delta_c):
         if delta_c >= 0:
@@ -213,7 +173,7 @@ class FanCooling:
         )
 
 
-class Thermostat:
+class Thermostat(Component):
     def __init__(self, power_w, is_heater):
         self._power_w = power_w
         self._is_heater = is_heater
@@ -243,7 +203,7 @@ class Thermostat:
         return demand * self._power_w
 
 
-class HysteresisThermostat:
+class HysteresisThermostat(Component):
     def __init__(self, power_w, is_heater, hysteresis_c=0.5):
         self._power_w = power_w * (1 if is_heater else -1)
         self._is_heater = is_heater
@@ -267,11 +227,12 @@ class HysteresisThermostat:
             return 0
 
 
-class TempDelay:
+class TempDelay(Component):
     def __init__(self, temp_delay_c, component):
         self._temp_delay_c = temp_delay_c
         self._component = component
         self._is_on = False
+        self._is_heater = component.is_heater
 
     def get_available(self, *args):
         res = self._component.get_available(*args)
@@ -314,13 +275,14 @@ class TempDelay:
         return self._handle_power(power, in_temp_c, heat_setpoint_c, cool_setpoint_c)
 
 
-class DiscreteLevels:
+class DiscreteLevels(Component):
     def __init__(self, component, levels):
         levels = sorted(levels)
         self._component = component
         self._levels = levels
         self._level_i = levels.index(0)
         self._max_level_i = len(self._levels) - 1
+        self._is_heater = component.is_heater
 
     def get_available(self, *args):
         return self._component.get_available(*args)
@@ -348,9 +310,10 @@ class DiscreteLevels:
         )
 
 
-class FixedOutput:
+class FixedOutput(Component):
     def __init__(self, energy_w=0):
         self._energy_w = energy_w
+        self._is_heater = energy_w > 0
 
     def get_power(self, in_temp_c, out_temp_c, heat_setpoint_c, cool_setpoint_c):
         return self._energy_w
