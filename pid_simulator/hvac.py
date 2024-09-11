@@ -97,26 +97,21 @@ class Component:
         return self._is_heater
 
 
-class PIDComponent(Component):
-    def __init__(self, component, p_range_c, t_i):
-        self._component = component
+class PIDAlgorithm:
+    def __init__(self, is_heater, p_range_c, t_i):
         self._p_range_c = float(p_range_c)
         self._i = 0.0
         self._t_i = t_i
-        self._is_heater = component.is_heater
+        self._is_heater = is_heater
 
-    def get_power(self, in_temp_c, out_temp_c, heat_setpoint_c, cool_setpoint_c):
-        setpoint_c = heat_setpoint_c if self.is_heater else cool_setpoint_c
+    def get_demand(self, in_temp_c, out_temp_c, heat_setpoint_c, cool_setpoint_c):
+        setpoint_c = heat_setpoint_c if self._is_heater else cool_setpoint_c
         err = (setpoint_c - in_temp_c) / self._p_range_c
 
         self._i += err
         self._clamp_integral(err)
         i_demand = self._i / self._t_i
-        demand = self._clamp(err + i_demand)
-
-        return self._component.get_power_with_demand(
-            demand, in_temp_c, out_temp_c, heat_setpoint_c, cool_setpoint_c
-        )
+        return self._clamp(err + i_demand)
 
     def _clamp_integral(self, p_demand):
         p_demand = self._clamp(p_demand)
@@ -124,12 +119,27 @@ class PIDComponent(Component):
         # Clamping to zero slightly improves response.
         self._i = self._clamp(
             self._i,
-            -self._t_i if not self.is_heater else 0,
-            self._t_i if self.is_heater else 0,
+            -self._t_i if not self._is_heater else 0,
+            self._t_i if self._is_heater else 0,
         )
 
     def _clamp(self, value, min_value=-1, max_value=1):
         return max(min_value, min(value, max_value))
+
+
+class PIDComponent(Component):
+    def __init__(self, component, p_range_c, t_i):
+        self.algo = PIDAlgorithm(component.is_heater, p_range_c, t_i)
+        self._component = component
+        self._is_heater = component.is_heater
+
+    def get_power(self, in_temp_c, out_temp_c, heat_setpoint_c, cool_setpoint_c):
+        demand = self.algo.get_demand(
+            in_temp_c, out_temp_c, heat_setpoint_c, cool_setpoint_c
+        )
+        return self._component.get_power_with_demand(
+            demand, in_temp_c, out_temp_c, heat_setpoint_c, cool_setpoint_c
+        )
 
 
 class FanCooling(Component):

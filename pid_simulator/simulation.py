@@ -38,7 +38,7 @@ def create_room():
 temps = InterpolatedInput(
     WeatherInput.from_csv(
         "./weather/KCASANFR1934.csv",
-        after=datetime.datetime(2023, 7, 1),
+        after=datetime.datetime(2024, 7, 1),
         # before=datetime.datetime(2024, 2, 1),
     ),
     interval=datetime.timedelta(minutes=1),
