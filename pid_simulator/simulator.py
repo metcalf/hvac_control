@@ -85,7 +85,7 @@ class Simulator:
 
         for dt, tc in self._outdoor_temp_input:
             heat_setpoint_c, cool_setpoint_c = self._setpoint_schedule.get(dt)
-            system_power = self._update_power(tc, heat_setpoint_c, cool_setpoint_c)
+            system_power = self._update_power(dt, tc, heat_setpoint_c, cool_setpoint_c)
 
             total_energy = hvac.SystemEnergy()
             if prev_dt is not None:
@@ -191,9 +191,9 @@ class Simulator:
 
         plt.show()
 
-    def _update_power(self, out_t_c, heat_setpoint_c, cool_setpoint_c):
+    def _update_power(self, dt, out_t_c, heat_setpoint_c, cool_setpoint_c):
         system_power = self._hvac_system.get_power(
-            self._room.air_temp_c, out_t_c, heat_setpoint_c, cool_setpoint_c
+            self._room.air_temp_c, out_t_c, heat_setpoint_c, cool_setpoint_c, dt
         )
         mode = hvac.HVACMode.from_power(system_power.net_power_w)
         if self._hvac_mode is not None and mode != self._hvac_mode:

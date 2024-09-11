@@ -118,7 +118,7 @@ def fancoil_simple_pid_system(t_i=1):
     )
 
 
-for hvac_system in [fancoil_simple_pid_system(t_i=4)]:
+for hvac_system in [fancoil_simple_pid_system(t_i=4 * 60)]:
     print("starting run")
     mbr = create_room()
     sim = Simulator(temps, mbr, setpoint_schedule, hvac_system)

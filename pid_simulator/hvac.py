@@ -2,6 +2,7 @@ import room
 from functools import cached_property
 import conversions
 from enum import Enum
+import datetime
 
 # Fan cooling needs to know temps
 # Temp delay needs to know temps
@@ -62,8 +63,10 @@ class SystemPower:
     def __init__(self, component_power_w):
         self._component_power_w = component_power_w
 
-    def energy(self, time_s):
-        return SystemEnergy({n: time_s * p for n, p in self._component_power_w.items()})
+    def energy(self, curr_time):
+        return SystemEnergy(
+            {n: curr_time * p for n, p in self._component_power_w.items()}
+        )
 
     @cached_property
     def net_power_w(self):
@@ -98,17 +101,26 @@ class Component:
 
 
 class PIDAlgorithm:
-    def __init__(self, is_heater, p_range_c, t_i):
+    def __init__(
+        self, is_heater, p_range_c, t_i, max_interval=datetime.timedelta(minutes=10)
+    ):
         self._p_range_c = float(p_range_c)
         self._i = 0.0
         self._t_i = t_i
         self._is_heater = is_heater
+        self._last_time = datetime.datetime.min
+        self._max_interval = max_interval
 
-    def get_demand(self, in_temp_c, out_temp_c, heat_setpoint_c, cool_setpoint_c):
+    def get_demand(
+        self, in_temp_c, out_temp_c, heat_setpoint_c, cool_setpoint_c, curr_time
+    ):
         setpoint_c = heat_setpoint_c if self._is_heater else cool_setpoint_c
         err = (setpoint_c - in_temp_c) / self._p_range_c
 
-        self._i += err
+        delta_s = min(curr_time - self._last_time, self._max_interval).total_seconds()
+        self._last_time = curr_time
+
+        self._i += err * delta_s
         self._clamp_integral(err)
         i_demand = self._i / self._t_i
         return self._clamp(err + i_demand)
@@ -133,9 +145,11 @@ class PIDComponent(Component):
         self._component = component
         self._is_heater = component.is_heater
 
-    def get_power(self, in_temp_c, out_temp_c, heat_setpoint_c, cool_setpoint_c):
+    def get_power(
+        self, in_temp_c, out_temp_c, heat_setpoint_c, cool_setpoint_c, curr_time
+    ):
         demand = self.algo.get_demand(
-            in_temp_c, out_temp_c, heat_setpoint_c, cool_setpoint_c
+            in_temp_c, out_temp_c, heat_setpoint_c, cool_setpoint_c, curr_time
         )
         return self._component.get_power_with_demand(
             demand, in_temp_c, out_temp_c, heat_setpoint_c, cool_setpoint_c
@@ -160,7 +174,9 @@ class FanCooling(Component):
             self._get_power_for_delta(min(-10, delta)),
         )
 
-    def get_power(self, in_temp_c, out_temp_c, heat_setpoint_c, cool_setpoint_c):
+    def get_power(
+        self, in_temp_c, out_temp_c, heat_setpoint_c, cool_setpoint_c, curr_time
+    ):
         demand = -1 if in_temp_c > cool_setpoint_c else 0
         return self.get_power_with_demand(
             demand, in_temp_c, out_temp_c, heat_setpoint_c, cool_setpoint_c
@@ -192,7 +208,9 @@ class Thermostat(Component):
         pwr = self._power_w * (1 if self._is_heater else -1)
         return (pwr, pwr)
 
-    def get_power(self, in_temp_c, out_temp_c, heat_setpoint_c, cool_setpoint_c):
+    def get_power(
+        self, in_temp_c, out_temp_c, heat_setpoint_c, cool_setpoint_c, curr_time
+    ):
         if in_temp_c > cool_setpoint_c:
             demand = -1
         elif in_temp_c < heat_setpoint_c:
@@ -220,7 +238,9 @@ class HysteresisThermostat(Component):
         self._hysteresis_c = hysteresis_c
         self._is_on = False
 
-    def get_power(self, in_temp_c, out_temp_c, heat_setpoint_c, cool_setpoint_c):
+    def get_power(
+        self, in_temp_c, out_temp_c, heat_setpoint_c, cool_setpoint_c, curr_time
+    ):
         if self._is_heater:
             delta = heat_setpoint_c - in_temp_c
         else:
@@ -270,7 +290,9 @@ class TempDelay(Component):
         else:
             return 0
 
-    def get_power(self, in_temp_c, out_temp_c, heat_setpoint_c, cool_setpoint_c):
+    def get_power(
+        self, in_temp_c, out_temp_c, heat_setpoint_c, cool_setpoint_c, curr_time
+    ):
         power = self._component.get_power(
             in_temp_c, out_temp_c, heat_setpoint_c, cool_setpoint_c
         )
@@ -325,5 +347,7 @@ class FixedOutput(Component):
         self._energy_w = energy_w
         self._is_heater = energy_w > 0
 
-    def get_power(self, in_temp_c, out_temp_c, heat_setpoint_c, cool_setpoint_c):
+    def get_power(
+        self, in_temp_c, out_temp_c, heat_setpoint_c, cool_setpoint_c, curr_time
+    ):
         return self._energy_w
