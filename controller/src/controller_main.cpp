@@ -19,6 +19,7 @@
 #include "Sensors.h"
 #include "UIManager.h"
 #include "ValveCtrl.h"
+#include "WUndergroundClient.h"
 #include "rtc-rx8111.h"
 
 #define INIT_ERR_RESTART_DELAY_TICKS pdMS_TO_TICKS(10 * 1000)
@@ -54,6 +55,7 @@ static DemandController demandController_;
 static QueueHandle_t uiEvtQueue_;
 static ESPWifi wifi_;
 static AppConfigStore appConfigStore_;
+static WUndergroundClient weatherCli_;
 
 void sensorTask(void *sensors) {
     while (1) {
@@ -181,8 +183,10 @@ extern "C" void controller_main() {
     UIManager::setEventsInst(uiManager_);
     modbusController_ = new ModbusController(config.equipment.hasMakeupDemand);
     valveCtrl_.init();
+    weatherCli_.start();
+
     app_ = new ControllerApp(config, uiManager_, modbusController_, &sensors_, &demandController_,
-                             &valveCtrl_, &wifi_, &appConfigStore_, uiEvtRcv);
+                             &valveCtrl_, &wifi_, &appConfigStore_, &weatherCli_, uiEvtRcv);
     xTaskCreate(uiTask, "uiTask", UI_TASK_STACK_SIZE, uiManager_, UI_TASK_PRIO, NULL);
 
     setenv("TZ", POSIX_TZ_STR, 1);

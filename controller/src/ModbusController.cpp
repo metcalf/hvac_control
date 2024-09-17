@@ -4,63 +4,132 @@
 
 #define POLL_INTERVAL_SECS 5
 
-void ModbusController::task() {
-    while (1) {
-        esp_err_t err;
-        EventBits_t bits = xEventGroupWaitBits(requests_, 0xff, pdTRUE, pdFALSE,
-                                               pdMS_TO_TICKS(POLL_INTERVAL_SECS * 1000));
+void ModbusController::doMakeup() {
+    bool makeupDemand;
 
-        std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now();
+    esp_err_t err = client_.getMakeupDemand(&makeupDemand);
 
-        if (bits & requestBits(RequestType::SetFreshAirSpeed)) {
-            xSemaphoreTake(mutex_, portMAX_DELAY);
-            FanSpeed speed = requestFreshAirSpeed_;
-            xSemaphoreGive(mutex_);
+    xSemaphoreTake(mutex_, portMAX_DELAY);
+    makeupDemandErr_ = err;
+    if (makeupDemandErr_ == ESP_OK) {
+        makeupDemand_ = makeupDemand;
+        lastMakeupDemand_ = std::chrono::steady_clock::now();
+    }
+    xSemaphoreGive(mutex_);
+}
 
-            err = client_.setFreshAirSpeed(speed);
-            xSemaphoreTake(mutex_, portMAX_DELAY);
-            freshAirSpeedErr_ = err;
-            xSemaphoreGive(mutex_);
-        }
-        if (bits & requestBits(RequestType::SetFancoil)) {
-            xSemaphoreTake(mutex_, portMAX_DELAY);
-            FancoilRequest req = requestFancoil_;
-            xSemaphoreGive(mutex_);
+void ModbusController::doSetFreshAir() {
+    xSemaphoreTake(mutex_, portMAX_DELAY);
+    FanSpeed speed = requestFreshAirSpeed_;
+    xSemaphoreGive(mutex_);
 
-            err = client_.setFancoil(req);
+    esp_err_t err = client_.setFreshAirSpeed(speed);
+    xSemaphoreTake(mutex_, portMAX_DELAY);
+    freshAirSpeedErr_ = err;
+    if (err == ESP_OK) {
+        lastFreshAirSpeed_ = std::chrono::steady_clock::now();
+        freshAirSpeed_ = speed;
+    }
+    xSemaphoreGive(mutex_);
+}
+
+void ModbusController::doGetFreshAir() {
+    if (freshAirModelId_ == 0) {
+        client_.getFreshAirModelId(&freshAirModelId_);
+    }
+
+    FreshAirState freshAirState;
+    esp_err_t err = client_.getFreshAirState(&freshAirState);
+
+    xSemaphoreTake(mutex_, portMAX_DELAY);
+    freshAirStateErr_ = err;
+    if (freshAirStateErr_ == ESP_OK) {
+        freshAirState_ = freshAirState;
+        lastFreshAirState_ = std::chrono::steady_clock::now();
+    }
+    xSemaphoreGive(mutex_);
+}
+
+void ModbusController::doSetFancoil() {
+    esp_err_t err;
+
+    if (!fancoilConfigured_) {
+        err = client_.configureFancoil();
+        if (err != ESP_OK) {
             xSemaphoreTake(mutex_, portMAX_DELAY);
             setFancoilErr_ = err;
             xSemaphoreGive(mutex_);
+            return;
+        }
+
+        fancoilConfigured_ = true;
+    }
+
+    xSemaphoreTake(mutex_, portMAX_DELAY);
+    FancoilRequest req = requestFancoil_;
+    xSemaphoreGive(mutex_);
+
+    err = client_.setFancoil(req);
+    xSemaphoreTake(mutex_, portMAX_DELAY);
+    setFancoilErr_ = err;
+    xSemaphoreGive(mutex_);
+}
+
+void ModbusController::doGetFancoil() {
+    FancoilState state;
+    esp_err_t err = client_.getFancoilState(&state);
+    xSemaphoreTake(mutex_, portMAX_DELAY);
+    fancoilStateErr_ = err;
+    if (fancoilStateErr_ == ESP_OK) {
+        fancoilState_ = state;
+        lastFancoilState_ = std::chrono::steady_clock::now();
+    }
+    xSemaphoreGive(mutex_);
+}
+
+void ModbusController::task() {
+    while (1) {
+        EventBits_t bits = xEventGroupWaitBits(requests_, 0xff, pdTRUE, pdFALSE,
+                                               pdMS_TO_TICKS(POLL_INTERVAL_SECS * 1000));
+
+        if (bits & requestBits(RequestType::SetFreshAirSpeed)) {
+            doSetFreshAir();
+        }
+        if (bits & requestBits(RequestType::SetFancoil)) {
+            doSetFancoil();
         }
 
         // We fetch updated data on every turn through the loop even though this happens
         // both at the poll interval and on every set* request. Extra queries are harmless
         // and it makes the code simpler.
         if (hasMakeupDemand_) {
-            bool makeupDemand;
-
-            err = client_.getMakeupDemand(&makeupDemand);
-
-            xSemaphoreTake(mutex_, portMAX_DELAY);
-            makeupDemandErr_ = err;
-            if (makeupDemandErr_ == ESP_OK) {
-                makeupDemand_ = makeupDemand;
-                lastMakeupDemand_ = now;
-            }
-            xSemaphoreGive(mutex_);
+            doMakeup();
         }
 
-        FreshAirState freshAirState;
-        err = client_.getFreshAirState(&freshAirState);
-
-        xSemaphoreTake(mutex_, portMAX_DELAY);
-        freshAirStateErr_ = err;
-        if (freshAirStateErr_ == ESP_OK) {
-            freshAirState_ = freshAirState;
-            lastFreshAirState_ = now;
-        }
-        xSemaphoreGive(mutex_);
+        doGetFreshAir();
+        doGetFancoil();
     }
+}
+
+ControllerDomain::FreshAirModel ModbusController::getFreshAirModelId() {
+    xSemaphoreTake(mutex_, portMAX_DELAY);
+    uint16_t id = freshAirModelId_;
+    xSemaphoreGive(mutex_);
+
+    return (ControllerDomain::FreshAirModel)id;
+}
+
+esp_err_t ModbusController::getFancoilState(ControllerDomain::FancoilState *state,
+                                            std::chrono::steady_clock::time_point *time) {
+    xSemaphoreTake(mutex_, portMAX_DELAY);
+    esp_err_t err = fancoilStateErr_;
+    if (err == ESP_OK) {
+        *state = fancoilState_;
+        *time = lastFancoilState_;
+    }
+    xSemaphoreGive(mutex_);
+
+    return err;
 }
 
 esp_err_t ModbusController::getFreshAirState(FreshAirState *state,
@@ -70,6 +139,18 @@ esp_err_t ModbusController::getFreshAirState(FreshAirState *state,
     if (err == ESP_OK) {
         *state = freshAirState_;
         *time = lastFreshAirState_;
+    }
+    xSemaphoreGive(mutex_);
+
+    return err;
+}
+esp_err_t ModbusController::getLastFreshAirSpeed(ControllerDomain::FanSpeed *speed,
+                                                 std::chrono::steady_clock::time_point *time) {
+    xSemaphoreTake(mutex_, portMAX_DELAY);
+    esp_err_t err = freshAirSpeedErr_;
+    if (err == ESP_OK) {
+        *speed = freshAirSpeed_;
+        *time = lastFreshAirSpeed_;
     }
     xSemaphoreGive(mutex_);
 
@@ -117,12 +198,6 @@ EventBits_t ModbusController::requestBits(RequestType request) {
     return 0x01 << static_cast<size_t>(request);
 }
 
-esp_err_t ModbusController::lastFreshAirSpeedErr() {
-    xSemaphoreTake(mutex_, portMAX_DELAY);
-    esp_err_t err = freshAirSpeedErr_;
-    xSemaphoreGive(mutex_);
-    return err;
-}
 esp_err_t ModbusController::lastSetFancoilErr() {
     xSemaphoreTake(mutex_, portMAX_DELAY);
     esp_err_t err = setFancoilErr_;

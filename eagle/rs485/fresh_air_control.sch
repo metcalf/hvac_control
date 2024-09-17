@@ -1472,7 +1472,7 @@ You are welcome to use this library for commercial purposes. For attribution, we
 <rectangle x1="-0.5" y1="-0.25" x2="-0.3" y2="0.25" layer="51"/>
 <rectangle x1="0.3" y1="-0.25" x2="0.5" y2="0.25" layer="51" rot="R180"/>
 </package>
-<package name="0402@1" urn="urn:adsk.eagle:footprint:39625/2" library_version="2">
+<package name="0402" urn="urn:adsk.eagle:footprint:39625/2" library_version="2">
 <description>&lt;p&gt;&lt;b&gt;Generic 1005 (0402) package&lt;/b&gt;&lt;/p&gt;
 &lt;p&gt;0.2mm courtyard excess rounded to nearest 0.05mm.&lt;/p&gt;</description>
 <wire x1="-0.2704" y1="0.2286" x2="0.2704" y2="0.2286" width="0.1524" layer="51"/>
@@ -1576,23 +1576,6 @@ You are welcome to use this library for commercial purposes. For attribution, we
 <vertex x="-3.3681" y="-0.0101" curve="-90.012967"/>
 </polygon>
 </package>
-<package name="0402" urn="urn:adsk.eagle:footprint:39625/2" library_version="2">
-<description>&lt;p&gt;&lt;b&gt;Generic 1005 (0402) package&lt;/b&gt;&lt;/p&gt;
-&lt;p&gt;0.2mm courtyard excess rounded to nearest 0.05mm.&lt;/p&gt;</description>
-<wire x1="-0.2704" y1="0.2286" x2="0.2704" y2="0.2286" width="0.1524" layer="51"/>
-<wire x1="0.2704" y1="-0.2286" x2="-0.2704" y2="-0.2286" width="0.1524" layer="51"/>
-<wire x1="-1.2" y1="0.65" x2="1.2" y2="0.65" width="0.0508" layer="39"/>
-<wire x1="1.2" y1="0.65" x2="1.2" y2="-0.65" width="0.0508" layer="39"/>
-<wire x1="1.2" y1="-0.65" x2="-1.2" y2="-0.65" width="0.0508" layer="39"/>
-<wire x1="-1.2" y1="-0.65" x2="-1.2" y2="0.65" width="0.0508" layer="39"/>
-<smd name="1" x="-0.58" y="0" dx="0.85" dy="0.9" layer="1"/>
-<smd name="2" x="0.58" y="0" dx="0.85" dy="0.9" layer="1"/>
-<text x="0" y="0.762" size="0.6096" layer="25" font="vector" ratio="20" align="bottom-center">&gt;NAME</text>
-<text x="0" y="-0.762" size="0.6096" layer="27" font="vector" ratio="20" align="top-center">&gt;VALUE</text>
-<rectangle x1="-0.554" y1="-0.3048" x2="-0.254" y2="0.3048" layer="51"/>
-<rectangle x1="0.2588" y1="-0.3048" x2="0.5588" y2="0.3048" layer="51"/>
-<rectangle x1="-0.1999" y1="-0.3" x2="0.1999" y2="0.3" layer="35"/>
-</package>
 </packages>
 <packages3d>
 <package3d name="0603" urn="urn:adsk.eagle:package:41389018/1" type="box" library_version="2">
@@ -1607,11 +1590,11 @@ You are welcome to use this library for commercial purposes. For attribution, we
 <packageinstance name="0402-TIGHT"/>
 </packageinstances>
 </package3d>
-<package3d name="0402" urn="urn:adsk.eagle:package:39657@1/2" type="box" library_version="2">
+<package3d name="0402" urn="urn:adsk.eagle:package:39657/2" type="box" library_version="2">
 <description>&lt;p&gt;&lt;b&gt;Generic 1005 (0402) package&lt;/b&gt;&lt;/p&gt;
 &lt;p&gt;0.2mm courtyard excess rounded to nearest 0.05mm.&lt;/p&gt;</description>
 <packageinstances>
-<packageinstance name="0402@1"/>
+<packageinstance name="0402"/>
 </packageinstances>
 </package3d>
 <package3d name="AXIAL-0.3" urn="urn:adsk.eagle:package:39658/2" type="box" library_version="2">
@@ -1642,13 +1625,6 @@ You are welcome to use this library for commercial purposes. For attribution, we
 &lt;p&gt;&lt;b&gt;Warning:&lt;/b&gt; This is the KIT version of the AXIAL-0.3 package. This package has a smaller diameter top stop mask, which doesn't cover the diameter of the pad. This means only the bottom side of the pads' copper will be exposed. You'll only be able to solder to the bottom side.&lt;/p&gt;</description>
 <packageinstances>
 <packageinstance name="AXIAL-0.3-KIT"/>
-</packageinstances>
-</package3d>
-<package3d name="0402" urn="urn:adsk.eagle:package:39657/2" type="box" library_version="2">
-<description>&lt;p&gt;&lt;b&gt;Generic 1005 (0402) package&lt;/b&gt;&lt;/p&gt;
-&lt;p&gt;0.2mm courtyard excess rounded to nearest 0.05mm.&lt;/p&gt;</description>
-<packageinstances>
-<packageinstance name="0402"/>
 </packageinstances>
 </package3d>
 </packages3d>
@@ -1872,13 +1848,13 @@ You are welcome to use this library for commercial purposes. For attribution, we
 </technology>
 </technologies>
 </device>
-<device name="-0402-1/16W-1%" package="0402@1">
+<device name="-0402-1/16W-1%" package="0402">
 <connects>
 <connect gate="G$1" pin="1" pad="1"/>
 <connect gate="G$1" pin="2" pad="2"/>
 </connects>
 <package3dinstances>
-<package3dinstance package3d_urn="urn:adsk.eagle:package:39657@1/2"/>
+<package3dinstance package3d_urn="urn:adsk.eagle:package:39657/2"/>
 </package3dinstances>
 <technologies>
 <technology name="">
@@ -1914,6 +1890,45 @@ You are welcome to use this library for commercial purposes. For attribution, we
 <technology name="">
 <attribute name="PROD_ID" value="RES-16147" constant="no"/>
 <attribute name="VALUE" value="10K" constant="no"/>
+</technology>
+</technologies>
+</device>
+</devices>
+</deviceset>
+<deviceset name="22KOHM" urn="urn:adsk.eagle:component:39707/2" prefix="R" uservalue="yes" library_version="2">
+<description>&lt;h3&gt;22kΩ resistor&lt;/h3&gt;
+&lt;p&gt;A resistor is a passive two-terminal electrical component that implements electrical resistance as a circuit element. Resistors act to reduce current flow, and, at the same time, act to lower voltage levels within circuits. - Wikipedia&lt;/p&gt;</description>
+<gates>
+<gate name="G$1" symbol="RESISTOR" x="0" y="0"/>
+</gates>
+<devices>
+<device name="-0603-1/10W-1%" package="0603">
+<connects>
+<connect gate="G$1" pin="1" pad="1"/>
+<connect gate="G$1" pin="2" pad="2"/>
+</connects>
+<package3dinstances>
+<package3dinstance package3d_urn="urn:adsk.eagle:package:41389018/1"/>
+</package3dinstances>
+<technologies>
+<technology name="">
+<attribute name="PROD_ID" value="RES-07853"/>
+<attribute name="VALUE" value="22k"/>
+</technology>
+</technologies>
+</device>
+<device name="-0402_TIGHT-1/10W-1%" package="0402-TIGHT">
+<connects>
+<connect gate="G$1" pin="1" pad="1"/>
+<connect gate="G$1" pin="2" pad="2"/>
+</connects>
+<package3dinstances>
+<package3dinstance package3d_urn="urn:adsk.eagle:package:41389023/1"/>
+</package3dinstances>
+<technologies>
+<technology name="">
+<attribute name="PROD_ID" value="RES-14281"/>
+<attribute name="VALUE" value="22k"/>
 </technology>
 </technologies>
 </device>
@@ -5386,8 +5401,8 @@ Physical Characteristics:
 <part name="GND6" library="SparkFun-PowerSymbols" library_urn="urn:adsk.eagle:library:530" deviceset="GND" device=""/>
 <part name="GND7" library="SparkFun-PowerSymbols" library_urn="urn:adsk.eagle:library:530" deviceset="GND" device=""/>
 <part name="Q1" library="SparkFun-DiscreteSemi" library_urn="urn:adsk.eagle:library:514" deviceset="TRANS_PNP" device="-PMBT3906|MMBT3906L" package3d_urn="urn:adsk.eagle:package:38446/2" value="200mA/40V"/>
-<part name="R8" library="SparkFun-Resistors" library_urn="urn:adsk.eagle:library:532" deviceset="4.7KOHM" device="-0603-1/10W-1%" package3d_urn="urn:adsk.eagle:package:41389018/1" value="4.7k"/>
-<part name="R9" library="SparkFun-Resistors" library_urn="urn:adsk.eagle:library:532" deviceset="4.7KOHM" device="-0603-1/10W-1%" package3d_urn="urn:adsk.eagle:package:41389018/1" value="4.7k"/>
+<part name="R8" library="SparkFun-Resistors" library_urn="urn:adsk.eagle:library:532" deviceset="2.2KOHM" device="-0603-1/10W-1%" package3d_urn="urn:adsk.eagle:package:41389018/1" value="2.2k"/>
+<part name="R9" library="SparkFun-Resistors" library_urn="urn:adsk.eagle:library:532" deviceset="22KOHM" device="-0603-1/10W-1%" package3d_urn="urn:adsk.eagle:package:41389018/1" value="22k"/>
 <part name="R10" library="Resistors" deviceset="120OHM" device="-0603-1/10W-5%" package3d_urn="urn:adsk.eagle:package:41389018/1" value="120"/>
 <part name="R5" library="SparkFun-Resistors" library_urn="urn:adsk.eagle:library:532" deviceset="2.2KOHM" device="-0603-1/10W-1%" package3d_urn="urn:adsk.eagle:package:41389018/1" value="2.2k"/>
 <part name="U8" library="SparkFun-Sensors" library_urn="urn:adsk.eagle:library:534" deviceset="BME280" device="" package3d_urn="urn:adsk.eagle:package:39984/3" value="BME280"/>
@@ -5444,7 +5459,7 @@ Physical Characteristics:
 <wire x1="269.24" y1="30.48" x2="182.88" y2="30.48" width="0.1524" layer="94"/>
 <text x="184.404" y="27.432" size="1.778" layer="94">MOTOR POWER</text>
 <text x="292.1" y="43.18" size="1.778" layer="94" rot="R90">consider pull R8 high to M+15
-switching R9 to 2.2k (or R8 too)</text>
+make R8/9 4.7k</text>
 </plain>
 <instances>
 <instance part="U5" gate="G$1" x="200.66" y="2.54" smashed="yes">

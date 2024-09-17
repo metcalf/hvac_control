@@ -453,6 +453,10 @@ void UIManager::onCancelMsg(uint8_t msgID) {
     eventCb_(evt);
 }
 
+// I ran out of allowed widgets in the free version of Squareline so this is
+// where I add new stuff until I come up with a better answer.
+void UIManager::initExtraWidgets() {}
+
 UIManager::UIManager(ControllerDomain::Config config, size_t nMsgIds, eventCb_t eventCb)
     : eventCb_(eventCb) {
     mutex_ = xSemaphoreCreateMutex();
@@ -464,6 +468,7 @@ UIManager::UIManager(ControllerDomain::Config config, size_t nMsgIds, eventCb_t 
     wifi_ = config.wifi;
 
     ui_init();
+    initExtraWidgets();
 
     sleepMgr_ = new SleepManager(ui_Home, GPIO_NUM_48);
 

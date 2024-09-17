@@ -38,7 +38,7 @@ def create_room():
 temps = InterpolatedInput(
     WeatherInput.from_csv(
         "./weather/KCASANFR1934.csv",
-        # after=datetime.datetime(2023, 7, 1),
+        after=datetime.datetime(2024, 7, 1),
         # before=datetime.datetime(2024, 2, 1),
     ),
     interval=datetime.timedelta(minutes=1),
@@ -86,55 +86,39 @@ on_off_system = hvac.System(
         "fan": hvac.FanCooling(conversions.ft3_to_m3(150)),
     }
 )
-p_system = hvac.PIDSystem(
-    {
-        "heat": hvac.Thermostat(power_w=500, is_heater=True),
-        "ac": hvac.TempDelay(
-            temp_delay_c=conversions.rel_f_to_c(4),
-            component=hvac.Thermostat(power_w=500, is_heater=False),
-        ),
-        "fan": hvac.FanCooling(conversions.ft3_to_m3(150)),
-    },
-    p_range_c=conversions.rel_f_to_c(2),
-    t_i=2,
-)
-no_fan_system = hvac.PIDSystem(
-    {
-        "heat": hvac.DiscreteLevels(
-            hvac.Thermostat(power_w=500, is_heater=True), fancoil_levels
-        ),
-        "ac": hvac.DiscreteLevels(
-            hvac.Thermostat(power_w=500, is_heater=False),
-            fancoil_levels,
-        ),
-    },
-    p_range_c=conversions.rel_f_to_c(2),
-    t_i=2,
-)
-hvac_system = p_system
 
 
-def fancoil_system(t_i=1):
-    return hvac.PIDSystem(
+def fancoil_simple_pid_system(t_i=1):
+    return hvac.System(
         {
-            "heat": hvac.DiscreteLevels(
-                hvac.Thermostat(power_w=500, is_heater=True), fancoil_levels
-            ),
-            "ac": hvac.DiscreteLevels(
-                hvac.TempDelay(
-                    temp_delay_c=conversions.rel_f_to_c(4),
-                    component=hvac.Thermostat(power_w=500, is_heater=False),
+            "heat": hvac.PIDComponent(
+                hvac.DiscreteLevels(
+                    hvac.Thermostat(power_w=500, is_heater=True), fancoil_levels
                 ),
-                fancoil_levels,
+                p_range_c=conversions.rel_f_to_c(2),
+                t_i=t_i,
             ),
-            "fan": hvac.FanCooling(conversions.ft3_to_m3(150)),
-        },
-        p_range_c=conversions.rel_f_to_c(2),
-        t_i=t_i,
+            "ac": hvac.PIDComponent(
+                hvac.DiscreteLevels(
+                    hvac.TempDelay(
+                        temp_delay_c=conversions.rel_f_to_c(4),
+                        component=hvac.Thermostat(power_w=500, is_heater=False),
+                    ),
+                    fancoil_levels,
+                ),
+                p_range_c=conversions.rel_f_to_c(2),
+                t_i=t_i,
+            ),
+            "fan": hvac.PIDComponent(
+                hvac.FanCooling(conversions.ft3_to_m3(150)),
+                p_range_c=conversions.rel_f_to_c(2),
+                t_i=t_i,
+            ),
+        }
     )
 
 
-for hvac_system in [fancoil_system(t_i) for t_i in (2, 4, 6, 8)]:
+for hvac_system in [fancoil_simple_pid_system(t_i=4 * 60)]:
     print("starting run")
     mbr = create_room()
     sim = Simulator(temps, mbr, setpoint_schedule, hvac_system)

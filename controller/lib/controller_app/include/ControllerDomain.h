@@ -12,11 +12,33 @@
 
 #define CONTROLLER_CONFIG_VERSION 1
 
+// Maximum age of outdoor temp to display in the UI before treating it as stale
+#define OUTDOOR_TEMP_MAX_AGE std::chrono::minutes(20)
+
 namespace ControllerDomain {
 typedef uint8_t FanSpeed;
 
 enum class HVACState { Off, Heat, FanCool, ACCool };
-enum class FancoilSpeed { Off, Low, Med, High };
+
+enum class FancoilSpeed {
+    // Values are explicit since they indicate the number of degrees C off setpoint
+    // to trigger this speed on the fancoil.
+    Off = 0,
+    Min = 1,
+    Low = 2,
+    Med = 3,
+    High = 4
+};
+
+enum class FreshAirModel {
+    UNKNOWN = 0x00,
+    SP = 0x01,
+    BROAN = 0x02,
+};
+
+struct FancoilState {
+    double coilTempC;
+};
 
 struct FreshAirState {
     double tempC, humidity;

@@ -11,7 +11,7 @@ typedef int esp_err_t;
 #define ESP_OK 0
 #endif
 
-#define SCHEDULE_TIME_STR_ARGS(s) (s.startHr - 1) % 12 + 1, s.startMin, s.startHr < 12 ? 'a' : 'p'
+#define SCHEDULE_TIME_STR_ARGS(s) (s.startHr - 1) % 12 + 1, s.startMin, s.startHr < 12 ? "AM" : "PM"
 
 #define APP_LOOP_INTERVAL_SECS 5
 #define STATUS_LOG_INTERVAL std::chrono::seconds(60)
@@ -25,12 +25,14 @@ typedef int esp_err_t;
 // Interval between running the fan to get an updated outdoor temp when we're
 // waiting for the temp to drop to allow fan cooling
 #define OUTDOOR_TEMP_UPDATE_INTERVAL std::chrono::minutes(15)
-// Maximum age of outdoor temp to display in the UI before treating it as stale
-#define OUTDOOR_TEMP_MAX_AGE std::chrono::minutes(20)
 // Minimum time fan needs to run before we trust the outdoor temp reading
 #define OUTDOOR_TEMP_MIN_FAN_TIME std::chrono::seconds(60)
+// Minimum time fan needs to run at maximum before we read static pressure.
+// We set this pretty high because the Broan fan takes awhile start up and stabilize.
+#define STATIC_PRESSURE_MIN_FAN_TIME std::chrono::seconds(60)
 // Ignore makeup demand requests older than this
 #define MAKEUP_MAX_AGE std::chrono::minutes(5)
+#define COIL_COLD_TEMP_C ABS_F_TO_C(60.0)
 
 #define MAKEUP_FAN_SPEED (FanSpeed)120
 #define MIN_FAN_SPEED_VALUE (FanSpeed)10
@@ -52,13 +54,25 @@ void ControllerApp::updateACMode(const DemandRequest &request) {
         clearMessage(MsgID::ACMode);
     }
 
+    bool coilIsCold = false;
+    FancoilState fcState;
+    std::chrono::steady_clock::time_point _t;
+    esp_err_t err = modbusController_->getFancoilState(&fcState, &_t);
+    if (err == ESP_OK) {
+        coilIsCold = (fcState.coilTempC < COIL_COLD_TEMP_C);
+        ESP_LOGD(TAG, "fancoil is cold");
+    } else {
+        ESP_LOGE(TAG, "Error getting fancoil state: %d", err);
+    }
+
     DemandRequest::FancoilRequest fc = request.fancoil;
     switch (acMode_) {
     case ACMode::Off:
         break;
     case ACMode::Standby:
-        // If we're demanding HIGH A/C, turn the A/C on
-        if (fc.cool && fc.speed == FancoilSpeed::High) {
+        // If we're demanding HIGH A/C or the coil is cold anyway, turn the A/C on
+        if (fc.cool &&
+            (fc.speed == FancoilSpeed::High || (fc.speed != FancoilSpeed::Off && coilIsCold))) {
             acMode_ = ACMode::On;
         }
         break;
@@ -136,10 +150,8 @@ FanSpeed ControllerApp::computeFanSpeed(const DemandRequest &request) {
             }
         }
 
-        if (fanSpeed < MIN_FAN_SPEED_VALUE &&
-            AbstractDemandController::isFanCoolingTempLimited(request) &&
-            (std::isnan(rawOutdoorTempC_) ||
-             (now - lastOutdoorTempUpdate_) > OUTDOOR_TEMP_UPDATE_INTERVAL)) {
+        if ((modbusController_->getFreshAirModelId() == ControllerDomain::FreshAirModel::SP) &&
+            fanSpeed < MIN_FAN_SPEED_VALUE && shouldPollOutdoorTemp(request)) {
             // If we're waiting for the outdoor temperature to drop for cooling and
             // we haven't updated the outdoor temperature recently, run the fan until
             // we get an update.
@@ -256,16 +268,23 @@ bool ControllerApp::pollUIEvent(bool wait) {
         wifi_->updateSTA(config_.wifi.ssid, config_.wifi.password);
         // TODO: Update remote logger with name when we have it
         break;
-    case EventType::FanOverride:
+    case EventType::FanOverride: {
         fanOverrideSpeed_ = uiEvent.payload.fanOverride.speed;
         fanOverrideUntil_ =
             steadyNow() + std::chrono::minutes{uiEvent.payload.fanOverride.timeMins};
         ESP_LOGI(TAG, "FanOveride:\tspeed=%u\tmins=%u", fanOverrideSpeed_,
                  uiEvent.payload.fanOverride.timeMins);
         // TODO: Implement "until" in this message
-        setMessageF(MsgID::FanOverride, true, "Fan set to %u%%",
-                    (uint8_t)(fanOverrideSpeed_ / 255.0 * 100));
+
+        struct tm nowLocalTm;
+        time_t nowUTC = std::chrono::system_clock::to_time_t(realNow());
+        localtime_r(&nowUTC, &nowLocalTm);
+
+        setMessageF(MsgID::FanOverride, true, "Fan set to %u%% until %02d:%02d%s",
+                    (uint8_t)(fanOverrideSpeed_ / 255.0 * 100), (nowLocalTm.tm_hour % 12) + 1,
+                    nowLocalTm.tm_min, nowLocalTm.tm_hour < 11 ? "AM" : "PM");
         break;
+    }
     case EventType::TempOverride: {
         ESP_LOGI(TAG, "TempOverride:\theat=%.1f\tcool=%.1f", uiEvent.payload.tempOverride.heatC,
                  uiEvent.payload.tempOverride.coolC);
@@ -389,18 +408,31 @@ ControllerDomain::HVACState ControllerApp::setHVAC(const DemandRequest &request)
 }
 
 void ControllerApp::checkModbusErrors() {
-    esp_err_t err = modbusController_->lastFreshAirSpeedErr();
-    if (err == ESP_OK) {
-        clearMessage(MsgID::SetFreshAirSpeedErr);
-    } else {
-        setMessageF(MsgID::SetFreshAirSpeedErr, false, "Error setting fan speed: %d", err);
-    }
-
-    err = modbusController_->lastSetFancoilErr();
+    esp_err_t err = modbusController_->lastSetFancoilErr();
     if (err == ESP_OK) {
         clearMessage(MsgID::SetFancoilErr);
     } else {
         setMessageF(MsgID::SetFancoilErr, false, "Error controlling fancoil: %d", err);
+    }
+}
+
+void ControllerApp::handleWeather() {
+    if (modbusController_->getFreshAirModelId() != ControllerDomain::FreshAirModel::BROAN) {
+        return;
+    }
+
+    AbstractWeatherClient::WeatherResult weather = weatherCli_->lastResult();
+    if (weather.err != AbstractWeatherClient::Error::OK) {
+        setMessage(MsgID::WeatherErr, false, "Error fetching weather");
+    } else {
+        clearMessage(MsgID::WeatherErr);
+        rawOutdoorTempC_ = weather.tempC;
+        lastOutdoorTempUpdate_ = steadyNow() + (realNow() - weather.obsTime);
+    }
+
+    if ((std::isnan(rawOutdoorTempC_) ||
+         (steadyNow() - lastOutdoorTempUpdate_) > OUTDOOR_TEMP_UPDATE_INTERVAL)) {
+        weatherCli_->runFetch();
     }
 }
 
@@ -410,6 +442,12 @@ uint16_t ControllerApp::localMinOfDay() {
     localtime_r(&nowUTC, &nowLocalTm);
 
     return nowLocalTm.tm_hour * 60 + nowLocalTm.tm_min;
+}
+
+bool ControllerApp::shouldPollOutdoorTemp(const DemandRequest &request) {
+    return (AbstractDemandController::isFanCoolingTempLimited(request) &&
+            (std::isnan(rawOutdoorTempC_) ||
+             (steadyNow() - lastOutdoorTempUpdate_) > OUTDOOR_TEMP_UPDATE_INTERVAL));
 }
 
 void ControllerApp::logState(const ControllerDomain::FreshAirState &freshAirState,
@@ -484,6 +522,8 @@ void ControllerApp::checkWifiState() {
     setMessageF(MsgID::Wifi, "Wifi %s%s%s", stateMsg, sep, wifiMsg_);
 }
 
+double ControllerApp::outdoorTempC() { return rawOutdoorTempC_ + config_.outTempOffsetC; }
+
 int ControllerApp::getScheduleIdx(int offset) {
     if (!clockReady()) {
         return -1;
@@ -553,7 +593,7 @@ Setpoints ControllerApp::getCurrentSetpoints() {
             if (precoolC < setpoints.coolTempC) {
                 setpointReason_ = "precooling";
                 setpoints.coolTempC = precoolC;
-                setMessageF(MsgID::Precooling, true, "Cooling to %d by %02d:%02d%c",
+                setMessageF(MsgID::Precooling, true, "Cooling to %d by %02d:%02d%s",
                             ABS_C_TO_F(setpoints.coolTempC), SCHEDULE_TIME_STR_ARGS(nextSchedule));
 
                 return setpoints;
@@ -579,7 +619,7 @@ void ControllerApp::setTempOverride(AbstractUIManager::TempOverride to) {
         tempOverrideUntilScheduleIdx_ = idx;
         Config::Schedule schedule = config_.schedules[tempOverrideUntilScheduleIdx_];
 
-        setMessageF(MsgID::TempOverride, true, "Hold %d/%d until %02d:%02d%c",
+        setMessageF(MsgID::TempOverride, true, "Hold %d/%d until %02d:%02d%s",
                     ABS_C_TO_F(tempOverride_.heatC), ABS_C_TO_F(tempOverride_.coolC),
                     SCHEDULE_TIME_STR_ARGS(schedule));
     }
@@ -591,18 +631,50 @@ void ControllerApp::handleFreshAirState(ControllerDomain::FreshAirState *freshAi
     if (err == ESP_OK) {
         if (freshAirState->fanRpm > MIN_FAN_RUNNING_RPM) {
             if (fanLastStarted_ == std::chrono::steady_clock::time_point{}) {
+                fanLastStopped_ = {};
                 fanLastStarted_ = fasTime;
-            } else if (now - fanLastStarted_ > OUTDOOR_TEMP_MIN_FAN_TIME) {
+            } else if ((modbusController_->getFreshAirModelId() ==
+                        ControllerDomain::FreshAirModel::SP) &&
+                       now - fanLastStarted_ > OUTDOOR_TEMP_MIN_FAN_TIME) {
                 rawOutdoorTempC_ = freshAirState->tempC;
                 uiManager_->setOutTempC(outdoorTempC());
                 lastOutdoorTempUpdate_ = fasTime;
             }
-        } else {
-            fanLastStarted_ = {};
+        } else if (freshAirState->fanRpm == 0) {
+            if (fanLastStopped_ == std::chrono::steady_clock::time_point{}) {
+                fanLastStopped_ = fanLastStarted_ = fasTime;
+                fanLastStarted_ = {};
+            }
+            stoppedPressurePa_ = freshAirState->pressurePa;
         }
         clearMessage(MsgID::GetFreshAirStateErr);
     } else {
         setErrMessageF(MsgID::GetFreshAirStateErr, false, "Error getting fresh air state: %d", err);
+    }
+
+    FanSpeed speed;
+    std::chrono::steady_clock::time_point speedT;
+    err = modbusController_->getLastFreshAirSpeed(&speed, &speedT);
+    if (err == ESP_OK) {
+        if (speed == UINT8_MAX) {
+            if (fanMaxSpeedStarted_ == std::chrono::steady_clock::time_point{}) {
+                fanMaxSpeedStarted_ = speedT;
+            } else if (speedT - fanMaxSpeedStarted_ > STATIC_PRESSURE_MIN_FAN_TIME &&
+                       stoppedPressurePa_ > 0) {
+                if (stoppedPressurePa_ > freshAirState->pressurePa) {
+                    ESP_LOGW(TAG, "est fresh air static pressure (pa): %lu",
+                             (stoppedPressurePa_ - freshAirState->pressurePa));
+                } else {
+                    ESP_LOGE(TAG, "Unexpected negative static pressure estimate");
+                }
+
+                stoppedPressurePa_ = 0;
+            }
+        }
+        clearMessage(MsgID::SetFreshAirSpeedErr);
+    } else {
+        fanMaxSpeedStarted_ = {};
+        setMessageF(MsgID::SetFreshAirSpeedErr, false, "Error setting fan speed: %d", err);
     }
 
     if (now - lastOutdoorTempUpdate_ > OUTDOOR_TEMP_MAX_AGE) {
@@ -643,6 +715,7 @@ void ControllerApp::clearMessage(MsgID msgID) {
 
 void ControllerApp::task(bool firstTime) {
     // TODO: Vacation? Other status info from zone controller?
+    handleWeather();
     ControllerDomain::FreshAirState freshAirState{};
     handleFreshAirState(&freshAirState);
 

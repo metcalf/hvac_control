@@ -9,6 +9,7 @@
 #include "AbstractSensors.h"
 #include "AbstractUIManager.h"
 #include "AbstractValveCtrl.h"
+#include "AbstractWeatherClient.h"
 #include "AbstractWifi.h"
 #include "ControllerDomain.h"
 
@@ -22,10 +23,10 @@ class ControllerApp {
                   AbstractModbusController *modbusController, AbstractSensors *sensors,
                   AbstractDemandController *demandController, AbstractValveCtrl *valveCtrl,
                   AbstractWifi *wifi, AbstractConfigStore<ControllerDomain::Config> *cfgStore,
-                  const uiEvtRcv_t &uiEvtRcv)
+                  AbstractWeatherClient *weatherCli, const uiEvtRcv_t &uiEvtRcv)
         : uiManager_(uiManager), modbusController_(modbusController), sensors_(sensors),
           demandController_(demandController), valveCtrl_(valveCtrl), wifi_(wifi),
-          cfgStore_(cfgStore), uiEvtRcv_(uiEvtRcv) {
+          cfgStore_(cfgStore), weatherCli_(weatherCli), uiEvtRcv_(uiEvtRcv) {
         setConfig(config);
     }
     void setConfig(ControllerDomain::Config config) { config_ = config; }
@@ -53,6 +54,7 @@ class ControllerApp {
   private:
     using FancoilSpeed = ControllerDomain::FancoilSpeed;
     using SensorData = ControllerDomain::SensorData;
+    using FancoilState = ControllerDomain::FancoilState;
     using FreshAirState = ControllerDomain::FreshAirState;
     using DemandRequest = ControllerDomain::DemandRequest;
     using Setpoints = ControllerDomain::Setpoints;
@@ -73,6 +75,7 @@ class ControllerApp {
         SetFreshAirSpeedErr,
         GetMakeupDemandErr,
         SetFancoilErr,
+        WeatherErr,
         _Last,
     };
 
@@ -111,6 +114,8 @@ class ControllerApp {
         case MsgID::SetFancoilErr:
             return "SetFancoilErr";
             break;
+        case MsgID::WeatherErr:
+            return "WeatherErr";
         case MsgID::_Last:
             return "";
             break;
@@ -130,19 +135,20 @@ class ControllerApp {
     void setMessage(MsgID msgID, bool allowCancel, const char *msg);
     void clearMessage(MsgID msgID);
     void checkModbusErrors();
+    void handleWeather();
     void handleFreshAirState(ControllerDomain::FreshAirState *);
     int getScheduleIdx(int offset);
     Setpoints getCurrentSetpoints();
     void setTempOverride(AbstractUIManager::TempOverride);
     uint16_t localMinOfDay();
-
+    bool shouldPollOutdoorTemp(const DemandRequest &request);
     void logState(const ControllerDomain::FreshAirState &freshAirState,
                   const ControllerDomain::SensorData &sensorData,
                   const ControllerDomain::DemandRequest &request,
                   const ControllerDomain::Setpoints &setpoints,
                   const ControllerDomain::HVACState hvacState, const FanSpeed fanSpeed);
     void checkWifiState();
-    double outdoorTempC() { return rawOutdoorTempC_ + config_.outTempOffsetC; }
+    double outdoorTempC();
 
     Config config_;
     AbstractUIManager *uiManager_;
@@ -152,6 +158,7 @@ class ControllerApp {
     AbstractValveCtrl *valveCtrl_;
     AbstractWifi *wifi_;
     AbstractConfigStore<ControllerDomain::Config> *cfgStore_;
+    AbstractWeatherClient *weatherCli_;
     uiEvtRcv_t uiEvtRcv_;
 
     AbstractUIManager::TempOverride tempOverride_;
@@ -164,7 +171,9 @@ class ControllerApp {
 
     bool fanIsOn_ = false;
     FanSpeed fanOverrideSpeed_;
-    std::chrono::steady_clock::time_point fanOverrideUntil_, fanLastStarted_;
+    uint32_t stoppedPressurePa_ = 0;
+    std::chrono::steady_clock::time_point fanOverrideUntil_{}, fanLastStarted_{}, fanLastStopped_{},
+        fanMaxSpeedStarted_{};
 
-    std::chrono::steady_clock::time_point lastStatusLog_;
+    std::chrono::steady_clock::time_point lastStatusLog_{};
 };

@@ -29,11 +29,15 @@ class ModbusController : public AbstractModbusController {
 
     void setHasMakeupDemand(bool has) override { hasMakeupDemand_ = has; };
 
+    esp_err_t getFancoilState(ControllerDomain::FancoilState *state,
+                              std::chrono::steady_clock::time_point *time) override;
+    ControllerDomain::FreshAirModel getFreshAirModelId() override;
     esp_err_t getFreshAirState(ControllerDomain::FreshAirState *state,
                                std::chrono::steady_clock::time_point *time) override;
+    esp_err_t getLastFreshAirSpeed(ControllerDomain::FanSpeed *speed,
+                                   std::chrono::steady_clock::time_point *time) override;
     esp_err_t getMakeupDemand(bool *demand, std::chrono::steady_clock::time_point *time) override;
 
-    esp_err_t lastFreshAirSpeedErr() override;
     esp_err_t lastSetFancoilErr() override;
 
     void setFreshAirSpeed(ControllerDomain::FanSpeed speed) override;
@@ -42,6 +46,7 @@ class ModbusController : public AbstractModbusController {
   private:
     using FanSpeed = ControllerDomain::FanSpeed;
     using FancoilSpeed = ControllerDomain::FancoilSpeed;
+    using FancoilState = ControllerDomain::FancoilState;
     using FreshAirState = ControllerDomain::FreshAirState;
     using SensorData = ControllerDomain::SensorData;
     using HVACState = ControllerDomain::HVACState;
@@ -58,14 +63,26 @@ class ModbusController : public AbstractModbusController {
 
     FancoilRequest requestFancoil_;
     FanSpeed requestFreshAirSpeed_;
+    FancoilState fancoilState_;
 
+    uint16_t freshAirModelId_ = 0;
     FreshAirState freshAirState_ = {};
+    FanSpeed freshAirSpeed_;
     bool makeupDemand_ = false;
 
-    esp_err_t freshAirStateErr_ = ESP_OK, makeupDemandErr_ = ESP_OK, setFancoilErr_ = ESP_OK,
-              freshAirSpeedErr_ = ESP_OK;
-    std::chrono::steady_clock::time_point lastFreshAirState_, lastMakeupDemand_;
+    esp_err_t freshAirStateErr_ = ESP_OK, freshAirSpeedErr_ = ESP_OK, makeupDemandErr_ = ESP_OK,
+              setFancoilErr_ = ESP_OK, fancoilStateErr_ = ESP_OK;
+    std::chrono::steady_clock::time_point lastFreshAirState_{}, lastMakeupDemand_{},
+        lastFreshAirSpeed_{}, lastFancoilState_{};
+
+    bool fancoilConfigured_ = false;
 
     void makeRequest(RequestType request);
     EventBits_t requestBits(RequestType request);
+
+    void doMakeup();
+    void doSetFreshAir();
+    void doGetFreshAir();
+    void doSetFancoil();
+    void doGetFancoil();
 };

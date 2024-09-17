@@ -11,6 +11,7 @@
 #define MB_UART_RTS GPIO_NUM_7
 
 #define MB_NAME_FAN_CONTROL_INPUTS "fan_control_inputs"
+#define MB_NAME_FAN_ID "fan_id"
 #define MB_NAME_FAN_CONTROL_SPEED "fan_control_speed"
 #define MB_NAME_MAKEUP "makeup"
 #define MB_NAME_PRIM_FANCOIL "prim_fancoil"
@@ -30,6 +31,7 @@ enum {
 // Enumeration of all supported CIDs for device (used in parameter definition table)
 enum {
     CID_FAN_CONTROL_INPUTS = 0,
+    CID_FAN_ID,
     CID_FAN_CONTROL_SPEED,
     CID_MAKEUP,
     CID_PRIM_FANCOIL,
@@ -56,6 +58,20 @@ const mb_parameter_descriptor_t device_parameters[] = {
         MB_PARAM_INPUT,
         0,                  // Start register address
         4,                  // Number of registers
+        0,                  // Instance offset (ignored)
+        (mb_descr_type_t)0, // Ignored
+        (mb_descr_size_t)0, // Ignored
+        {},                 // Ignored
+        (mb_param_perms_t)0 // Ignored
+    },
+    {
+        CID_FAN_ID,
+        MB_NAME_FAN_ID,
+        NULL, // Units (ignored)
+        FAC_DEVICE_ADDR,
+        MB_PARAM_INPUT,
+        0x0A,               // Start register address
+        1,                  // Number of registers
         0,                  // Instance offset (ignored)
         (mb_descr_type_t)0, // Ignored
         (mb_descr_size_t)0, // Ignored
@@ -172,7 +188,24 @@ esp_err_t read_fresh_air_data() {
     esp_err_t err = ESP_OK;
     uint8_t type = 0; // throwaway
 
+    uint16_t id;
+    uint16_t speed;
     uint16_t data[4];
+
+    err = mbc_master_get_parameter(CID_FAN_ID, (char *)MB_NAME_FAN_ID, (uint8_t *)&id, &type);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Characteristic #%u (%s) read fail, err = 0x%x (%s).", CID_FAN_ID,
+                 MB_NAME_FAN_ID, (int)err, (char *)esp_err_to_name(err));
+        return err;
+    }
+
+    err = mbc_master_get_parameter(CID_FAN_CONTROL_SPEED, (char *)MB_NAME_FAN_CONTROL_SPEED,
+                                   (uint8_t *)&speed, &type);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Characteristic #%u (%s) read fail, err = 0x%x (%s).", CID_FAN_CONTROL_SPEED,
+                 MB_NAME_FAN_CONTROL_SPEED, (int)err, (char *)esp_err_to_name(err));
+        return err;
+    }
 
     err = mbc_master_get_parameter(CID_FAN_CONTROL_INPUTS, (char *)MB_NAME_FAN_CONTROL_INPUTS,
                                    (uint8_t *)&data, &type);
@@ -182,8 +215,8 @@ esp_err_t read_fresh_air_data() {
         uint32_t pressure = data[2] + 87000;
         uint16_t tach_rpm = data[3];
 
-        ESP_LOGI(TAG, "FC data: t=%.2fC\th=%.2f%%\tp=%luPa\trpm=%u", temp, humidity, pressure,
-                 tach_rpm);
+        ESP_LOGI(TAG, "FC data: id=%#x t=%.2fC\th=%.2f%%\tp=%luPa\trpm=%u speed=%u", id, temp,
+                 humidity, pressure, tach_rpm, speed);
     } else {
         ESP_LOGE(TAG, "Characteristic #%u (%s) read fail, err = 0x%x (%s).", CID_FAN_CONTROL_INPUTS,
                  MB_NAME_FAN_CONTROL_INPUTS, (int)err, (char *)esp_err_to_name(err));
