@@ -231,7 +231,7 @@ double hvacCallTempSeq[] = {
 };
 int nHvacCalls = sizeof(hvacCallTempSeq) / sizeof(hvacCallTempSeq[0]);
 
-ControllerDomain::DemandRequest::FancoilRequest hvacReqSeq[] = {
+ControllerDomain::FancoilRequest hvacReqSeq[] = {
     {FancoilSpeed::Off, false},  //
     {FancoilSpeed::High, false}, //
     {FancoilSpeed::Med, false},  //
@@ -276,7 +276,7 @@ TEST_F(ControllerAppTest, CallsForValveHVAC) {
 
 TEST_F(ControllerAppTest, CallsForFancoilHVAC) {
     using FancoilSpeed = ControllerDomain::FancoilSpeed;
-    using FancoilRequest = ControllerDomain::DemandRequest::FancoilRequest;
+    using FancoilRequest = ControllerDomain::FancoilRequest;
 
     for (int i = 0; i < nHvacCalls; i++) {
         // Establish heating demand

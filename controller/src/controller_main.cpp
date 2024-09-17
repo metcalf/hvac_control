@@ -13,7 +13,6 @@
 
 #include "AppConfigStore.h"
 #include "ControllerApp.h"
-#include "DemandController.h"
 #include "ESPWifi.h"
 #include "ModbusController.h"
 #include "Sensors.h"
@@ -51,7 +50,6 @@ static ModbusController *modbusController_;
 static UIManager *uiManager_;
 static ValveCtrl valveCtrl_;
 static Sensors sensors_;
-static DemandController demandController_;
 static QueueHandle_t uiEvtQueue_;
 static ESPWifi wifi_;
 static AppConfigStore appConfigStore_;
@@ -185,8 +183,8 @@ extern "C" void controller_main() {
     valveCtrl_.init();
     weatherCli_.start();
 
-    app_ = new ControllerApp(config, uiManager_, modbusController_, &sensors_, &demandController_,
-                             &valveCtrl_, &wifi_, &appConfigStore_, &weatherCli_, uiEvtRcv);
+    app_ = new ControllerApp(config, uiManager_, modbusController_, &sensors_, &valveCtrl_, &wifi_,
+                             &appConfigStore_, &weatherCli_, uiEvtRcv);
     xTaskCreate(uiTask, "uiTask", UI_TASK_STACK_SIZE, uiManager_, UI_TASK_PRIO, NULL);
 
     setenv("TZ", POSIX_TZ_STR, 1);

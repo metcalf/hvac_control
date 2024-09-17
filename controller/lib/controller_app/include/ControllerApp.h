@@ -4,7 +4,7 @@
 #include <functional>
 
 #include "AbstractConfigStore.h"
-#include "AbstractDemandController.h"
+#include "AbstractDemandAlgorithm.h"
 #include "AbstractModbusController.h"
 #include "AbstractSensors.h"
 #include "AbstractUIManager.h"
@@ -12,6 +12,9 @@
 #include "AbstractWeatherClient.h"
 #include "AbstractWifi.h"
 #include "ControllerDomain.h"
+#include "LinearVentAlgorithm.h"
+#include "NullAlgorithm.h"
+#include "ValveAlgorithm.h"
 
 class ControllerApp {
   public:
@@ -21,15 +24,24 @@ class ControllerApp {
 
     ControllerApp(ControllerDomain::Config config, AbstractUIManager *uiManager,
                   AbstractModbusController *modbusController, AbstractSensors *sensors,
-                  AbstractDemandController *demandController, AbstractValveCtrl *valveCtrl,
-                  AbstractWifi *wifi, AbstractConfigStore<ControllerDomain::Config> *cfgStore,
+                  AbstractValveCtrl *valveCtrl, AbstractWifi *wifi,
+                  AbstractConfigStore<ControllerDomain::Config> *cfgStore,
                   AbstractWeatherClient *weatherCli, const uiEvtRcv_t &uiEvtRcv)
         : uiManager_(uiManager), modbusController_(modbusController), sensors_(sensors),
-          demandController_(demandController), valveCtrl_(valveCtrl), wifi_(wifi),
-          cfgStore_(cfgStore), weatherCli_(weatherCli), uiEvtRcv_(uiEvtRcv) {
+          valveCtrl_(valveCtrl), wifi_(wifi), cfgStore_(cfgStore), weatherCli_(weatherCli),
+          uiEvtRcv_(uiEvtRcv) {
+        ventAlgo_ = new LinearVentAlgorithm();
+        heatAlgo_ = new NullAlgorithm();
+        coolAlgo_ = new NullAlgorithm();
+
         setConfig(config);
     }
-    void setConfig(ControllerDomain::Config config) { config_ = config; }
+    ~ControllerApp() {
+        delete ventAlgo_;
+        delete heatAlgo_;
+        delete coolAlgo_;
+    }
+    void setConfig(ControllerDomain::Config config);
 
     void task(bool firstTime = false);
     void bootErr(const char *msg);
@@ -56,7 +68,6 @@ class ControllerApp {
     using SensorData = ControllerDomain::SensorData;
     using FancoilState = ControllerDomain::FancoilState;
     using FreshAirState = ControllerDomain::FreshAirState;
-    using DemandRequest = ControllerDomain::DemandRequest;
     using Setpoints = ControllerDomain::Setpoints;
     using FanSpeed = ControllerDomain::FanSpeed;
     using HVACState = ControllerDomain::HVACState;
@@ -124,12 +135,12 @@ class ControllerApp {
         __builtin_unreachable();
     }
 
-    void updateACMode(const DemandRequest &request);
-    FanSpeed computeFanSpeed(const DemandRequest &request);
+    void updateACMode(double coolDemand, double coolSetpointDelta);
+    FanSpeed computeFanSpeed(double demand, bool wantOutdoorTemp);
     void setFanSpeed(FanSpeed);
     bool pollUIEvent(bool wait);
     void handleCancelMessage(MsgID id);
-    HVACState setHVAC(const DemandRequest &request);
+    HVACState setHVAC(double heatDemand, double coolDemand);
     void setErrMessageF(MsgID msgID, bool allowCancel, const char *fmt, ...);
     void setMessageF(MsgID msgID, bool allowCancel, const char *fmt, ...);
     void setMessage(MsgID msgID, bool allowCancel, const char *msg);
@@ -141,25 +152,26 @@ class ControllerApp {
     Setpoints getCurrentSetpoints();
     void setTempOverride(AbstractUIManager::TempOverride);
     uint16_t localMinOfDay();
-    bool shouldPollOutdoorTemp(const DemandRequest &request);
     void logState(const ControllerDomain::FreshAirState &freshAirState,
-                  const ControllerDomain::SensorData &sensorData,
-                  const ControllerDomain::DemandRequest &request,
+                  const ControllerDomain::SensorData &sensorData, double ventDemand,
+                  double heatDemand, double coolDemand,
                   const ControllerDomain::Setpoints &setpoints,
                   const ControllerDomain::HVACState hvacState, const FanSpeed fanSpeed);
     void checkWifiState();
     double outdoorTempC();
+    AbstractDemandAlgorithm *getAlgoForEquipment(ControllerDomain::Config::HVACType type,
+                                                 bool isHeat);
 
     Config config_;
     AbstractUIManager *uiManager_;
     AbstractModbusController *modbusController_;
     AbstractSensors *sensors_;
-    AbstractDemandController *demandController_;
     AbstractValveCtrl *valveCtrl_;
     AbstractWifi *wifi_;
     AbstractConfigStore<ControllerDomain::Config> *cfgStore_;
     AbstractWeatherClient *weatherCli_;
     uiEvtRcv_t uiEvtRcv_;
+    AbstractDemandAlgorithm *ventAlgo_, *heatAlgo_, *coolAlgo_;
 
     AbstractUIManager::TempOverride tempOverride_;
     int tempOverrideUntilScheduleIdx_ = -1;

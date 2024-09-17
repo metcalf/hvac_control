@@ -2,7 +2,8 @@
 
 double ValveAlgorithm::update(const ControllerDomain::SensorData &sensorData,
                               const ControllerDomain::Setpoints &setpoints,
-                              const double outdoorTempC) {
+                              const double outdoorTempC,
+                              std::chrono::steady_clock::time_point now) {
     double delta;
     if (isHeater_) {
         delta = setpoints.heatTempC - sensorData.tempC;
@@ -11,6 +12,11 @@ double ValveAlgorithm::update(const ControllerDomain::SensorData &sensorData,
     }
 
     if (isOn_) {
+        if (delta < offThresholdC_) {
+            isOn_ = false;
+        }
+    } else if (delta > onThresholdC_) {
+        isOn_ = true;
     }
 
     return isOn_ ? 1 : 0;

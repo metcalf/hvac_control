@@ -18,7 +18,7 @@
 namespace ControllerDomain {
 typedef uint8_t FanSpeed;
 
-enum class HVACState { Off, Heat, FanCool, ACCool };
+enum class HVACState { Off, Heat, ACCool };
 
 enum class FancoilSpeed {
     // Values are explicit since they indicate the number of degrees C off setpoint
@@ -59,18 +59,9 @@ struct Setpoints {
     uint16_t co2;
 };
 
-struct Demand {
-    float heat_cool, vent;
-};
-
-struct DemandRequest {
-    struct FancoilRequest {
-        FancoilSpeed speed;
-        bool cool;
-    };
-
-    FanSpeed targetVent, targetFanCooling, maxFanCooling, maxFanVenting;
-    FancoilRequest fancoil;
+struct FancoilRequest {
+    FancoilSpeed speed;
+    bool cool;
 };
 
 struct Config {

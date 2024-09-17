@@ -10,7 +10,7 @@
 #define HANDLER_ARGS(a) a, (sizeof(a) / sizeof(*(a)))
 #define HANDLER_INIT(h) h(HANDLER_ARGS(h##cutoffs_))
 
-using DemandRequest = ControllerDomain::DemandRequest;
+using DemandRequest = AbstractDemandController::DemandRequest;
 using FanSpeed = ControllerDomain::FanSpeed;
 using FancoilSpeed = ControllerDomain::FancoilSpeed;
 
@@ -61,18 +61,18 @@ FanSpeed DemandController::computeVentLimit(const Setpoints &setpoints, const do
     }
 }
 
-DemandRequest::FancoilRequest DemandController::computeFancoil(const Setpoints &setpoints,
-                                                               const double indoor) {
+ControllerDomain::FancoilRequest DemandController::computeFancoil(const Setpoints &setpoints,
+                                                                  const double indoor) {
     return computeFancoil(setpoints, indoor, hvac_temp_);
 }
-DemandRequest::FancoilRequest DemandController::computeFancoil(const Setpoints &setpoints,
-                                                               const double indoor,
-                                                               FancoilSetpointHandler hvac_temp) {
+ControllerDomain::FancoilRequest
+DemandController::computeFancoil(const Setpoints &setpoints, const double indoor,
+                                 FancoilSetpointHandler hvac_temp) {
 
     double heat_delta = abs(setpoints.heatTempC - indoor);
     double cool_delta = abs(setpoints.coolTempC - indoor);
 
-    DemandRequest::FancoilRequest request;
+    ControllerDomain::FancoilRequest request;
 
     // If the indoor temp is closer to the cooling setpoint than the heating setpoint then
     // we're cooling. We may want to cool slightly below setpoint so it's fine that this will

@@ -206,7 +206,7 @@ esp_err_t ModbusClient::getFancoilState(ControllerDomain::FancoilState *state) {
     return cxi_client_get_temp_param(CxiRegister::CoilTemperature, &(state->coilTempC));
 }
 
-esp_err_t ModbusClient::setFancoil(const ControllerDomain::DemandRequest::FancoilRequest req) {
+esp_err_t ModbusClient::setFancoil(const ControllerDomain::FancoilRequest req) {
     if (req.speed == FancoilSpeed::Off) {
         return cxi_client_set_param(CxiRegister::OnOff, 0);
     }

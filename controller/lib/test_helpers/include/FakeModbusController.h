@@ -28,7 +28,7 @@ class FakeModbusController : public AbstractModbusController {
     esp_err_t lastSetFancoilErr() override { return ESP_OK; }
 
     void setFreshAirSpeed(ControllerDomain::FanSpeed speed) override { fanSpeed_ = speed; }
-    void setFancoil(ControllerDomain::DemandRequest::FancoilRequest req) override { req_ = req; }
+    void setFancoil(ControllerDomain::FancoilRequest req) override { req_ = req; }
 
     // TEST METHODS
     void setFreshAirState(ControllerDomain::FreshAirState state,
@@ -42,12 +42,12 @@ class FakeModbusController : public AbstractModbusController {
     }
 
     ControllerDomain::FanSpeed getFreshAirSpeed() { return fanSpeed_; }
-    ControllerDomain::DemandRequest::FancoilRequest getFancoilRequest() { return req_; }
+    ControllerDomain::FancoilRequest getFancoilRequest() { return req_; }
 
   private:
     std::chrono::steady_clock::time_point lastFreshAirState_, lastMakeupDemand_;
     ControllerDomain::FreshAirState freshAirState_;
     ControllerDomain::FanSpeed fanSpeed_;
-    ControllerDomain::DemandRequest::FancoilRequest req_;
+    ControllerDomain::FancoilRequest req_;
     bool makeupDemand_, hasMakeupDemand_ = false;
 };

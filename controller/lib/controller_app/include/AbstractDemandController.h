@@ -4,12 +4,17 @@
 
 class AbstractDemandController {
   public:
-    virtual ~AbstractDemandController() {}
-    virtual ControllerDomain::DemandRequest update(const ControllerDomain::SensorData &sensor_data,
-                                                   const ControllerDomain::Setpoints &setpoints,
-                                                   const double outdoorTempC) = 0;
+    struct DemandRequest {
+        ControllerDomain::FanSpeed targetVent, targetFanCooling, maxFanCooling, maxFanVenting;
+        ControllerDomain::FancoilRequest fancoil;
+    };
 
-    static bool isFanCoolingTempLimited(const ControllerDomain::DemandRequest &request) {
+    virtual ~AbstractDemandController() {}
+    virtual DemandRequest update(const ControllerDomain::SensorData &sensor_data,
+                                 const ControllerDomain::Setpoints &setpoints,
+                                 const double outdoorTempC) = 0;
+
+    static bool isFanCoolingTempLimited(const DemandRequest &request) {
         return request.targetFanCooling > 0 && request.maxFanCooling < UINT8_MAX;
     }
 };

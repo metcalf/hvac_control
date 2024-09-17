@@ -14,14 +14,14 @@ class AbstractDemandAlgorithm {
             step_ = (max_.output - min_.output) / (max_.input - min_.input);
         };
 
-        double getSpeed(const double value) const {
-            if (value >= max_.input) {
+        double getOutput(const double input) const {
+            if (input >= max_.input) {
                 return max_.output;
-            } else if (value <= min_.input) {
+            } else if (input <= min_.input) {
                 return min_.output;
             }
 
-            return min_.output + (value - min_.input) * step_;
+            return min_.output + (input - min_.input) * step_;
         };
 
       private:
@@ -32,8 +32,8 @@ class AbstractDemandAlgorithm {
     virtual ~AbstractDemandAlgorithm(){};
 
     virtual double update(const ControllerDomain::SensorData &sensor_data,
-                          const ControllerDomain::Setpoints &setpoints,
-                          const double outdoorTempC) = 0;
+                          const ControllerDomain::Setpoints &setpoints, const double outdoorTempC,
+                          std::chrono::steady_clock::time_point now) = 0;
 
   protected:
     using Setpoints = ControllerDomain::Setpoints;

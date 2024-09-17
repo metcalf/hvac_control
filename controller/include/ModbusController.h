@@ -41,7 +41,7 @@ class ModbusController : public AbstractModbusController {
     esp_err_t lastSetFancoilErr() override;
 
     void setFreshAirSpeed(ControllerDomain::FanSpeed speed) override;
-    void setFancoil(const ControllerDomain::DemandRequest::FancoilRequest req) override;
+    void setFancoil(const ControllerDomain::FancoilRequest req) override;
 
   private:
     using FanSpeed = ControllerDomain::FanSpeed;
@@ -51,7 +51,7 @@ class ModbusController : public AbstractModbusController {
     using SensorData = ControllerDomain::SensorData;
     using HVACState = ControllerDomain::HVACState;
     using Setpoints = ControllerDomain::Setpoints;
-    using FancoilRequest = ControllerDomain::DemandRequest::FancoilRequest;
+    using FancoilRequest = ControllerDomain::FancoilRequest;
 
     enum class RequestType { SetFreshAirSpeed, SetFancoil };
 

@@ -8,7 +8,8 @@ class LinearVentAlgorithm : public AbstractDemandAlgorithm {
     ~LinearVentAlgorithm(){};
 
     double update(const ControllerDomain::SensorData &sensor_data,
-                  const ControllerDomain::Setpoints &setpoints, const double outdoorTempC);
+                  const ControllerDomain::Setpoints &setpoints, const double outdoorTempC,
+                  std::chrono::steady_clock::time_point now) override;
 
   protected:
     // Delta to indoor in the direction by which indoor is off the setpoint

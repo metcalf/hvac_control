@@ -30,5 +30,5 @@ class AbstractModbusController {
     virtual esp_err_t lastSetFancoilErr() = 0;
 
     virtual void setFreshAirSpeed(ControllerDomain::FanSpeed speed) = 0;
-    virtual void setFancoil(ControllerDomain::DemandRequest::FancoilRequest req) = 0;
+    virtual void setFancoil(ControllerDomain::FancoilRequest req) = 0;
 };

@@ -14,6 +14,6 @@ class ModbusClient {
     esp_err_t getFancoilState(ControllerDomain::FancoilState *state);
 
     esp_err_t getMakeupDemand(bool *demand);
-    esp_err_t setFancoil(const ControllerDomain::DemandRequest::FancoilRequest req);
+    esp_err_t setFancoil(const ControllerDomain::FancoilRequest req);
     esp_err_t configureFancoil();
 };

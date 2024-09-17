@@ -14,15 +14,15 @@ class DemandController : public AbstractDemandController {
   public:
     DemandController();
 
-    ControllerDomain::DemandRequest update(const ControllerDomain::SensorData &sensor_data,
-                                           const ControllerDomain::Setpoints &setpoints,
-                                           const double outdoorTempC) override;
+    DemandRequest update(const ControllerDomain::SensorData &sensor_data,
+                         const ControllerDomain::Setpoints &setpoints,
+                         const double outdoorTempC) override;
 
   protected:
     using FancoilSpeed = ControllerDomain::FancoilSpeed;
     using SensorData = ControllerDomain::SensorData;
     using Setpoints = ControllerDomain::Setpoints;
-    using DemandRequest = ControllerDomain::DemandRequest;
+    using DemandRequest = DemandRequest;
     using FanSpeed = ControllerDomain::FanSpeed;
 
     class FancoilSetpointHandler : public SetpointHandler<FancoilSpeed, double> {
@@ -58,9 +58,10 @@ class DemandController : public AbstractDemandController {
     FanSpeed computeVentLimit(const Setpoints &setpoints, const double indoor, const double outdoor,
                               const LinearRange outdoor_limit);
 
-    DemandRequest::FancoilRequest computeFancoil(const Setpoints &setpoints, const double indoor);
-    DemandRequest::FancoilRequest computeFancoil(const Setpoints &setpoints, const double indoor,
-                                                 FancoilSetpointHandler hvac_temp);
+    ControllerDomain::FancoilRequest computeFancoil(const Setpoints &setpoints,
+                                                    const double indoor);
+    ControllerDomain::FancoilRequest computeFancoil(const Setpoints &setpoints, const double indoor,
+                                                    FancoilSetpointHandler hvac_temp);
 
   private:
     using FancoilCutoff = FancoilSetpointHandler::Cutoff;

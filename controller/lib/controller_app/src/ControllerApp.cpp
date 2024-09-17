@@ -33,6 +33,7 @@ typedef int esp_err_t;
 // Ignore makeup demand requests older than this
 #define MAKEUP_MAX_AGE std::chrono::minutes(5)
 #define COIL_COLD_TEMP_C ABS_F_TO_C(60.0)
+#define AC_ON_THRESHOLD_C REL_F_TO_C(4.0)
 
 #define MAKEUP_FAN_SPEED (FanSpeed)120
 #define MIN_FAN_SPEED_VALUE (FanSpeed)10
@@ -48,7 +49,7 @@ void ControllerApp::bootErr(const char *msg) {
     uiManager_->bootErr(msg);
 }
 
-void ControllerApp::updateACMode(const DemandRequest &request) {
+void ControllerApp::updateACMode(double coolDemand, double coolSetpointDelta) {
     if (!config_.systemOn) {
         acMode_ = ACMode::Standby;
         clearMessage(MsgID::ACMode);
@@ -65,33 +66,17 @@ void ControllerApp::updateACMode(const DemandRequest &request) {
         ESP_LOGE(TAG, "Error getting fancoil state: %d", err);
     }
 
-    DemandRequest::FancoilRequest fc = request.fancoil;
     switch (acMode_) {
     case ACMode::Off:
         break;
     case ACMode::Standby:
         // If we're demanding HIGH A/C or the coil is cold anyway, turn the A/C on
-        if (fc.cool &&
-            (fc.speed == FancoilSpeed::High || (fc.speed != FancoilSpeed::Off && coilIsCold))) {
+        if (coolSetpointDelta > AC_ON_THRESHOLD_C || (coolDemand > 0 && coilIsCold)) {
             acMode_ = ACMode::On;
         }
         break;
     case ACMode::On:
-        // If we're are still demanding cooling or the fan can't satisfy
-        bool shouldKeepACOn = false;
-        if (fc.cool && fc.speed != FancoilSpeed::Off) {
-            shouldKeepACOn = true; // Fancoil is still demanding cooling
-            break;
-        }
-
-        if (request.targetFanCooling > request.maxFanCooling) {
-            shouldKeepACOn = true; // Fan cannot satisfy cooling demand
-            break;
-        }
-
-        // If fancoils aren't being used for cooling and the fan can satisfy cooling
-        // demands then switch A/C back to standby
-        if (!shouldKeepACOn) {
+        if (coolDemand < 0.01) {
             clearMessage(MsgID::ACMode);
             acMode_ = ACMode::Standby;
         }
@@ -99,7 +84,7 @@ void ControllerApp::updateACMode(const DemandRequest &request) {
     }
 }
 
-FanSpeed ControllerApp::computeFanSpeed(const DemandRequest &request) {
+FanSpeed ControllerApp::computeFanSpeed(double demand, bool wantOutdoorTemp) {
     FanSpeed fanSpeed = 0;
     fanSpeedReason_ = "off";
 
@@ -117,29 +102,8 @@ FanSpeed ControllerApp::computeFanSpeed(const DemandRequest &request) {
         }
         fanSpeedReason_ = "override";
     } else {
-        ControllerDomain::FanSpeed fanCool =
-            std::min(request.targetFanCooling, request.maxFanCooling);
-        ControllerDomain::FanSpeed target = std::max(request.targetVent, fanCool);
-        if (request.maxFanVenting < target) {
-            fanSpeedReason_ = "vent_limit";
-            fanSpeed = request.maxFanVenting;
-        } else {
-            fanSpeed = target;
-            if (request.targetVent > fanCool) {
-                if (request.targetFanCooling > request.targetVent) {
-                    // Would be cooling more if not limited by outdoor temp
-                    fanSpeedReason_ = "vent_cool_temp_limited";
-                } else {
-                    fanSpeedReason_ = "vent";
-                }
-            } else {
-                if (request.targetFanCooling > request.maxFanCooling) {
-                    fanSpeedReason_ = "cool_temp_limited";
-                } else if (request.targetFanCooling > 0) {
-                    fanSpeedReason_ = "cool";
-                }
-            }
-        }
+        fanSpeedReason_ = "demand";
+        fanSpeed = UINT8_MAX * demand;
 
         // Hysteresis around the turn-off point
         if (fanSpeed > 0 && fanSpeed < MIN_FAN_SPEED_VALUE) {
@@ -151,7 +115,7 @@ FanSpeed ControllerApp::computeFanSpeed(const DemandRequest &request) {
         }
 
         if ((modbusController_->getFreshAirModelId() == ControllerDomain::FreshAirModel::SP) &&
-            fanSpeed < MIN_FAN_SPEED_VALUE && shouldPollOutdoorTemp(request)) {
+            fanSpeed < MIN_FAN_SPEED_VALUE && wantOutdoorTemp) {
             // If we're waiting for the outdoor temperature to drop for cooling and
             // we haven't updated the outdoor temperature recently, run the fan until
             // we get an update.
@@ -351,12 +315,15 @@ void ControllerApp::handleCancelMessage(MsgID id) {
     }
 }
 
-ControllerDomain::HVACState ControllerApp::setHVAC(const DemandRequest &request) {
+ControllerDomain::HVACState ControllerApp::setHVAC(double heatDemand, double coolDemand) {
+    // TODO: HVACState::FanCool may be unreachable
+    // TODO: Report and log an error if heat/cool conflict
+
     HVACState state;
     FancoilSpeed speed = FancoilSpeed::Off;
-    bool cool = request.fancoil.cool;
+    bool cool = true; //request.fancoil.cool;
     if (config_.systemOn && (!cool || acMode_ == ACMode::On)) {
-        speed = request.fancoil.speed;
+        //speed = request.fancoil.speed;
     }
 
     if (speed != FancoilSpeed::Off) {
@@ -365,8 +332,8 @@ ControllerDomain::HVACState ControllerApp::setHVAC(const DemandRequest &request)
         } else {
             state = HVACState::Heat;
         }
-    } else if (request.targetFanCooling > 0) {
-        state = HVACState::FanCool;
+        //} else if (request.targetFanCooling > 0) {
+        //state = HVACState::FanCool;
     } else {
         state = HVACState::Off;
     }
@@ -386,7 +353,7 @@ ControllerDomain::HVACState ControllerApp::setHVAC(const DemandRequest &request)
         valveCtrl_->setMode(!cool, false); // Make sure valves are off
         break;
     case Config::HVACType::Fancoil:
-        modbusController_->setFancoil(DemandRequest::FancoilRequest{speed, cool});
+        //modbusController_->setFancoil(DemandRequest::FancoilRequest{speed, cool});
 
         break;
     case Config::HVACType::Valve:
@@ -396,7 +363,7 @@ ControllerDomain::HVACState ControllerApp::setHVAC(const DemandRequest &request)
 
     if (hvacType != Config::HVACType::Fancoil && otherType == Config::HVACType::Fancoil) {
         // Turn off the fancoil if we didn't set it already and the other mode is a fancoil
-        modbusController_->setFancoil(DemandRequest::FancoilRequest{FancoilSpeed::Off, false});
+        //modbusController_->setFancoil(DemandRequest::FancoilRequest{FancoilSpeed::Off, false});
     }
 
     if (hvacType != Config::HVACType::Valve) {
@@ -444,15 +411,9 @@ uint16_t ControllerApp::localMinOfDay() {
     return nowLocalTm.tm_hour * 60 + nowLocalTm.tm_min;
 }
 
-bool ControllerApp::shouldPollOutdoorTemp(const DemandRequest &request) {
-    return (AbstractDemandController::isFanCoolingTempLimited(request) &&
-            (std::isnan(rawOutdoorTempC_) ||
-             (steadyNow() - lastOutdoorTempUpdate_) > OUTDOOR_TEMP_UPDATE_INTERVAL));
-}
-
 void ControllerApp::logState(const ControllerDomain::FreshAirState &freshAirState,
-                             const ControllerDomain::SensorData &sensorData,
-                             const ControllerDomain::DemandRequest &request,
+                             const ControllerDomain::SensorData &sensorData, double ventDemand,
+                             double heatDemand, double coolDemand,
                              const ControllerDomain::Setpoints &setpoints,
                              const ControllerDomain::HVACState hvacState, const FanSpeed fanSpeed) {
     esp_log_level_t statusLevel;
@@ -477,7 +438,7 @@ void ControllerApp::logState(const ControllerDomain::FreshAirState &freshAirStat
                   // Setpoints
                   "\tset_h=%.1f\tset_c=%.1f\tset_co2=%u\tset_r=%s"
                   // DemandRequest
-                  "\tt_vent=%u\tt_cool=%u\tmax_cool=%u\tmax_vent=%u\tt_fc_speed=%s\tt_fc_cool=%d"
+                  "\tvent_d=%.2f\theat_d=%.2f\tcool_d=%.2f"
                   // HVACState
                   "\thvac=%s",
                   // Sensors
@@ -485,10 +446,8 @@ void ControllerApp::logState(const ControllerDomain::FreshAirState &freshAirStat
                   sensorData.pressurePa, sensorData.co2,
                   // Setpoints
                   setpoints.heatTempC, setpoints.coolTempC, setpoints.co2, setpointReason_,
-                  // DemandRequest
-                  request.targetVent, request.targetFanCooling, request.maxFanCooling,
-                  request.maxFanVenting, ControllerDomain::fancoilSpeedToS(request.fancoil.speed),
-                  request.fancoil.cool,
+                  // Demands
+                  ventDemand, heatDemand, coolDemand,
                   // HVACState
                   ControllerDomain::hvacStateToS(hvacState));
 }
@@ -523,6 +482,19 @@ void ControllerApp::checkWifiState() {
 }
 
 double ControllerApp::outdoorTempC() { return rawOutdoorTempC_ + config_.outTempOffsetC; }
+
+AbstractDemandAlgorithm *ControllerApp::getAlgoForEquipment(ControllerDomain::Config::HVACType type,
+                                                            bool isHeat) {
+    switch (type) {
+    case ControllerDomain::Config::HVACType::None:
+        return new NullAlgorithm();
+    case ControllerDomain::Config::HVACType::Fancoil:
+    case ControllerDomain::Config::HVACType::Valve:
+        return new ValveAlgorithm(isHeat);
+    }
+
+    __builtin_unreachable();
+}
 
 int ControllerApp::getScheduleIdx(int offset) {
     if (!clockReady()) {
@@ -713,21 +685,38 @@ void ControllerApp::clearMessage(MsgID msgID) {
     uiManager_->clearMessage(static_cast<uint8_t>(msgID));
 }
 
+void ControllerApp::setConfig(ControllerDomain::Config config) {
+    if (config.equipment.heatType != config_.equipment.heatType) {
+        delete heatAlgo_;
+        heatAlgo_ = getAlgoForEquipment(config.equipment.heatType, true);
+    }
+    if (config.equipment.coolType != config_.equipment.coolType) {
+        delete coolAlgo_;
+        coolAlgo_ = getAlgoForEquipment(config.equipment.coolType, false);
+    }
+
+    config_ = config;
+}
+
 void ControllerApp::task(bool firstTime) {
     // TODO: Vacation? Other status info from zone controller?
     handleWeather();
     ControllerDomain::FreshAirState freshAirState{};
     handleFreshAirState(&freshAirState);
 
-    DemandRequest request{};
-
     Setpoints setpoints = getCurrentSetpoints();
     uiManager_->setCurrentSetpoints(setpoints.heatTempC, setpoints.coolTempC);
 
     SensorData sensorData = sensors_->getLatest();
     sensorData.tempC += config_.inTempOffsetC;
+
+    double ventDemand = 0, heatDemand = 0, coolDemand = 0;
+
     if (strlen(sensorData.errMsg) == 0) {
-        request = demandController_->update(sensorData, setpoints, outdoorTempC());
+        ventDemand = ventAlgo_->update(sensorData, setpoints, outdoorTempC(), steadyNow());
+        heatDemand = heatAlgo_->update(sensorData, setpoints, outdoorTempC(), steadyNow());
+        coolDemand = coolAlgo_->update(sensorData, setpoints, outdoorTempC(), steadyNow());
+
         clearMessage(MsgID::SensorErr);
 
         uiManager_->setHumidity(sensorData.humidity);
@@ -738,12 +727,18 @@ void ControllerApp::task(bool firstTime) {
         setMessage(MsgID::SensorErr, false, sensorData.errMsg);
     }
 
-    FanSpeed speed = computeFanSpeed(request);
+    double coolSetpointDelta = sensorData.tempC - setpoints.coolTempC;
+
+    bool wantOutdoorTemp = (coolSetpointDelta > 0 && (std::isnan(rawOutdoorTempC_) ||
+                                                      (steadyNow() - lastOutdoorTempUpdate_) >
+                                                          OUTDOOR_TEMP_UPDATE_INTERVAL));
+
+    FanSpeed speed = computeFanSpeed(ventDemand, wantOutdoorTemp);
     setFanSpeed(speed);
 
-    updateACMode(request);
+    updateACMode(coolDemand, coolSetpointDelta);
 
-    HVACState hvacState = setHVAC(request);
+    HVACState hvacState = setHVAC(heatDemand, coolDemand);
 
     checkModbusErrors();
 
@@ -751,7 +746,8 @@ void ControllerApp::task(bool firstTime) {
         uiManager_->bootDone();
     }
 
-    logState(freshAirState, sensorData, request, setpoints, hvacState, speed);
+    logState(freshAirState, sensorData, ventDemand, heatDemand, coolDemand, setpoints, hvacState,
+             speed);
 
     if (pollUIEvent(true)) {
         // If we found something in the queue, clear the queue before proceeeding with

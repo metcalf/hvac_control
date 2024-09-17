@@ -26,9 +26,6 @@ const char *hvacStateToS(HVACState state) {
     case HVACState::Heat:
         return "HEAT";
         break;
-    case HVACState::FanCool:
-        return "FAN";
-        break;
     case HVACState::ACCool:
         return "AC";
         break;
