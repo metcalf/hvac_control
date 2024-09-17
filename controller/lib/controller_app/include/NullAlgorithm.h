@@ -5,7 +5,6 @@
 class NullAlgorithm : public AbstractDemandAlgorithm {
   public:
     NullAlgorithm(){};
-    ~NullAlgorithm(){};
 
     double update(const ControllerDomain::SensorData &sensorData,
                   const ControllerDomain::Setpoints &setpoints, const double outdoorTempC,

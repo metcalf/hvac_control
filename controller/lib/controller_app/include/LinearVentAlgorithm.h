@@ -5,7 +5,6 @@
 class LinearVentAlgorithm : public AbstractDemandAlgorithm {
   public:
     LinearVentAlgorithm(){};
-    ~LinearVentAlgorithm(){};
 
     double update(const ControllerDomain::SensorData &sensor_data,
                   const ControllerDomain::Setpoints &setpoints, const double outdoorTempC,
