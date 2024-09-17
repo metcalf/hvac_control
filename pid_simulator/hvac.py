@@ -101,21 +101,16 @@ class Component:
 
 
 class PIDAlgorithm:
-    def __init__(
-        self, is_heater, p_range_c, t_i, max_interval=datetime.timedelta(minutes=10)
-    ):
+    def __init__(self, p_range_c, t_i, max_interval=datetime.timedelta(minutes=10)):
         self._p_range_c = float(p_range_c)
         self._i = 0.0
         self._t_i = t_i
-        self._is_heater = is_heater
         self._last_time = datetime.datetime.min
         self._max_interval = max_interval
 
-    def get_demand(
-        self, in_temp_c, out_temp_c, heat_setpoint_c, cool_setpoint_c, curr_time
-    ):
-        setpoint_c = heat_setpoint_c if self._is_heater else cool_setpoint_c
-        err = (setpoint_c - in_temp_c) / self._p_range_c
+    # Returns a demand (0, 1)
+    def get_demand(self, delta_temp_c, curr_time):
+        err = delta_temp_c / self._p_range_c
 
         delta_s = min(curr_time - self._last_time, self._max_interval).total_seconds()
         self._last_time = curr_time
@@ -131,26 +126,27 @@ class PIDAlgorithm:
         # Clamping to zero slightly improves response.
         self._i = self._clamp(
             self._i,
-            -self._t_i if not self._is_heater else 0,
-            self._t_i if self._is_heater else 0,
+            max_value=self._t_i,
         )
 
-    def _clamp(self, value, min_value=-1, max_value=1):
+    def _clamp(self, value, min_value=0, max_value=1):
         return max(min_value, min(value, max_value))
 
 
 class PIDComponent(Component):
     def __init__(self, component, p_range_c, t_i):
-        self.algo = PIDAlgorithm(component.is_heater, p_range_c, t_i)
+        self.algo = PIDAlgorithm(p_range_c, t_i)
         self._component = component
         self._is_heater = component.is_heater
 
     def get_power(
         self, in_temp_c, out_temp_c, heat_setpoint_c, cool_setpoint_c, curr_time
     ):
-        demand = self.algo.get_demand(
-            in_temp_c, out_temp_c, heat_setpoint_c, cool_setpoint_c, curr_time
-        )
+        setpoint_c = heat_setpoint_c if self.is_heater else cool_setpoint_c
+        delta_c = setpoint_c - in_temp_c
+        sign = 1 if self.is_heater else -1
+
+        demand = sign * self.algo.get_demand(sign * delta_c, curr_time)
         return self._component.get_power_with_demand(
             demand, in_temp_c, out_temp_c, heat_setpoint_c, cool_setpoint_c
         )
