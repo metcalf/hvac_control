@@ -1,16 +1,16 @@
 #include "LinearVentAlgorithm.h"
 
-double LinearVentAlgorithm::update(const SensorData &sensor_data, const Setpoints &setpoints,
+double LinearVentAlgorithm::update(const SensorData &sensorData, const Setpoints &setpoints,
                                    const double outdoorTempC,
                                    std::chrono::steady_clock::time_point now) {
     double max, target;
     if (std::isnan(outdoorTempC)) {
         max = 1;
     } else {
-        max = computeVentLimit(setpoints, sensor_data.tempC, outdoorTempC);
+        max = computeVentLimit(setpoints, sensorData.tempC, outdoorTempC);
     }
 
-    target = co2_venting_range_.getOutput(sensor_data.co2 - setpoints.co2);
+    target = co2_venting_range_.getOutput(sensorData.co2 - setpoints.co2);
 
     return std::min(target, max);
 }

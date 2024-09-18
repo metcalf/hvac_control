@@ -3,7 +3,6 @@
 
 #include "ControllerApp.h"
 
-#include "DemandController.h"
 #include "FakeConfigStore.h"
 #include "FakeModbusController.h"
 #include "FakeSensors.h"
@@ -58,7 +57,7 @@ class ControllerAppTest : public testing::Test {
     void SetUp() override {
         using namespace std::placeholders;
         app_ = new TestControllerApp(default_test_config(), &uiManager_, &modbusController_,
-                                     &sensors_, &demandController_, &valveCtrl_, &wifi_, &cfgStore_,
+                                     &sensors_, &valveCtrl_, &wifi_, &cfgStore_,
                                      std::bind(&ControllerAppTest::uiEvtRcv, this, _1, _2));
 
         setRealNow(std::tm{
@@ -114,7 +113,6 @@ class ControllerAppTest : public testing::Test {
     }
 
     TestControllerApp *app_;
-    DemandController demandController_;
     FakeModbusController modbusController_;
     FakeSensors sensors_;
     MockUIManager uiManager_;

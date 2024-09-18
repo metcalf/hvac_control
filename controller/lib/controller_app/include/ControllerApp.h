@@ -14,6 +14,7 @@
 #include "ControllerDomain.h"
 #include "LinearVentAlgorithm.h"
 #include "NullAlgorithm.h"
+#include "SetpointHandler.h"
 #include "ValveAlgorithm.h"
 
 class ControllerApp {
@@ -29,7 +30,9 @@ class ControllerApp {
                   AbstractWeatherClient *weatherCli, const uiEvtRcv_t &uiEvtRcv)
         : uiManager_(uiManager), modbusController_(modbusController), sensors_(sensors),
           valveCtrl_(valveCtrl), wifi_(wifi), cfgStore_(cfgStore), weatherCli_(weatherCli),
-          uiEvtRcv_(uiEvtRcv) {
+          uiEvtRcv_(uiEvtRcv),
+          fancoilCoolHandler_(fancoilCoolCutoffs_, std::size(fancoilCoolCutoffs_)),
+          fancoilHeatHandler_(fancoilHeatCutoffs_, std::size(fancoilHeatCutoffs_)) {
         ventAlgo_ = new LinearVentAlgorithm();
         heatAlgo_ = new NullAlgorithm();
         coolAlgo_ = new NullAlgorithm();
@@ -64,6 +67,7 @@ class ControllerApp {
     const char *fanSpeedReason_ = "";
 
   private:
+    using FancoilRequest = ControllerDomain::FancoilRequest;
     using FancoilSpeed = ControllerDomain::FancoilSpeed;
     using SensorData = ControllerDomain::SensorData;
     using FancoilState = ControllerDomain::FancoilState;
@@ -161,6 +165,7 @@ class ControllerApp {
     double outdoorTempC();
     AbstractDemandAlgorithm *getAlgoForEquipment(ControllerDomain::Config::HVACType type,
                                                  bool isHeat);
+    FancoilSpeed getSpeedForDemand(bool cool, double demand);
 
     Config config_;
     AbstractUIManager *uiManager_;
@@ -172,6 +177,7 @@ class ControllerApp {
     AbstractWeatherClient *weatherCli_;
     uiEvtRcv_t uiEvtRcv_;
     AbstractDemandAlgorithm *ventAlgo_, *heatAlgo_, *coolAlgo_;
+    bool isCoilCold();
 
     AbstractUIManager::TempOverride tempOverride_;
     int tempOverrideUntilScheduleIdx_ = -1;
@@ -188,4 +194,28 @@ class ControllerApp {
         fanMaxSpeedStarted_{};
 
     std::chrono::steady_clock::time_point lastStatusLog_{};
+
+    // Delta from setpoint in the direction we're aiming to correct
+    // e.g. when heating, the amount by which the indoor temp is below the setpoint
+    class FancoilSetpointHandler : public SetpointHandler<FancoilSpeed, double> {
+        using SetpointHandler::SetpointHandler;
+    };
+    using FancoilCutoff = FancoilSetpointHandler::Cutoff;
+
+    // My best guess is that the levels produce the following % of power (based on some
+    // output numbers from other fancoils and comparing fan power consumptions at
+    // different levels, note that lower speeds product more output per cfm):
+    // Min: 50% (very random guess)
+    //Low: 70%
+    // Medium: 80%
+    // High: 100%
+    // I then tried to map this to some reasonable cutoffs
+    static constexpr FancoilCutoff fancoilCoolCutoffs_[] = {
+        FancoilCutoff{FancoilSpeed::Off, 0.01}, FancoilCutoff{FancoilSpeed::Low, 0.6},
+        FancoilCutoff{FancoilSpeed::Med, 0.8}, FancoilCutoff{FancoilSpeed::High, 0.99}};
+    static constexpr FancoilCutoff fancoilHeatCutoffs_[] = {
+        fancoilCoolCutoffs_[0], FancoilCutoff{FancoilSpeed::Min, 0.3}, fancoilCoolCutoffs_[1],
+        fancoilCoolCutoffs_[2], fancoilCoolCutoffs_[3]};
+    FancoilSetpointHandler fancoilCoolHandler_;
+    FancoilSetpointHandler fancoilHeatHandler_;
 };

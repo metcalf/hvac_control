@@ -6,7 +6,7 @@ class LinearVentAlgorithm : public AbstractDemandAlgorithm {
   public:
     LinearVentAlgorithm(){};
 
-    double update(const ControllerDomain::SensorData &sensor_data,
+    double update(const ControllerDomain::SensorData &sensorData,
                   const ControllerDomain::Setpoints &setpoints, const double outdoorTempC,
                   std::chrono::steady_clock::time_point now) override;
 

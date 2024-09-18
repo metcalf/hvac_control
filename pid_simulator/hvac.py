@@ -327,8 +327,6 @@ class DiscreteLevels(Component):
         ):
             self._level_i += 1
 
-        delta = demand - self._levels[self._level_i]
-
         return self._component.get_power_with_demand(
             self._levels[self._level_i],
             in_temp_c,

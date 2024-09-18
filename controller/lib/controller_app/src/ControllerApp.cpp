@@ -32,8 +32,11 @@ typedef int esp_err_t;
 #define STATIC_PRESSURE_MIN_FAN_TIME std::chrono::seconds(60)
 // Ignore makeup demand requests older than this
 #define MAKEUP_MAX_AGE std::chrono::minutes(5)
+// Turn A/C on if we have cooling demand and the coil temp is below this
 #define COIL_COLD_TEMP_C ABS_F_TO_C(60.0)
+// Turn the A/C on if temp exceeds setpoint by this amount
 #define AC_ON_THRESHOLD_C REL_F_TO_C(4.0)
+#define ON_DEMAND_THRESHOLD 0.01
 
 #define MAKEUP_FAN_SPEED (FanSpeed)120
 #define MIN_FAN_SPEED_VALUE (FanSpeed)10
@@ -55,28 +58,17 @@ void ControllerApp::updateACMode(double coolDemand, double coolSetpointDelta) {
         clearMessage(MsgID::ACMode);
     }
 
-    bool coilIsCold = false;
-    FancoilState fcState;
-    std::chrono::steady_clock::time_point _t;
-    esp_err_t err = modbusController_->getFancoilState(&fcState, &_t);
-    if (err == ESP_OK) {
-        coilIsCold = (fcState.coilTempC < COIL_COLD_TEMP_C);
-        ESP_LOGD(TAG, "fancoil is cold");
-    } else {
-        ESP_LOGE(TAG, "Error getting fancoil state: %d", err);
-    }
-
     switch (acMode_) {
     case ACMode::Off:
         break;
     case ACMode::Standby:
         // If we're demanding HIGH A/C or the coil is cold anyway, turn the A/C on
-        if (coolSetpointDelta > AC_ON_THRESHOLD_C || (coolDemand > 0 && coilIsCold)) {
+        if (coolSetpointDelta > AC_ON_THRESHOLD_C || (coolDemand > 0 && isCoilCold())) {
             acMode_ = ACMode::On;
         }
         break;
     case ACMode::On:
-        if (coolDemand < 0.01) {
+        if (coolDemand < ON_DEMAND_THRESHOLD) {
             clearMessage(MsgID::ACMode);
             acMode_ = ACMode::Standby;
         }
@@ -238,7 +230,6 @@ bool ControllerApp::pollUIEvent(bool wait) {
             steadyNow() + std::chrono::minutes{uiEvent.payload.fanOverride.timeMins};
         ESP_LOGI(TAG, "FanOveride:\tspeed=%u\tmins=%u", fanOverrideSpeed_,
                  uiEvent.payload.fanOverride.timeMins);
-        // TODO: Implement "until" in this message
 
         struct tm nowLocalTm;
         time_t nowUTC = std::chrono::system_clock::to_time_t(realNow());
@@ -316,24 +307,21 @@ void ControllerApp::handleCancelMessage(MsgID id) {
 }
 
 ControllerDomain::HVACState ControllerApp::setHVAC(double heatDemand, double coolDemand) {
-    // TODO: HVACState::FanCool may be unreachable
     // TODO: Report and log an error if heat/cool conflict
 
-    HVACState state;
-    FancoilSpeed speed = FancoilSpeed::Off;
-    bool cool = true; //request.fancoil.cool;
+    bool cool = coolDemand > heatDemand;
+    double demand = 0;
     if (config_.systemOn && (!cool || acMode_ == ACMode::On)) {
-        //speed = request.fancoil.speed;
+        if (!cool) {
+            demand = heatDemand;
+        } else if (acMode_ == ACMode::On) {
+            demand = coolDemand;
+        }
     }
 
-    if (speed != FancoilSpeed::Off) {
-        if (cool) {
-            state = HVACState::ACCool;
-        } else {
-            state = HVACState::Heat;
-        }
-        //} else if (request.targetFanCooling > 0) {
-        //state = HVACState::FanCool;
+    HVACState state;
+    if (demand > ON_DEMAND_THRESHOLD) {
+        state = cool ? HVACState::ACCool : HVACState::Heat;
     } else {
         state = HVACState::Off;
     }
@@ -350,26 +338,32 @@ ControllerDomain::HVACState ControllerApp::setHVAC(double heatDemand, double coo
 
     switch (hvacType) {
     case Config::HVACType::None:
-        valveCtrl_->setMode(!cool, false); // Make sure valves are off
+        valveCtrl_->setMode(cool, false); // Make sure valve is off
         break;
-    case Config::HVACType::Fancoil:
-        //modbusController_->setFancoil(DemandRequest::FancoilRequest{speed, cool});
+    case Config::HVACType::Fancoil: {
+        FancoilSpeed speed = getSpeedForDemand(cool, demand);
+        modbusController_->setFancoil(FancoilRequest{speed, cool});
+
+        // HACK: If the demand is high, turn on the valve even in fancoil mode. We use
+        // this in the MBA for supplemental electric resistance heating.
+        if (speed == FancoilSpeed::High) {
+            valveCtrl_->setMode(cool, true);
+        }
 
         break;
+    }
     case Config::HVACType::Valve:
-        valveCtrl_->setMode(cool, speed != FancoilSpeed::Off);
+        valveCtrl_->setMode(cool, demand > ON_DEMAND_THRESHOLD);
         break;
     }
 
     if (hvacType != Config::HVACType::Fancoil && otherType == Config::HVACType::Fancoil) {
         // Turn off the fancoil if we didn't set it already and the other mode is a fancoil
-        //modbusController_->setFancoil(DemandRequest::FancoilRequest{FancoilSpeed::Off, false});
+        modbusController_->setFancoil(FancoilRequest{FancoilSpeed::Off, false});
     }
 
-    if (hvacType != Config::HVACType::Valve) {
-        // Turn off the valve if we didn't already.
-        valveCtrl_->setMode(!cool, false);
-    }
+    // Turn off the other valve
+    valveCtrl_->setMode(!cool, false);
 
     return state;
 }
@@ -494,6 +488,35 @@ AbstractDemandAlgorithm *ControllerApp::getAlgoForEquipment(ControllerDomain::Co
     }
 
     __builtin_unreachable();
+}
+
+ControllerDomain::FancoilSpeed ControllerApp::getSpeedForDemand(bool cool, double demand) {
+    FancoilSetpointHandler *curr, *other;
+    if (cool) {
+        curr = &fancoilCoolHandler_;
+        other = &fancoilHeatHandler_;
+    } else {
+        curr = &fancoilCoolHandler_;
+        other = &fancoilHeatHandler_;
+    }
+
+    other->update(0);
+    return curr->update(demand);
+}
+
+bool ControllerApp::isCoilCold() {
+    if (config_.equipment.coolType != Config::HVACType::Fancoil) {
+        return false;
+    }
+    FancoilState fcState;
+    std::chrono::steady_clock::time_point _t;
+    esp_err_t err = modbusController_->getFancoilState(&fcState, &_t);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Error getting fancoil state: %d", err);
+        return false;
+    }
+
+    return (fcState.coilTempC < COIL_COLD_TEMP_C);
 }
 
 int ControllerApp::getScheduleIdx(int offset) {

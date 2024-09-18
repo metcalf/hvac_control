@@ -14,13 +14,14 @@ class SetpointHandler {
     SetpointHandler(const Cutoff cutoffs[], size_t num_cutoffs)
         : cutoffs_(cutoffs), num_cutoffs_(num_cutoffs), state_idx_(0){};
 
-    OutputT update(SetpointT setpoint, SetpointT value) {
+    // TODO: This needs to be re-tested after switching the signature to take a delta
+    // instead of setpoint/value
+    OutputT update(SetpointT delta) {
         size_t lower_bound_idx = 0;
         size_t upper_bound_idx = SIZE_MAX;
 
         for (size_t c = 0; c < num_cutoffs_; c++) {
-            SetpointT cutoff_point = setpoint + cutoffs_[c].relative_threshold;
-            if (value < cutoff_point) {
+            if (delta < cutoffs_[c].relative_threshold) {
                 upper_bound_idx = c;
                 if (c > 0) {
                     lower_bound_idx = c - 1;
