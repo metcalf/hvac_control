@@ -336,6 +336,8 @@ ControllerDomain::HVACState ControllerApp::setHVAC(double heatDemand, double coo
         otherType = config_.equipment.coolType;
     }
 
+    // NB: Somewhat awkardly, the hysteresis for fancoils is handled in ControllerApp and
+    // the hysteresis for valves is handled by the ValveAlgorithm
     switch (hvacType) {
     case Config::HVACType::None:
         valveCtrl_->setMode(cool, false); // Make sure valve is off
