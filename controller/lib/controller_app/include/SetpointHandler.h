@@ -14,8 +14,6 @@ class SetpointHandler {
     SetpointHandler(const Cutoff cutoffs[], size_t num_cutoffs)
         : cutoffs_(cutoffs), num_cutoffs_(num_cutoffs), state_idx_(0){};
 
-    // TODO: This needs to be re-tested after switching the signature to take a delta
-    // instead of setpoint/value
     OutputT update(SetpointT delta) {
         size_t lower_bound_idx = 0;
         size_t upper_bound_idx = SIZE_MAX;
