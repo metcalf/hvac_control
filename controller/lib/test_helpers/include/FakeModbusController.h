@@ -68,13 +68,13 @@ class FakeModbusController : public AbstractModbusController {
     ControllerDomain::FancoilRequest getFancoilRequest() { return req_; }
 
   private:
-    std::chrono::steady_clock::time_point lastFreshAirState_, lastFreshAirSpeed_, lastMakeupDemand_,
-        lastFancoilState_;
+    std::chrono::steady_clock::time_point lastFreshAirState_{}, lastFreshAirSpeed_{},
+        lastMakeupDemand_{}, lastFancoilState_{};
     ControllerDomain::FancoilState fancoilState_;
     ControllerDomain::FanSpeed freshAirSpeed_;
     ControllerDomain::FreshAirState freshAirState_;
     ControllerDomain::FanSpeed fanSpeed_;
     ControllerDomain::FancoilRequest req_;
-    ControllerDomain::FreshAirModel freshAirModel_ = ControllerDomain::FreshAirModel::UNKNOWN;
+    ControllerDomain::FreshAirModel freshAirModel_ = ControllerDomain::FreshAirModel::SP;
     bool makeupDemand_, hasMakeupDemand_ = false;
 };

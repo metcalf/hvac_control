@@ -10,6 +10,7 @@ double LinearFancoilAlgorithm::update(const SensorData &sensorData, const Setpoi
     } else {
         delta = sensorData.tempC - setpoints.coolTempC;
     }
+    printf("fancoil %c delta: %.2f\n", isHeater_ ? 'h' : 'c', delta);
 
     return range_.getOutput(delta);
 }

@@ -6,10 +6,10 @@
 #include "FakeConfigStore.h"
 #include "FakeModbusController.h"
 #include "FakeSensors.h"
+#include "FakeValveCtrl.h"
 #include "FakeWeatherClient.h"
 #include "FakeWifi.h"
 #include "MockUIManager.h"
-#include "MockValveCtrl.h"
 
 using ::testing::_;
 using ::testing::AtMost;
@@ -117,7 +117,7 @@ class ControllerAppTest : public testing::Test {
     FakeModbusController modbusController_;
     FakeSensors sensors_;
     MockUIManager uiManager_;
-    MockValveCtrl valveCtrl_;
+    FakeValveCtrl valveCtrl_;
     FakeWifi wifi_;
     FakeConfigStore<Config> cfgStore_;
     FakeWeatherClient weatherCli_;
@@ -149,11 +149,11 @@ TEST_F(ControllerAppTest, Boots) {
 }
 
 TEST_F(ControllerAppTest, CallsForVenting) {
-    sensors_.setLatest({.tempC = 20.0, .humidity = 2.0, .co2 = 1100});
+    sensors_.setLatest({.tempC = 20.0, .humidity = 2.0, .co2 = 1150});
 
     // Start venting
     app_->task();
-    EXPECT_EQ(67, modbusController_.getFreshAirSpeed());
+    EXPECT_EQ(76, modbusController_.getFreshAirSpeed());
     EXPECT_EQ("vent", app_->fanSpeedReason());
 
     // No change when the fan hasn't been on long enough for an outdoor temp reading
@@ -163,29 +163,26 @@ TEST_F(ControllerAppTest, CallsForVenting) {
     };
     modbusController_.setFreshAirState(freshAirState, app_->steadyNow_);
     app_->task();
-    EXPECT_EQ(67, modbusController_.getFreshAirSpeed());
+    EXPECT_EQ(76, modbusController_.getFreshAirSpeed());
     EXPECT_EQ("vent", app_->fanSpeedReason());
 
     // Limit vent speed when we detect the cold outdoor temp
     app_->steadyNow_ += std::chrono::seconds(61);
     modbusController_.setFreshAirState(freshAirState, app_->steadyNow_);
     app_->task();
-    EXPECT_EQ(50, modbusController_.getFreshAirSpeed());
-    EXPECT_EQ("vent_limit", app_->fanSpeedReason());
+    EXPECT_EQ(51, modbusController_.getFreshAirSpeed());
 
     // Clear the limit at a more normal temp
     freshAirState.tempC = 20;
     modbusController_.setFreshAirState(freshAirState, app_->steadyNow_);
     app_->task();
-    EXPECT_EQ(67, modbusController_.getFreshAirSpeed());
-    EXPECT_EQ("vent", app_->fanSpeedReason());
+    EXPECT_EQ(76, modbusController_.getFreshAirSpeed());
 
     // Limit vent speed with high outdoor temp
     freshAirState.tempC = 35;
     modbusController_.setFreshAirState(freshAirState, app_->steadyNow_);
     app_->task();
-    EXPECT_EQ(50, modbusController_.getFreshAirSpeed());
-    EXPECT_EQ("vent_limit", app_->fanSpeedReason());
+    EXPECT_EQ(51, modbusController_.getFreshAirSpeed());
 }
 
 TEST_F(ControllerAppTest, UsesFanCoolingWhenOutdoorTempAllows) {
@@ -217,29 +214,8 @@ TEST_F(ControllerAppTest, UsesFanCoolingWhenOutdoorTempAllows) {
     EXPECT_CALL(uiManager_, setOutTempC(30));
     app_->task();
     EXPECT_EQ(0, modbusController_.getFreshAirSpeed());
-    EXPECT_EQ("cool_temp_limited", app_->fanSpeedReason());
+    EXPECT_EQ("off", app_->fanSpeedReason());
 }
-
-double hvacCallTempSeq[] = {
-    20.0, // Off
-    15.0, // High heating demand
-    18.5, // Medium heating demand
-    23.0, // Establish cooling demand but not at a level high enough to trigger "ac on"
-    25.0, // Establish cooling demand at a high enough level to trigger "ac on"
-    23.0, // With reduced cooling demand, AC should stay on
-    22.5  // With low enough demand, AC should turn off
-};
-int nHvacCalls = sizeof(hvacCallTempSeq) / sizeof(hvacCallTempSeq[0]);
-
-ControllerDomain::FancoilRequest hvacReqSeq[] = {
-    {FancoilSpeed::Off, false},  //
-    {FancoilSpeed::High, false}, //
-    {FancoilSpeed::Med, false},  //
-    {FancoilSpeed::Off, true},   //
-    {FancoilSpeed::High, true},  //
-    {FancoilSpeed::Low, true},   //
-    {FancoilSpeed::Off, true},   //
-};
 
 TEST_F(ControllerAppTest, CallsForValveHVAC) {
     auto cfg = default_test_config();
@@ -247,36 +223,67 @@ TEST_F(ControllerAppTest, CallsForValveHVAC) {
     cfg.equipment.heatType = Config::HVACType::Valve;
     app_->setConfig(cfg);
 
-    {
-        InSequence seq;
+    // Off
+    sensors_.setLatest({.tempC = 18.8, .humidity = 2.0, .co2 = 500});
+    app_->task();
+    EXPECT_TRUE(valveCtrl_.set_);
+    valveCtrl_.set_ = false;
+    EXPECT_FALSE(valveCtrl_.on_);
 
-        for (int i = 0; i < nHvacCalls; i++) {
-            auto req = hvacReqSeq[i];
-            EXPECT_CALL(valveCtrl_, setMode(req.cool, req.speed != FancoilSpeed::Off));
-        }
-    }
-    {
-        InSequence seq;
+    // Turn heat on
+    sensors_.setLatest({.tempC = 18.5, .humidity = 2.0, .co2 = 500});
+    app_->task();
+    EXPECT_TRUE(valveCtrl_.set_);
+    valveCtrl_.set_ = false;
+    EXPECT_FALSE(valveCtrl_.cool_);
+    EXPECT_TRUE(valveCtrl_.on_);
 
-        EXPECT_CALL(uiManager_, setHVACState(ControllerDomain::HVACState::Off));
-        EXPECT_CALL(uiManager_, setHVACState(ControllerDomain::HVACState::Heat));
-        EXPECT_CALL(uiManager_, setHVACState(ControllerDomain::HVACState::Heat));
-        EXPECT_CALL(
-            uiManager_,
-            setHVACState(ControllerDomain::HVACState::Off)); // TODO: Was fancool, should check this
-        EXPECT_CALL(uiManager_, setHVACState(ControllerDomain::HVACState::ACCool));
-        EXPECT_CALL(uiManager_, setHVACState(ControllerDomain::HVACState::ACCool));
-        EXPECT_CALL(
-            uiManager_,
-            setHVACState(ControllerDomain::HVACState::Off)); // TODO: Was fancool, should check this
-    }
+    // Stays on from hysteresis
+    sensors_.setLatest({.tempC = 18.8, .humidity = 2.0, .co2 = 500});
+    app_->task();
+    EXPECT_TRUE(valveCtrl_.set_);
+    valveCtrl_.set_ = false;
+    EXPECT_FALSE(valveCtrl_.cool_);
+    EXPECT_TRUE(valveCtrl_.on_);
 
-    for (int i = 0; i < nHvacCalls; i++) {
-        // Establish heating demand
-        sensors_.setLatest({.tempC = hvacCallTempSeq[i], .humidity = 2.0, .co2 = 500});
-        app_->task();
-    }
+    // Turns off
+    sensors_.setLatest({.tempC = 19.1, .humidity = 2.0, .co2 = 500});
+    app_->task();
+    EXPECT_TRUE(valveCtrl_.set_);
+    valveCtrl_.set_ = false;
+    EXPECT_FALSE(valveCtrl_.on_);
+
+    // Cools
+    sensors_.setLatest({.tempC = 25.0, .humidity = 2.0, .co2 = 500});
+    app_->task();
+    EXPECT_TRUE(valveCtrl_.set_);
+    valveCtrl_.set_ = false;
+    EXPECT_TRUE(valveCtrl_.cool_);
+    EXPECT_TRUE(valveCtrl_.on_);
 }
+
+double fcCallTempSeq[] = {
+    20.0, // Off
+    18.6, // Min heating demand
+    15.0, // High heating demand
+    18.3, // Medium heating demand
+    23.0, // Establish cooling demand below the "ac on" threshold
+    25.0, // Establish cooling demand at a high enough level to trigger "ac on"
+    22.3, // With reduced cooling demand, AC should stay on
+    22.0, // With low enough demand, AC should turn off
+};
+int nHvacCalls = std::size(fcCallTempSeq);
+
+ControllerDomain::FancoilRequest fcReqSeq[] = {
+    {FancoilSpeed::Off, false},  // 0
+    {FancoilSpeed::Min, false},  // 1
+    {FancoilSpeed::High, false}, // 2
+    {FancoilSpeed::Med, false},  // 3
+    {FancoilSpeed::Off, true},   // 4
+    {FancoilSpeed::High, true},  // 5
+    {FancoilSpeed::Low, true},   // 6
+    {FancoilSpeed::Off, false},  // 7
+};
 
 TEST_F(ControllerAppTest, CallsForFancoilHVAC) {
     using FancoilSpeed = ControllerDomain::FancoilSpeed;
@@ -284,14 +291,30 @@ TEST_F(ControllerAppTest, CallsForFancoilHVAC) {
 
     for (int i = 0; i < nHvacCalls; i++) {
         // Establish heating demand
-        sensors_.setLatest({.tempC = hvacCallTempSeq[i], .humidity = 2.0, .co2 = 500});
+        sensors_.setLatest({.tempC = fcCallTempSeq[i], .humidity = 2.0, .co2 = 500});
         app_->task();
 
         auto actual = modbusController_.getFancoilRequest();
-        auto expect = hvacReqSeq[i];
+        auto expect = fcReqSeq[i];
         EXPECT_EQ(actual.speed, expect.speed) << "i=" << i;
         EXPECT_EQ(actual.cool, expect.cool) << "i=" << i;
     }
+}
+
+TEST_F(ControllerAppTest, CallsForACWithColdCoil) {
+    sensors_.setLatest({.tempC = 22.5, .humidity = 2.0, .co2 = 500});
+
+    modbusController_.setFancoilState({.coilTempC = 20}, app_->steadyNow_);
+    app_->task();
+
+    auto actual = modbusController_.getFancoilRequest();
+    EXPECT_EQ(actual.speed, FancoilSpeed::Off); // Stays off without coil temp
+
+    modbusController_.setFancoilState({.coilTempC = 10}, app_->steadyNow_);
+    app_->task();
+
+    actual = modbusController_.getFancoilRequest();
+    EXPECT_EQ(actual.speed, FancoilSpeed::Low); // Turns onn with a cold coil
 }
 
 TEST_F(ControllerAppTest, FanSpeedOverride) {
@@ -317,7 +340,7 @@ TEST_F(ControllerAppTest, FanSpeedOverride) {
 }
 
 TEST_F(ControllerAppTest, TempOverride) {
-    sensors_.setLatest({.tempC = 20.0, .humidity = 2.0, .co2 = 456});
+    sensors_.setLatest({.tempC = 19.3, .humidity = 2.0, .co2 = 456});
     auto evt = AbstractUIManager::Event{
         AbstractUIManager::EventType::TempOverride,
         {.tempOverride = AbstractUIManager::TempOverride{.heatC = 10, .coolC = 15}},
@@ -347,7 +370,7 @@ TEST_F(ControllerAppTest, TempOverride) {
 }
 
 TEST_F(ControllerAppTest, ACOverride) {
-    sensors_.setLatest({.tempC = 24.0, .humidity = 2.0, .co2 = 456});
+    sensors_.setLatest({.tempC = 22.8, .humidity = 2.0, .co2 = 456});
 
     // No A/C
     app_->task();

@@ -3,6 +3,9 @@
 #include <algorithm>
 #include <cstring>
 
+#include "LinearFancoilAlgorithm.h"
+#include "ValveAlgorithm.h"
+
 #include "esp_log.h"
 #if defined(ESP_PLATFORM)
 #include "esp_err.h"
@@ -32,6 +35,8 @@ typedef int esp_err_t;
 #define STATIC_PRESSURE_MIN_FAN_TIME std::chrono::seconds(60)
 // Ignore makeup demand requests older than this
 #define MAKEUP_MAX_AGE std::chrono::minutes(5)
+// Ignore fancoil states older than this
+#define FANCOIL_STATE_MAX_AGE std::chrono::minutes(5)
 // Turn A/C on if we have cooling demand and the coil temp is below this
 #define COIL_COLD_TEMP_C ABS_F_TO_C(60.0)
 // Turn the A/C on if temp exceeds setpoint by this amount
@@ -76,7 +81,8 @@ void ControllerApp::updateACMode(double coolDemand, double coolSetpointDelta) {
     }
 }
 
-FanSpeed ControllerApp::computeFanSpeed(double demand, bool wantOutdoorTemp) {
+FanSpeed ControllerApp::computeFanSpeed(double ventDemand, double coolDemand,
+                                        bool wantOutdoorTemp) {
     FanSpeed fanSpeed = 0;
     fanSpeedReason_ = "off";
 
@@ -94,7 +100,18 @@ FanSpeed ControllerApp::computeFanSpeed(double demand, bool wantOutdoorTemp) {
         }
         fanSpeedReason_ = "override";
     } else {
-        fanSpeedReason_ = "demand";
+        double demand = 0;
+        if (coolDemand > ventDemand) {
+            if (coolDemand > 0) {
+                fanSpeedReason_ = "cool";
+                demand = coolDemand;
+            }
+        } else {
+            if (ventDemand > 0) {
+                fanSpeedReason_ = "vent";
+                demand = ventDemand;
+            }
+        }
         fanSpeed = UINT8_MAX * demand;
 
         // Hysteresis around the turn-off point
@@ -341,7 +358,7 @@ ControllerDomain::HVACState ControllerApp::setHVAC(double heatDemand, double coo
     // all hysteresis to the algo.
     switch (hvacType) {
     case Config::HVACType::None:
-        valveCtrl_->setMode(cool, false); // Make sure valve is off
+        valveCtrl_->setMode(false, false); // Make sure valve is off
         break;
     case Config::HVACType::Fancoil: {
         FancoilSpeed speed = getSpeedForDemand(cool, demand);
@@ -351,6 +368,9 @@ ControllerDomain::HVACState ControllerApp::setHVAC(double heatDemand, double coo
         // this in the MBA for supplemental electric resistance heating.
         if (speed == FancoilSpeed::High) {
             valveCtrl_->setMode(cool, true);
+        } else {
+            // Turn off valves
+            valveCtrl_->setMode(false, false);
         }
 
         break;
@@ -364,9 +384,6 @@ ControllerDomain::HVACState ControllerApp::setHVAC(double heatDemand, double coo
         // Turn off the fancoil if we didn't set it already and the other mode is a fancoil
         modbusController_->setFancoil(FancoilRequest{FancoilSpeed::Off, false});
     }
-
-    // Turn off the other valve
-    valveCtrl_->setMode(!cool, false);
 
     return state;
 }
@@ -410,7 +427,7 @@ uint16_t ControllerApp::localMinOfDay() {
 
 void ControllerApp::logState(const ControllerDomain::FreshAirState &freshAirState,
                              const ControllerDomain::SensorData &sensorData, double ventDemand,
-                             double heatDemand, double coolDemand,
+                             double fanCoolDemand, double heatDemand, double coolDemand,
                              const ControllerDomain::Setpoints &setpoints,
                              const ControllerDomain::HVACState hvacState, const FanSpeed fanSpeed) {
     esp_log_level_t statusLevel;
@@ -435,7 +452,7 @@ void ControllerApp::logState(const ControllerDomain::FreshAirState &freshAirStat
                   // Setpoints
                   "\tset_h=%.1f\tset_c=%.1f\tset_co2=%u\tset_r=%s"
                   // DemandRequest
-                  "\tvent_d=%.2f\theat_d=%.2f\tcool_d=%.2f"
+                  "\tvent_d=%.2f\tfancool_d=%.2f\theat_d=%.2f\tcool_d=%.2f"
                   // HVACState
                   "\thvac=%s",
                   // Sensors
@@ -444,7 +461,7 @@ void ControllerApp::logState(const ControllerDomain::FreshAirState &freshAirStat
                   // Setpoints
                   setpoints.heatTempC, setpoints.coolTempC, setpoints.co2, setpointReason_,
                   // Demands
-                  ventDemand, heatDemand, coolDemand,
+                  ventDemand, fanCoolDemand, heatDemand, coolDemand,
                   // HVACState
                   ControllerDomain::hvacStateToS(hvacState));
 }
@@ -486,6 +503,7 @@ AbstractDemandAlgorithm *ControllerApp::getAlgoForEquipment(ControllerDomain::Co
     case ControllerDomain::Config::HVACType::None:
         return new NullAlgorithm();
     case ControllerDomain::Config::HVACType::Fancoil:
+        return new LinearFancoilAlgorithm(isHeat);
     case ControllerDomain::Config::HVACType::Valve:
         return new ValveAlgorithm(isHeat);
     }
@@ -499,8 +517,8 @@ ControllerDomain::FancoilSpeed ControllerApp::getSpeedForDemand(bool cool, doubl
         curr = &fancoilCoolHandler_;
         other = &fancoilHeatHandler_;
     } else {
-        curr = &fancoilCoolHandler_;
-        other = &fancoilHeatHandler_;
+        curr = &fancoilHeatHandler_;
+        other = &fancoilCoolHandler_;
     }
 
     other->update(0);
@@ -512,10 +530,18 @@ bool ControllerApp::isCoilCold() {
         return false;
     }
     FancoilState fcState;
-    std::chrono::steady_clock::time_point _t;
-    esp_err_t err = modbusController_->getFancoilState(&fcState, &_t);
+    std::chrono::steady_clock::time_point t;
+    esp_err_t err = modbusController_->getFancoilState(&fcState, &t);
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "Error getting fancoil state: %d", err);
+        return false;
+    }
+    if (t == std::chrono::steady_clock::time_point{}) {
+        ESP_LOGW(TAG, "Fancoil state has not been fetched");
+        return false;
+    }
+    if (steadyNow() - t > FANCOIL_STATE_MAX_AGE) {
+        ESP_LOGW(TAG, "Fancoil state is stale");
         return false;
     }
 
@@ -736,10 +762,11 @@ void ControllerApp::task(bool firstTime) {
     SensorData sensorData = sensors_->getLatest();
     sensorData.tempC += config_.inTempOffsetC;
 
-    double ventDemand = 0, heatDemand = 0, coolDemand = 0;
+    double ventDemand = 0, fanCoolDemand = 0, heatDemand = 0, coolDemand = 0;
 
     if (strlen(sensorData.errMsg) == 0) {
         ventDemand = ventAlgo_->update(sensorData, setpoints, outdoorTempC(), steadyNow());
+        fanCoolDemand = fanCoolAlgo_->update(sensorData, setpoints, outdoorTempC(), steadyNow());
         heatDemand = heatAlgo_->update(sensorData, setpoints, outdoorTempC(), steadyNow());
         coolDemand = coolAlgo_->update(sensorData, setpoints, outdoorTempC(), steadyNow());
 
@@ -759,11 +786,10 @@ void ControllerApp::task(bool firstTime) {
                                                       (steadyNow() - lastOutdoorTempUpdate_) >
                                                           OUTDOOR_TEMP_UPDATE_INTERVAL));
 
-    FanSpeed speed = computeFanSpeed(ventDemand, wantOutdoorTemp);
+    FanSpeed speed = computeFanSpeed(ventDemand, fanCoolDemand, wantOutdoorTemp);
     setFanSpeed(speed);
 
     updateACMode(coolDemand, coolSetpointDelta);
-
     HVACState hvacState = setHVAC(heatDemand, coolDemand);
 
     checkModbusErrors();
@@ -772,8 +798,8 @@ void ControllerApp::task(bool firstTime) {
         uiManager_->bootDone();
     }
 
-    logState(freshAirState, sensorData, ventDemand, heatDemand, coolDemand, setpoints, hvacState,
-             speed);
+    logState(freshAirState, sensorData, ventDemand, fanCoolDemand, heatDemand, coolDemand,
+             setpoints, hvacState, speed);
 
     if (pollUIEvent(true)) {
         // If we found something in the queue, clear the queue before proceeeding with

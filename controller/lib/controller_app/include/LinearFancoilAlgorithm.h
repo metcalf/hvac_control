@@ -13,8 +13,8 @@ class LinearFancoilAlgorithm : public AbstractDemandAlgorithm {
   protected:
     // Delta to indoor in the direction by which indoor is off the setpoint
     const LinearRange range_{
-        {REL_F_TO_C(0), 0.0},
-        {REL_F_TO_C(2), 1.0},
+        {0, 0.0},
+        {1, 1.0},
     };
 
   private:

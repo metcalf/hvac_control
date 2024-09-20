@@ -12,10 +12,10 @@
 #include "AbstractWeatherClient.h"
 #include "AbstractWifi.h"
 #include "ControllerDomain.h"
+#include "LinearFanCoolAlgorithm.h"
 #include "LinearVentAlgorithm.h"
 #include "NullAlgorithm.h"
 #include "SetpointHandler.h"
-#include "ValveAlgorithm.h"
 
 class ControllerApp {
   public:
@@ -34,6 +34,7 @@ class ControllerApp {
           fancoilCoolHandler_(fancoilCoolCutoffs_, std::size(fancoilCoolCutoffs_)),
           fancoilHeatHandler_(fancoilHeatCutoffs_, std::size(fancoilHeatCutoffs_)) {
         ventAlgo_ = new LinearVentAlgorithm();
+        fanCoolAlgo_ = new LinearFanCoolAlgorithm();
         heatAlgo_ = new NullAlgorithm();
         coolAlgo_ = new NullAlgorithm();
 
@@ -140,7 +141,7 @@ class ControllerApp {
     }
 
     void updateACMode(double coolDemand, double coolSetpointDelta);
-    FanSpeed computeFanSpeed(double demand, bool wantOutdoorTemp);
+    FanSpeed computeFanSpeed(double ventDemand, double coolDemand, bool wantOutdoorTemp);
     void setFanSpeed(FanSpeed);
     bool pollUIEvent(bool wait);
     void handleCancelMessage(MsgID id);
@@ -158,7 +159,7 @@ class ControllerApp {
     uint16_t localMinOfDay();
     void logState(const ControllerDomain::FreshAirState &freshAirState,
                   const ControllerDomain::SensorData &sensorData, double ventDemand,
-                  double heatDemand, double coolDemand,
+                  double fanCoolDemand, double heatDemand, double coolDemand,
                   const ControllerDomain::Setpoints &setpoints,
                   const ControllerDomain::HVACState hvacState, const FanSpeed fanSpeed);
     void checkWifiState();
@@ -176,7 +177,7 @@ class ControllerApp {
     AbstractConfigStore<ControllerDomain::Config> *cfgStore_;
     AbstractWeatherClient *weatherCli_;
     uiEvtRcv_t uiEvtRcv_;
-    AbstractDemandAlgorithm *ventAlgo_, *heatAlgo_, *coolAlgo_;
+    AbstractDemandAlgorithm *ventAlgo_, *fanCoolAlgo_, *heatAlgo_, *coolAlgo_;
     bool isCoilCold();
 
     AbstractUIManager::TempOverride tempOverride_;
@@ -211,11 +212,11 @@ class ControllerApp {
     // High: 100%
     // I then tried to map this to some reasonable cutoffs
     static constexpr FancoilCutoff fancoilCoolCutoffs_[] = {
-        FancoilCutoff{FancoilSpeed::Off, 0.01}, FancoilCutoff{FancoilSpeed::Low, 0.6},
+        FancoilCutoff{FancoilSpeed::Off, 0.01}, FancoilCutoff{FancoilSpeed::Low, 0.4},
         FancoilCutoff{FancoilSpeed::Med, 0.8}, FancoilCutoff{FancoilSpeed::High, 0.99}};
     static constexpr FancoilCutoff fancoilHeatCutoffs_[] = {
-        fancoilCoolCutoffs_[0], FancoilCutoff{FancoilSpeed::Min, 0.3}, fancoilCoolCutoffs_[1],
-        fancoilCoolCutoffs_[2], fancoilCoolCutoffs_[3]};
+        fancoilCoolCutoffs_[0], FancoilCutoff{FancoilSpeed::Min, 0.3},
+        FancoilCutoff{FancoilSpeed::Low, 0.6}, fancoilCoolCutoffs_[2], fancoilCoolCutoffs_[3]};
     FancoilSetpointHandler fancoilCoolHandler_;
     FancoilSetpointHandler fancoilHeatHandler_;
 };
