@@ -324,11 +324,11 @@ void ControllerApp::handleCancelMessage(MsgID id) {
 }
 
 ControllerDomain::HVACState ControllerApp::setHVAC(double heatDemand, double coolDemand) {
-    // TODO: Report and log an error if heat/cool conflict
-
     bool cool = coolDemand > heatDemand;
     double demand = 0;
-    if (config_.systemOn && (!cool || acMode_ == ACMode::On)) {
+    if (coolDemand > ON_DEMAND_THRESHOLD && heatDemand > ON_DEMAND_THRESHOLD) {
+        ESP_LOGE(TAG, "Conflicting heat(%.2f) and cool(%.2f) demands", heatDemand, coolDemand);
+    } else if (config_.systemOn) {
         if (!cool) {
             demand = heatDemand;
         } else if (acMode_ == ACMode::On) {
