@@ -503,7 +503,7 @@ AbstractDemandAlgorithm *ControllerApp::getAlgoForEquipment(ControllerDomain::Co
     case ControllerDomain::Config::HVACType::None:
         return new NullAlgorithm();
     case ControllerDomain::Config::HVACType::Fancoil:
-        return new LinearFancoilAlgorithm(isHeat);
+        return new PIDAlgorithm(isHeat);
     case ControllerDomain::Config::HVACType::Valve:
         return new ValveAlgorithm(isHeat);
     }
@@ -766,7 +766,8 @@ void ControllerApp::task(bool firstTime) {
 
     if (strlen(sensorData.errMsg) == 0) {
         ventDemand = ventAlgo_->update(sensorData, setpoints, outdoorTempC(), steadyNow());
-        fanCoolDemand = fanCoolAlgo_->update(sensorData, setpoints, outdoorTempC(), steadyNow());
+        fanCoolDemand =
+            fanCoolLimitAlgo_->update(sensorData, setpoints, outdoorTempC(), steadyNow());
         heatDemand = heatAlgo_->update(sensorData, setpoints, outdoorTempC(), steadyNow());
         coolDemand = coolAlgo_->update(sensorData, setpoints, outdoorTempC(), steadyNow());
 

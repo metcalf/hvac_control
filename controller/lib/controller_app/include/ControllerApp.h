@@ -12,9 +12,11 @@
 #include "AbstractWeatherClient.h"
 #include "AbstractWifi.h"
 #include "ControllerDomain.h"
+#include "FanCoolLimitAlgorithm.h"
 #include "LinearFanCoolAlgorithm.h"
 #include "LinearVentAlgorithm.h"
 #include "NullAlgorithm.h"
+#include "PIDAlgorithm.h"
 #include "SetpointHandler.h"
 
 class ControllerApp {
@@ -34,7 +36,8 @@ class ControllerApp {
           fancoilCoolHandler_(fancoilCoolCutoffs_, std::size(fancoilCoolCutoffs_)),
           fancoilHeatHandler_(fancoilHeatCutoffs_, std::size(fancoilHeatCutoffs_)) {
         ventAlgo_ = new LinearVentAlgorithm();
-        fanCoolAlgo_ = new LinearFanCoolAlgorithm();
+        fanCoolAlgo_ = new PIDAlgorithm(false);
+        fanCoolLimitAlgo_ = new FanCoolLimitAlgorithm(fanCoolAlgo_);
         heatAlgo_ = new NullAlgorithm();
         coolAlgo_ = new NullAlgorithm();
 
@@ -44,6 +47,8 @@ class ControllerApp {
         delete ventAlgo_;
         delete heatAlgo_;
         delete coolAlgo_;
+        delete fanCoolAlgo_;
+        delete fanCoolLimitAlgo_;
     }
     void setConfig(ControllerDomain::Config config);
 
@@ -177,7 +182,7 @@ class ControllerApp {
     AbstractConfigStore<ControllerDomain::Config> *cfgStore_;
     AbstractWeatherClient *weatherCli_;
     uiEvtRcv_t uiEvtRcv_;
-    AbstractDemandAlgorithm *ventAlgo_, *fanCoolAlgo_, *heatAlgo_, *coolAlgo_;
+    AbstractDemandAlgorithm *ventAlgo_, *fanCoolAlgo_, *fanCoolLimitAlgo_, *heatAlgo_, *coolAlgo_;
     bool isCoilCold();
 
     AbstractUIManager::TempOverride tempOverride_;
@@ -215,8 +220,8 @@ class ControllerApp {
         FancoilCutoff{FancoilSpeed::Off, 0.01}, FancoilCutoff{FancoilSpeed::Low, 0.4},
         FancoilCutoff{FancoilSpeed::Med, 0.8}, FancoilCutoff{FancoilSpeed::High, 0.99}};
     static constexpr FancoilCutoff fancoilHeatCutoffs_[] = {
-        fancoilCoolCutoffs_[0], FancoilCutoff{FancoilSpeed::Min, 0.3},
-        FancoilCutoff{FancoilSpeed::Low, 0.6}, fancoilCoolCutoffs_[2], fancoilCoolCutoffs_[3]};
+        fancoilCoolCutoffs_[0], FancoilCutoff{FancoilSpeed::Min, 0.25},
+        FancoilCutoff{FancoilSpeed::Low, 0.5}, fancoilCoolCutoffs_[2], fancoilCoolCutoffs_[3]};
     FancoilSetpointHandler fancoilCoolHandler_;
     FancoilSetpointHandler fancoilHeatHandler_;
 };

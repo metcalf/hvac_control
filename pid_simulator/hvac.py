@@ -116,18 +116,13 @@ class PIDAlgorithm:
         self._last_time = curr_time
 
         self._i += err * delta_s
-        self._clamp_integral(err)
-        i_demand = self._i / self._t_i
-        return self._clamp(err + i_demand)
-
-    def _clamp_integral(self, p_demand):
-        p_demand = self._clamp(p_demand)
-
-        # Clamping to zero slightly improves response.
         self._i = self._clamp(
             self._i,
-            max_value=self._t_i,
+            max_value=self._t_i * (1 - self._clamp(err)),
         )
+
+        i_demand = self._i / self._t_i
+        return self._clamp(err + i_demand)
 
     def _clamp(self, value, min_value=0, max_value=1):
         return max(min_value, min(value, max_value))

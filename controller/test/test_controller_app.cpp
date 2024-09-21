@@ -301,6 +301,41 @@ TEST_F(ControllerAppTest, CallsForFancoilHVAC) {
     }
 }
 
+TEST_F(ControllerAppTest, IncreasesFancoilSpeedOverTime) {
+    sensors_.setLatest({.tempC = 18.3, .humidity = 2.0, .co2 = 500});
+
+    modbusController_.setFancoilState({.coilTempC = 20}, app_->steadyNow_);
+    app_->task();
+
+    auto actual = modbusController_.getFancoilRequest();
+    EXPECT_EQ(actual.speed, FancoilSpeed::Low); // Starts on Low
+
+    app_->steadyNow_ += std::chrono::minutes(15);
+    app_->task();
+
+    actual = modbusController_.getFancoilRequest();
+    EXPECT_EQ(actual.speed, FancoilSpeed::Med);
+}
+
+TEST_F(ControllerAppTest, IncreasesFanSpeedOverTime) {
+    // Establish cooling demand to trigger fan for outdoor temp update
+    sensors_.setLatest({.tempC = 22.5, .humidity = 2.0, .co2 = 500});
+    modbusController_.setFreshAirState(ControllerDomain::FreshAirState{.tempC = 15, .fanRpm = 1000},
+                                       app_->steadyNow_);
+    // After rolling time forward enough to measure the outdoor temperature, fan cooling
+    // should come on.
+    app_->task();
+    app_->steadyNow_ += std::chrono::seconds(61);
+    app_->task();
+    EXPECT_LT(modbusController_.getFreshAirSpeed(), 150);
+    EXPECT_EQ("cool", app_->fanSpeedReason());
+
+    app_->steadyNow_ += std::chrono::minutes(15);
+    app_->task();
+    EXPECT_GT(modbusController_.getFreshAirSpeed(), 150);
+    EXPECT_EQ("cool", app_->fanSpeedReason());
+}
+
 TEST_F(ControllerAppTest, CallsForACWithColdCoil) {
     sensors_.setLatest({.tempC = 22.5, .humidity = 2.0, .co2 = 500});
 
@@ -388,7 +423,7 @@ TEST_F(ControllerAppTest, ACOverride) {
     app_->task();
     fcReq = modbusController_.getFancoilRequest();
     EXPECT_TRUE(fcReq.cool);
-    EXPECT_EQ(FancoilSpeed::Med, fcReq.speed);
+    EXPECT_NE(FancoilSpeed::Off, fcReq.speed);
 
     // Override "Stop"
     evt.payload.acOverride = AbstractUIManager::ACOverride::Stop;
@@ -442,7 +477,8 @@ TEST_F(ControllerAppTest, Precooling) {
     app_->steadyNow_ += std::chrono::seconds(61);
     modbusController_.setFreshAirState(freshAirState, app_->steadyNow_);
     app_->task();
-    EXPECT_EQ(30, modbusController_.getFreshAirSpeed());
+    EXPECT_GT(modbusController_.getFreshAirSpeed(), 20);
+    EXPECT_LT(modbusController_.getFreshAirSpeed(), 40);
     EXPECT_EQ("cool", app_->fanSpeedReason());
     EXPECT_EQ("normal", app_->setpointReason());
     auto fcReq = modbusController_.getFancoilRequest();
@@ -451,7 +487,8 @@ TEST_F(ControllerAppTest, Precooling) {
     // Start fan precooling
     app_->realNow_ += std::chrono::hours(4);
     app_->task();
-    EXPECT_EQ(63, modbusController_.getFreshAirSpeed());
+    EXPECT_GT(modbusController_.getFreshAirSpeed(), 60);
+    EXPECT_LT(modbusController_.getFreshAirSpeed(), 100);
     EXPECT_EQ("cool", app_->fanSpeedReason());
     EXPECT_EQ("precooling", app_->setpointReason());
     fcReq = modbusController_.getFancoilRequest();
