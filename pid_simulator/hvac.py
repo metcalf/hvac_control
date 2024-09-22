@@ -107,6 +107,7 @@ class PIDAlgorithm:
         self._t_i = t_i
         self._last_time = datetime.datetime.min
         self._max_interval = max_interval
+        self._max_i_demand = 0.5
 
     # Returns a demand (0, 1)
     def get_demand(self, delta_temp_c, curr_time):
@@ -118,7 +119,7 @@ class PIDAlgorithm:
         self._i += err * delta_s
         self._i = self._clamp(
             self._i,
-            max_value=self._t_i * (1 - self._clamp(err)),
+            max_value=self._t_i * (1 - self._clamp(err, 1 - self._max_i_demand)),
         )
 
         i_demand = self._i / self._t_i

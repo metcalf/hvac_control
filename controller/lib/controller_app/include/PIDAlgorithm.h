@@ -16,7 +16,7 @@ class PIDAlgorithm : public AbstractDemandAlgorithm {
 
   private:
     bool isHeater_;
-    double pRangeC_, tiSecs_, i_ = 0;
+    double pRangeC_, tiSecs_, i_ = 0, maxIDemand_ = 0.5;
     std::chrono::steady_clock::time_point lastTime_;
     std::chrono::seconds maxInterval_;
 

@@ -18,7 +18,9 @@ double PIDAlgorithm::getDemand(double deltaC, std::chrono::steady_clock::time_po
     lastTime_ = now;
 
     i_ += err * deltaS.count();
-    i_ = clamp(i_, 0.0, tiSecs_ * (1 - clamp(err)));
+    // Clamp the integral value to keep iDemand below maxIDemand_ and
+    // keep err + iDemand <= 1. This reduces windup issues.
+    i_ = clamp(i_, 0.0, tiSecs_ * (1 - clamp(err, 1 - maxIDemand_)));
 
     double iDemand = i_ / tiSecs_;
     printf("idemand: %.2f\n", iDemand);

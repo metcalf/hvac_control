@@ -518,4 +518,3 @@ TEST_F(ControllerAppTest, Precooling) {
 // TODO: Write lots more tests!!
 // Indoor and outdoor temp offsets?
 // Setpoints with invalid time?
-// Separate tests for demand controller?
