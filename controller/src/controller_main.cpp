@@ -196,6 +196,7 @@ extern "C" void controller_main() {
     }
 
     // TODO: Setup OTA updates
+    // TODO: log app version on boot
     // TODO: Remote logging
     wifi_.init();
     wifi_.connect(config.wifi.ssid, config.wifi.password);
