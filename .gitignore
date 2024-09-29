@@ -2,6 +2,7 @@
 /.pio/
 /.vscode/
 wifi_credentials.h
+remote_spec.cfg
 sdkconfig.esp32s3.old
 
 # Prerequisites
