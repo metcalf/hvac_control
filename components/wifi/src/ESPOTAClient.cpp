@@ -66,11 +66,11 @@ AbstractOTAClient::Error ESPOTAClient::update() {
     snprintf(pathPart_, pathLen_ - 1, "%s.bin", outputBuffer_);
     ESP_LOGD(TAG, "Downloading firmware from %s", url_);
 
-    httpConfig.eventHandler = NULL;
+    httpConfig.event_handler = NULL;
     esp_https_ota_config_t otaConfig = {
         .http_config = &httpConfig,
     };
-    esp_err_t ret = esp_https_ota(&ota_config);
+    esp_err_t ret = esp_https_ota(&otaConfig);
     if (ret == ESP_OK) {
         ESP_LOGI(TAG, "OTA Succeed, Rebooting...");
         esp_restart();
