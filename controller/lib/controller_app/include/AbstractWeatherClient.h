@@ -23,6 +23,5 @@ class AbstractWeatherClient {
     virtual WeatherResult lastResult() = 0;
 
   protected:
-    // Probably should have an error enum or something
     WeatherResult lastResult_{.err = Error::NotRun};
 };

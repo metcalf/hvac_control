@@ -1,5 +1,10 @@
 #!/bin/bash -euxo pipefail
 
+if [[ ! -f "platformio.ini" ]]; then
+    echo "Please run this script from the root of the platformio project"
+    exit 1
+fi
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 FIRMWARE_PATH=.pio/build/esp32s3/firmware.bin
 REMOTE_ROOT="/var/www/local/esp-ota"

@@ -107,6 +107,7 @@ esp_err_t WUndergroundClient::_handleHTTPEvent(esp_http_client_event_t *evt) {
         break;
     case HTTP_EVENT_ON_FINISH: {
         ESP_LOGD(TAG, "HTTP_EVENT_ON_FINISH");
+        // TODO: Maybe should parse after checking the status code in the main loop instead
         WeatherResult r = parseResponse();
         setResult(r);
         if (r.err != Error::OK) {
