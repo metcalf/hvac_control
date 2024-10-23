@@ -32,6 +32,9 @@ class UIManager : public AbstractUIManager {
     void setHVACState(ControllerDomain::HVACState state) override;
     void setCurrentSetpoints(double heatC, double coolC) override;
     void setSystemPower(bool on) override;
+    void setFirmwareVersion(const char *version) {
+        lv_label_set_text(firmwareVersionLabel_, version);
+    }
 
     void setMessage(uint8_t msgID, bool allowCancel, const char *msg) override {
         xSemaphoreTake(mutex_, portMAX_DELAY);
@@ -96,6 +99,8 @@ class UIManager : public AbstractUIManager {
     void initExtraWidgets();
 
     inline static UIManager *eventsInst_;
+
+    lv_obj_t *firmwareVersionLabel_;
 
     SemaphoreHandle_t mutex_;
     MessageManager *msgMgr_;

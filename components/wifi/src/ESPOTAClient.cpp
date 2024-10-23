@@ -13,11 +13,12 @@ static const char *TAG = "OTA";
 
 extern const uint8_t server_root_pem[] asm("_binary_isrgrootx1_pem_end");
 
-esp_err_t _http_event_handler(esp_http_client_event_t *evt) {
+static esp_err_t _http_event_handler(esp_http_client_event_t *evt) {
     return ((ESPOTAClient *)evt->user_data)->_handleHTTPEvent(evt);
 }
 
-ESPOTAClient::ESPOTAClient(const char *name) {
+ESPOTAClient::ESPOTAClient(const char *name, msgCb_t msgCb, size_t maxMsgLen)
+    : msgCb_(msgCb), maxMsgLen_(maxMsgLen) {
     int written = snprintf(url_, std::size(url_), default_ota_url_tmpl, name);
     assert(written < std::size(url_));
 
@@ -44,11 +45,11 @@ AbstractOTAClient::Error ESPOTAClient::update() {
     esp_http_client_cleanup(client);
 
     if (err != ESP_OK) {
-        ESP_LOGE(TAG, "error fetching version %s", esp_err_to_name(err));
+        setErrMessageF("OTA version err: %s", esp_err_to_name(err));
         return Error::FetchError;
     }
     if (status != 200) {
-        ESP_LOGE(TAG, "Unexpected status %d fetching version", status);
+        setErrMessageF("OTA version err: %d", status);
         return Error::FetchError;
     }
 
@@ -56,8 +57,11 @@ AbstractOTAClient::Error ESPOTAClient::update() {
     ESP_LOGI(TAG, "latest version: %s", outputBuffer_);
 
     if (!strncmp(outputBuffer_, runningVersion_, std::size(outputBuffer_))) {
+        msgCb_("");
         ESP_LOGI(TAG, "already running version %s", outputBuffer_);
+        return Error::NoUpdateAvailable;
     } else {
+        setErrMessageF("Downloading update %s", outputBuffer_);
         ESP_LOGI(TAG, "new version `%s` found, upgrading from `%s`",
                  outputBuffer_, runningVersion_);
     }
@@ -76,6 +80,7 @@ AbstractOTAClient::Error ESPOTAClient::update() {
         esp_restart();
     } else {
         ESP_LOGE(TAG, "Firmware upgrade failed");
+        setErrMessageF("Upgrade failed");
         return Error::UpgradeFailed;
     }
 
@@ -83,6 +88,10 @@ AbstractOTAClient::Error ESPOTAClient::update() {
 }
 
 void ESPOTAClient::markValid() { esp_ota_mark_app_valid_cancel_rollback(); }
+
+const char *ESPOTAClient::currentVersion() {
+    return esp_app_get_description()->version;
+}
 
 esp_err_t ESPOTAClient::_handleHTTPEvent(esp_http_client_event_t *evt) {
     // Adapted from
@@ -132,4 +141,17 @@ esp_err_t ESPOTAClient::_handleHTTPEvent(esp_http_client_event_t *evt) {
     }
 
     return ESP_OK;
+}
+
+void __attribute__((format(printf, 2, 3)))
+ESPOTAClient::setErrMessageF(const char *fmt, ...) {
+    char msg[maxMsgLen_];
+
+    va_list args;
+    va_start(args, fmt);
+    vsnprintf(msg, sizeof(msg), fmt, args);
+    va_end(args);
+
+    msgCb_(msg);
+    ESP_LOGE(TAG, "%s", msg);
 }

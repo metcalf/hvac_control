@@ -13,6 +13,7 @@
 
 #include "AppConfigStore.h"
 #include "ControllerApp.h"
+#include "ESPOTAClient.h"
 #include "ESPWifi.h"
 #include "ModbusController.h"
 #include "Sensors.h"
@@ -38,6 +39,7 @@
 #define CLOCK_POLL_PERIOD_MS 100
 #define CLOCK_WAIT_MS 10 * 1000
 #define RTC_BOOT_TIME_TICKS pdMS_TO_TICKS(40)
+#define OTA_INTERVAL_TICKS pdMS_TO_TICKS(15 * 60 * 1000)
 
 #define POSIX_TZ_STR "PST8PDT,M3.2.0/2:00:00,M11.1.0/2:00:00"
 
@@ -54,6 +56,7 @@ static QueueHandle_t uiEvtQueue_;
 static ESPWifi wifi_;
 static AppConfigStore appConfigStore_;
 static WUndergroundClient weatherCli_;
+static ESPOTAClient *ota_;
 
 void sensorTask(void *sensors) {
     while (1) {
@@ -94,6 +97,18 @@ void mainTask(void *app) {
     }
 }
 
+void otaMsgCb(const char *msg) {
+    if (strlen(msg) > 0) {
+        uiManager_->setMessage(static_cast<uint8_t>(ControllerApp::MsgID::OTA), false, msg);
+    } else {
+        uiManager_->clearMessage(static_cast<uint8_t>(ControllerApp::MsgID::OTA));
+    }
+}
+
+void otaTask() {
+    ota_->update();
+    vTaskDelay(OTA_INTERVAL_TICKS);
+}
 void modbusTask(void *mb) { ((ModbusController *)mb)->task(); }
 
 void uiEvtCb(UIManager::Event &evt) { xQueueSend(uiEvtQueue_, &evt, portMAX_DELAY); }
@@ -179,12 +194,14 @@ extern "C" void controller_main() {
     Config config = appConfigStore_.load();
     uiManager_ = new UIManager(config, ControllerApp::nMsgIds(), uiEvtCb);
     UIManager::setEventsInst(uiManager_);
+    uiManager_->setFirmwareVersion(ota_->currentVersion());
     modbusController_ = new ModbusController(config.equipment.hasMakeupDemand);
     valveCtrl_.init();
     weatherCli_.start();
+    ota_ = new ESPOTAClient("controller", otaMsgCb, UI_MAX_MSG_LEN);
 
     app_ = new ControllerApp(config, uiManager_, modbusController_, &sensors_, &valveCtrl_, &wifi_,
-                             &appConfigStore_, &weatherCli_, uiEvtRcv);
+                             &appConfigStore_, &weatherCli_, ota_, uiEvtRcv);
     xTaskCreate(uiTask, "uiTask", UI_TASK_STACK_SIZE, uiManager_, UI_TASK_PRIO, NULL);
 
     setenv("TZ", POSIX_TZ_STR, 1);

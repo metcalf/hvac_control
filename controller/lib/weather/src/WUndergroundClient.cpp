@@ -21,7 +21,7 @@ static const char *TAG = "WEATHER";
     "current?apiKey=e1f10a1e78da46f5b10a1e78da96f525&stationId=%s&numericPrecision=decimal&"       \
     "format=json&units=m"
 
-esp_err_t _http_event_handler(esp_http_client_event_t *evt) {
+static esp_err_t _http_event_handler(esp_http_client_event_t *evt) {
     return ((WUndergroundClient *)evt->user_data)->_handleHTTPEvent(evt);
 }
 

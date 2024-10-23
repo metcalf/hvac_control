@@ -6,6 +6,7 @@
 #include "AbstractConfigStore.h"
 #include "AbstractDemandAlgorithm.h"
 #include "AbstractModbusController.h"
+#include "AbstractOTAClient.h"
 #include "AbstractSensors.h"
 #include "AbstractUIManager.h"
 #include "AbstractValveCtrl.h"
@@ -29,10 +30,11 @@ class ControllerApp {
                   AbstractModbusController *modbusController, AbstractSensors *sensors,
                   AbstractValveCtrl *valveCtrl, AbstractWifi *wifi,
                   AbstractConfigStore<ControllerDomain::Config> *cfgStore,
-                  AbstractWeatherClient *weatherCli, const uiEvtRcv_t &uiEvtRcv)
+                  AbstractWeatherClient *weatherCli, AbstractOTAClient *ota,
+                  const uiEvtRcv_t &uiEvtRcv)
         : uiManager_(uiManager), modbusController_(modbusController), sensors_(sensors),
           valveCtrl_(valveCtrl), wifi_(wifi), cfgStore_(cfgStore), weatherCli_(weatherCli),
-          uiEvtRcv_(uiEvtRcv),
+          ota_(ota), uiEvtRcv_(uiEvtRcv),
           fancoilCoolHandler_(fancoilCoolCutoffs_, std::size(fancoilCoolCutoffs_)),
           fancoilHeatHandler_(fancoilHeatCutoffs_, std::size(fancoilHeatCutoffs_)) {
         ventAlgo_ = new LinearVentAlgorithm();
@@ -61,6 +63,23 @@ class ControllerApp {
         return std::chrono::system_clock::to_time_t(realNow()) > (60 * 60 * 24 * 365 * 50);
     }
 
+    enum class MsgID {
+        SystemOff,
+        FanOverride,
+        TempOverride,
+        ACMode,
+        Precooling,
+        Wifi,
+        SensorErr,
+        GetFreshAirStateErr,
+        SetFreshAirSpeedErr,
+        GetMakeupDemandErr,
+        SetFancoilErr,
+        WeatherErr,
+        OTA,
+        _Last,
+    };
+
   protected:
     virtual std::chrono::steady_clock::time_point steadyNow() {
         return std::chrono::steady_clock::now();
@@ -84,21 +103,6 @@ class ControllerApp {
     using Config = ControllerDomain::Config;
 
     enum class ACMode { Off, On, Standby };
-    enum class MsgID {
-        SystemOff,
-        FanOverride,
-        TempOverride,
-        ACMode,
-        Precooling,
-        Wifi,
-        SensorErr,
-        GetFreshAirStateErr,
-        SetFreshAirSpeedErr,
-        GetMakeupDemandErr,
-        SetFancoilErr,
-        WeatherErr,
-        _Last,
-    };
 
     const char *msgIDToS(MsgID id) {
         switch (id) {
@@ -137,6 +141,8 @@ class ControllerApp {
             break;
         case MsgID::WeatherErr:
             return "WeatherErr";
+        case MsgID::OTA:
+            return "OTA";
         case MsgID::_Last:
             return "";
             break;
@@ -181,6 +187,7 @@ class ControllerApp {
     AbstractWifi *wifi_;
     AbstractConfigStore<ControllerDomain::Config> *cfgStore_;
     AbstractWeatherClient *weatherCli_;
+    AbstractOTAClient *ota_;
     uiEvtRcv_t uiEvtRcv_;
     AbstractDemandAlgorithm *ventAlgo_, *fanCoolAlgo_, *fanCoolLimitAlgo_, *heatAlgo_, *coolAlgo_;
     bool isCoilCold();

@@ -808,4 +808,8 @@ void ControllerApp::task(bool firstTime) {
         while (pollUIEvent(false))
             ;
     }
+
+    if (firstTime) {
+        ota_->markValid();
+    }
 }
