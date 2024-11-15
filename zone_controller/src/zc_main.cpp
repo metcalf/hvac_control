@@ -163,13 +163,13 @@ void setCxOpMode(HeatPumpMode output_mode) {
 
     switch (output_mode) {
     case HeatPumpMode::Heat:
-        cxMode = CxOpMode::HeatDHW;
+        cxMode = CxOpMode::Heat;
         break;
     case HeatPumpMode::Cool:
-        cxMode = CxOpMode::CoolDHW;
+        cxMode = CxOpMode::Cool;
         break;
     case HeatPumpMode::Standby:
-        cxMode = CxOpMode::DHW;
+        cxMode = CxOpMode::Off;
         break;
     case HeatPumpMode::Off:
         cxMode = CxOpMode::Off;

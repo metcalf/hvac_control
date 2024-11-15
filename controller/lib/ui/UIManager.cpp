@@ -456,7 +456,6 @@ void UIManager::onCancelMsg(uint8_t msgID) {
 // I ran out of allowed widgets in the free version of Squareline so this is
 // where I add new stuff until I come up with a better answer.
 void UIManager::initExtraWidgets() {
-    // TODO: Actually provide firmware version
     firmwareVersionLabel_ = lv_label_create(ui_Settings);
     lv_obj_remove_style_all(firmwareVersionLabel_);
     lv_obj_set_width(firmwareVersionLabel_, 300);

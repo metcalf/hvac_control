@@ -212,8 +212,6 @@ extern "C" void controller_main() {
         bootErr("RTC init error: %d", err);
     }
 
-    // TODO: Setup OTA updates
-    // TODO: log app version on boot
     // TODO: Remote logging
     wifi_.init();
     wifi_.connect(config.wifi.ssid, config.wifi.password);
