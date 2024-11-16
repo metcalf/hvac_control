@@ -15,11 +15,11 @@
 #include "ControllerApp.h"
 #include "ESPOTAClient.h"
 #include "ESPWifi.h"
+#include "HASSClient.h"
 #include "ModbusController.h"
 #include "Sensors.h"
 #include "UIManager.h"
 #include "ValveCtrl.h"
-#include "WUndergroundClient.h"
 #include "rtc-rx8111.h"
 
 #define INIT_ERR_RESTART_DELAY_TICKS pdMS_TO_TICKS(10 * 1000)
@@ -55,7 +55,7 @@ static Sensors sensors_;
 static QueueHandle_t uiEvtQueue_;
 static ESPWifi wifi_;
 static AppConfigStore appConfigStore_;
-static WUndergroundClient weatherCli_;
+static HASSClient homeCli_;
 static ESPOTAClient *ota_;
 
 void sensorTask(void *sensors) {
@@ -197,11 +197,11 @@ extern "C" void controller_main() {
     uiManager_->setFirmwareVersion(ota_->currentVersion());
     modbusController_ = new ModbusController(config.equipment.hasMakeupDemand);
     valveCtrl_.init();
-    weatherCli_.start();
+    homeCli_.start();
     ota_ = new ESPOTAClient("controller", otaMsgCb, UI_MAX_MSG_LEN);
 
     app_ = new ControllerApp(config, uiManager_, modbusController_, &sensors_, &valveCtrl_, &wifi_,
-                             &appConfigStore_, &weatherCli_, ota_, uiEvtRcv);
+                             &appConfigStore_, &homeCli_, ota_, uiEvtRcv);
     xTaskCreate(uiTask, "uiTask", UI_TASK_STACK_SIZE, uiManager_, UI_TASK_PRIO, NULL);
 
     setenv("TZ", POSIX_TZ_STR, 1);

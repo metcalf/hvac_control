@@ -402,11 +402,11 @@ void ControllerApp::handleWeather() {
         return;
     }
 
-    AbstractWeatherClient::WeatherResult weather = weatherCli_->lastResult();
-    if (weather.err != AbstractWeatherClient::Error::OK) {
-        setMessage(MsgID::WeatherErr, false, "Error fetching weather");
+    AbstractHomeClient::HomeState weather = weatherCli_->lastResult();
+    if (weather.err != AbstractHomeClient::Error::OK) {
+        setMessage(MsgID::HomeClientErr, false, "Error fetching weather");
     } else {
-        clearMessage(MsgID::WeatherErr);
+        clearMessage(MsgID::HomeClientErr);
         rawOutdoorTempC_ = weather.tempC;
         lastOutdoorTempUpdate_ = steadyNow() + (realNow() - weather.obsTime);
     }
@@ -582,7 +582,19 @@ Setpoints ControllerApp::getCurrentSetpoints() {
         };
     }
 
-    // If we don't have valid time, pick the least active setpoints from the schedules
+    // If on vacation, return fixed setpoints
+    if (config_.vacationOn) {
+        Setpoints setpoints{
+            .heatTempC = ABS_F_TO_C(60),
+            .coolTempC = ABS_C_TO_F(90),
+            .co2 = config_.co2Target,
+        };
+        setpointReason_ = "vacation";
+        clearMessage(MsgID::Precooling);
+        return setpoints;
+    }
+
+    // If we don't have valid time, pick the least active setpoints from the schedules and return it
     if (idx == -1) {
         Setpoints setpoints{
             .heatTempC = ABS_F_TO_C(72),
@@ -594,6 +606,7 @@ Setpoints ControllerApp::getCurrentSetpoints() {
             setpoints.coolTempC = std::max(setpoints.coolTempC, config_.schedules[i].coolC);
         }
         setpointReason_ = "no_time";
+        clearMessage(MsgID::Precooling);
         return setpoints;
     }
 
@@ -751,7 +764,10 @@ void ControllerApp::setConfig(ControllerDomain::Config config) {
 }
 
 void ControllerApp::task(bool firstTime) {
-    // TODO: Vacation? Other status info from zone controller?
+    // TODO: Polling vacation mode from Home Assistant
+    // Can use this to just override the schedule/setpoints and set a UI message
+    // Not sure I want to even allow clearing the UI message
+    // This might be a systemMode instead of systemOn
     handleWeather();
     ControllerDomain::FreshAirState freshAirState{};
     handleFreshAirState(&freshAirState);

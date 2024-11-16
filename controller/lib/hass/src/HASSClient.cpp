@@ -1,4 +1,4 @@
-#include "WUndergroundClient.h"
+#include "HASSClient.h"
 
 #include <algorithm>
 #include <chrono>
@@ -14,26 +14,20 @@ static const char *TAG = "WEATHER";
 
 #define TASK_STACK_SIZE 4096
 #define REQUEST_INTERVAL_MS 30 * 1000
-#define EPOCH_KEY "\"epoch\":"
-#define TEMP_KEY "\"temp\":"
-#define URL_FORMAT                                                                                 \
-    "https://api.weather.com/v2/pws/observations/"                                                 \
-    "current?apiKey=e1f10a1e78da46f5b10a1e78da96f525&stationId=%s&numericPrecision=decimal&"       \
-    "format=json&units=m"
 
 static esp_err_t _http_event_handler(esp_http_client_event_t *evt) {
-    return ((WUndergroundClient *)evt->user_data)->_handleHTTPEvent(evt);
+    return ((HASSClient *)evt->user_data)->_handleHTTPEvent(evt);
 }
 
-void taskFn(void *cli) { ((WUndergroundClient *)cli)->_task(); }
+void taskFn(void *cli) { ((HASSClient *)cli)->_task(); }
 
-void WUndergroundClient::start() {
-    xTaskCreate(taskFn, "wundergroundTask_", TASK_STACK_SIZE, this, ESP_TASK_MAIN_PRIO, &task_);
+void HASSClient::start() {
+    xTaskCreate(taskFn, "homeClientTask_", TASK_STACK_SIZE, this, ESP_TASK_MAIN_PRIO, &task_);
 }
 
-void WUndergroundClient::runFetch() { xTaskNotify(task_, 0, eNoAction); }
+void HASSClient::runFetch() { xTaskNotify(task_, 0, eNoAction); }
 
-void WUndergroundClient::_task() {
+void HASSClient::_task() {
     while (1) {
         // Wait for a request
         xTaskNotifyWait(0, 0, NULL, portMAX_DELAY);
@@ -63,19 +57,19 @@ void WUndergroundClient::_task() {
     }
 }
 
-WUndergroundClient::WeatherResult WUndergroundClient::lastResult() {
+HASSClient::HomeState HASSClient::lastResult() {
     xSemaphoreTake(mutex_, portMAX_DELAY);
-    WeatherResult r = lastResult_;
+    HomeState r = lastResult_;
     xSemaphoreGive(mutex_);
     return r;
 }
 
-esp_err_t WUndergroundClient::_handleHTTPEvent(esp_http_client_event_t *evt) {
+esp_err_t HASSClient::_handleHTTPEvent(esp_http_client_event_t *evt) {
     // Adapted from https://github.com/espressif/esp-idf/blob/v5.1.2/examples/protocols/esp_http_client/main/esp_http_client_example.c
     switch (evt->event_id) {
     case HTTP_EVENT_ERROR:
         ESP_LOGE(TAG, "HTTP_EVENT_ERROR");
-        setResult(WeatherResult{.err = Error::FetchError});
+        setResult(HomeState{.err = Error::FetchError});
         return ESP_FAIL;
     case HTTP_EVENT_ON_CONNECTED:
         ESP_LOGD(TAG, "HTTP_EVENT_ON_CONNECTED");
@@ -94,12 +88,12 @@ esp_err_t WUndergroundClient::_handleHTTPEvent(esp_http_client_event_t *evt) {
              */
         if (esp_http_client_is_chunked_response(evt->client)) {
             ESP_LOGE(TAG, "Unexpected chunked response");
-            setResult(WeatherResult{.err = Error::FetchError});
+            setResult(HomeState{.err = Error::FetchError});
             return ESP_FAIL;
         }
         if ((sizeof(outputBuffer_) - outputBufferPos_ - 1) < evt->data_len) {
             ESP_LOGE(TAG, "Response is too long");
-            setResult(WeatherResult{.err = Error::FetchError});
+            setResult(HomeState{.err = Error::FetchError});
             return ESP_FAIL;
         }
         memcpy(outputBuffer_ + outputBufferPos_, evt->data, evt->data_len);
@@ -108,7 +102,7 @@ esp_err_t WUndergroundClient::_handleHTTPEvent(esp_http_client_event_t *evt) {
     case HTTP_EVENT_ON_FINISH: {
         ESP_LOGD(TAG, "HTTP_EVENT_ON_FINISH");
         // TODO: Maybe should parse after checking the status code in the main loop instead
-        WeatherResult r = parseResponse();
+        HomeState r = parseResponse();
         setResult(r);
         if (r.err != Error::OK) {
             return ESP_FAIL;
@@ -120,15 +114,15 @@ esp_err_t WUndergroundClient::_handleHTTPEvent(esp_http_client_event_t *evt) {
         break;
     case HTTP_EVENT_REDIRECT:
         ESP_LOGD(TAG, "HTTP_EVENT_REDIRECT");
-        setResult(WeatherResult{.err = Error::FetchError});
+        setResult(HomeState{.err = Error::FetchError});
         return ESP_FAIL;
     }
 
     return ESP_OK;
 }
 
-AbstractWeatherClient::WeatherResult WUndergroundClient::parseResponse() {
-    WeatherResult result{.err = Error::OK};
+AbstractHomeClient::HomeState HASSClient::parseResponse() {
+    HomeState result{.err = Error::OK};
 
     // Null terminate for strstr
     outputBuffer_[outputBufferPos_] = 0;
@@ -169,7 +163,7 @@ AbstractWeatherClient::WeatherResult WUndergroundClient::parseResponse() {
     return result;
 }
 
-void WUndergroundClient::setResult(const WeatherResult &result) {
+void HASSClient::setResult(const HomeState &result) {
     // If we got an error, try the next station next time
     if (result.err != Error::OK) {
         stationIdx_ = (stationIdx_ + 1) % std::size(stationIds_);

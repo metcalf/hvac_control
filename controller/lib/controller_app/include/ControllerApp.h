@@ -5,12 +5,12 @@
 
 #include "AbstractConfigStore.h"
 #include "AbstractDemandAlgorithm.h"
+#include "AbstractHomeClient.h"
 #include "AbstractModbusController.h"
 #include "AbstractOTAClient.h"
 #include "AbstractSensors.h"
 #include "AbstractUIManager.h"
 #include "AbstractValveCtrl.h"
-#include "AbstractWeatherClient.h"
 #include "AbstractWifi.h"
 #include "ControllerDomain.h"
 #include "FanCoolLimitAlgorithm.h"
@@ -30,11 +30,10 @@ class ControllerApp {
                   AbstractModbusController *modbusController, AbstractSensors *sensors,
                   AbstractValveCtrl *valveCtrl, AbstractWifi *wifi,
                   AbstractConfigStore<ControllerDomain::Config> *cfgStore,
-                  AbstractWeatherClient *weatherCli, AbstractOTAClient *ota,
-                  const uiEvtRcv_t &uiEvtRcv)
+                  AbstractHomeClient *homeCli, AbstractOTAClient *ota, const uiEvtRcv_t &uiEvtRcv)
         : uiManager_(uiManager), modbusController_(modbusController), sensors_(sensors),
-          valveCtrl_(valveCtrl), wifi_(wifi), cfgStore_(cfgStore), weatherCli_(weatherCli),
-          ota_(ota), uiEvtRcv_(uiEvtRcv),
+          valveCtrl_(valveCtrl), wifi_(wifi), cfgStore_(cfgStore), homeCli_(homeCli), ota_(ota),
+          uiEvtRcv_(uiEvtRcv),
           fancoilCoolHandler_(fancoilCoolCutoffs_, std::size(fancoilCoolCutoffs_)),
           fancoilHeatHandler_(fancoilHeatCutoffs_, std::size(fancoilHeatCutoffs_)) {
         ventAlgo_ = new LinearVentAlgorithm();
@@ -75,8 +74,9 @@ class ControllerApp {
         SetFreshAirSpeedErr,
         GetMakeupDemandErr,
         SetFancoilErr,
-        WeatherErr,
+        HomeClientErr,
         OTA,
+        Vacation,
         _Last,
     };
 
@@ -139,8 +139,8 @@ class ControllerApp {
         case MsgID::SetFancoilErr:
             return "SetFancoilErr";
             break;
-        case MsgID::WeatherErr:
-            return "WeatherErr";
+        case MsgID::HomeClientErr:
+            return "HomeClientErr";
         case MsgID::OTA:
             return "OTA";
         case MsgID::_Last:
@@ -186,7 +186,7 @@ class ControllerApp {
     AbstractValveCtrl *valveCtrl_;
     AbstractWifi *wifi_;
     AbstractConfigStore<ControllerDomain::Config> *cfgStore_;
-    AbstractWeatherClient *weatherCli_;
+    AbstractHomeClient *homeCli_;
     AbstractOTAClient *ota_;
     uiEvtRcv_t uiEvtRcv_;
     AbstractDemandAlgorithm *ventAlgo_, *fanCoolAlgo_, *fanCoolLimitAlgo_, *heatAlgo_, *coolAlgo_;

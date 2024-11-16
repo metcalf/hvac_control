@@ -4,10 +4,10 @@
 #include "ControllerApp.h"
 
 #include "FakeConfigStore.h"
+#include "FakeHomeClient.h"
 #include "FakeModbusController.h"
 #include "FakeSensors.h"
 #include "FakeValveCtrl.h"
-#include "FakeWeatherClient.h"
 #include "FakeWifi.h"
 #include "MockUIManager.h"
 
@@ -58,7 +58,7 @@ class ControllerAppTest : public testing::Test {
     void SetUp() override {
         using namespace std::placeholders;
         app_ = new TestControllerApp(default_test_config(), &uiManager_, &modbusController_,
-                                     &sensors_, &valveCtrl_, &wifi_, &cfgStore_, &weatherCli_,
+                                     &sensors_, &valveCtrl_, &wifi_, &cfgStore_, &homeCli_,
                                      std::bind(&ControllerAppTest::uiEvtRcv, this, _1, _2));
 
         setRealNow(std::tm{
@@ -120,7 +120,7 @@ class ControllerAppTest : public testing::Test {
     FakeValveCtrl valveCtrl_;
     FakeWifi wifi_;
     FakeConfigStore<Config> cfgStore_;
-    FakeWeatherClient weatherCli_;
+    FakeHomeClient homeCli_;
 
     AbstractUIManager::Event *evt_;
     Config savedConfig_;
@@ -518,3 +518,4 @@ TEST_F(ControllerAppTest, Precooling) {
 // TODO: Write lots more tests!!
 // Indoor and outdoor temp offsets?
 // Setpoints with invalid time?
+// Separate tests for PID algorithm?

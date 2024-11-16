@@ -309,7 +309,6 @@ extern "C" void zc_main() {
     outIO_.init();
 
     // TODO:
-    // * polling Ecobee vacation API (or maybe home assistant)
     // * OTA updaates
     // * Remote logging
 
