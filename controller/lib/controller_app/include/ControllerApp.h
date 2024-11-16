@@ -143,6 +143,8 @@ class ControllerApp {
             return "HomeClientErr";
         case MsgID::OTA:
             return "OTA";
+        case MsgID::Vacation:
+            return "Vacation";
         case MsgID::_Last:
             return "";
             break;
@@ -162,7 +164,7 @@ class ControllerApp {
     void setMessage(MsgID msgID, bool allowCancel, const char *msg);
     void clearMessage(MsgID msgID);
     void checkModbusErrors();
-    void handleWeather();
+    void handleHomeClient();
     void handleFreshAirState(ControllerDomain::FreshAirState *);
     int getScheduleIdx(int offset);
     Setpoints getCurrentSetpoints();
@@ -178,8 +180,11 @@ class ControllerApp {
     AbstractDemandAlgorithm *getAlgoForEquipment(ControllerDomain::Config::HVACType type,
                                                  bool isHeat);
     FancoilSpeed getSpeedForDemand(bool cool, double demand);
+    bool isCoilCold();
+    void setVacation(bool on);
 
     Config config_;
+    bool vacationOn_ = false;
     AbstractUIManager *uiManager_;
     AbstractModbusController *modbusController_;
     AbstractSensors *sensors_;
@@ -190,7 +195,6 @@ class ControllerApp {
     AbstractOTAClient *ota_;
     uiEvtRcv_t uiEvtRcv_;
     AbstractDemandAlgorithm *ventAlgo_, *fanCoolAlgo_, *fanCoolLimitAlgo_, *heatAlgo_, *coolAlgo_;
-    bool isCoilCold();
 
     AbstractUIManager::TempOverride tempOverride_;
     int tempOverrideUntilScheduleIdx_ = -1;

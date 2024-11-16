@@ -397,24 +397,35 @@ void ControllerApp::checkModbusErrors() {
     }
 }
 
-void ControllerApp::handleWeather() {
-    if (modbusController_->getFreshAirModelId() != ControllerDomain::FreshAirModel::BROAN) {
+void ControllerApp::handleHomeClient() {
+    AbstractHomeClient::HomeState state = homeCli_->state();
+    if (state.err != AbstractHomeClient::Error::OK) {
+        setMessage(MsgID::HomeClientErr, false, "Error fetching home info");
         return;
     }
 
-    AbstractHomeClient::HomeState weather = weatherCli_->lastResult();
-    if (weather.err != AbstractHomeClient::Error::OK) {
-        setMessage(MsgID::HomeClientErr, false, "Error fetching weather");
+    clearMessage(MsgID::HomeClientErr);
+    setVacation(state.vacationOn);
+
+    if (modbusController_->getFreshAirModelId() == ControllerDomain::FreshAirModel::BROAN &&
+        state.weatherTempC != 0 &&
+        (std::chrono::system_clock::now() - state.weatherObsTime < OUTDOOR_TEMP_MAX_AGE)) {
+        rawOutdoorTempC_ = state.weatherTempC;
+        lastOutdoorTempUpdate_ = steadyNow() + (state.weatherObsTime - realNow());
+    }
+}
+
+void ControllerApp::setVacation(bool on) {
+    if (vacationOn_ == on) {
+        return;
+    }
+    if (on) {
+        setMessage(MsgID::Vacation, false, "Vacation mode on");
     } else {
-        clearMessage(MsgID::HomeClientErr);
-        rawOutdoorTempC_ = weather.tempC;
-        lastOutdoorTempUpdate_ = steadyNow() + (realNow() - weather.obsTime);
+        clearMessage(MsgID::Vacation);
     }
 
-    if ((std::isnan(rawOutdoorTempC_) ||
-         (steadyNow() - lastOutdoorTempUpdate_) > OUTDOOR_TEMP_UPDATE_INTERVAL)) {
-        weatherCli_->runFetch();
-    }
+    vacationOn_ = on;
 }
 
 uint16_t ControllerApp::localMinOfDay() {
@@ -583,7 +594,7 @@ Setpoints ControllerApp::getCurrentSetpoints() {
     }
 
     // If on vacation, return fixed setpoints
-    if (config_.vacationOn) {
+    if (vacationOn_) {
         Setpoints setpoints{
             .heatTempC = ABS_F_TO_C(60),
             .coolTempC = ABS_C_TO_F(90),
@@ -764,11 +775,7 @@ void ControllerApp::setConfig(ControllerDomain::Config config) {
 }
 
 void ControllerApp::task(bool firstTime) {
-    // TODO: Polling vacation mode from Home Assistant
-    // Can use this to just override the schedule/setpoints and set a UI message
-    // Not sure I want to even allow clearing the UI message
-    // This might be a systemMode instead of systemOn
-    handleWeather();
+    handleHomeClient();
     ControllerDomain::FreshAirState freshAirState{};
     handleFreshAirState(&freshAirState);
 

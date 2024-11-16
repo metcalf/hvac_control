@@ -32,6 +32,7 @@ class UIManager : public AbstractUIManager {
     void setHVACState(ControllerDomain::HVACState state) override;
     void setCurrentSetpoints(double heatC, double coolC) override;
     void setSystemPower(bool on) override;
+
     void setFirmwareVersion(const char *version) {
         lv_label_set_text(firmwareVersionLabel_, version);
     }

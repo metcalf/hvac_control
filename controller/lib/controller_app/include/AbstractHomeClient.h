@@ -9,7 +9,6 @@ class AbstractHomeClient {
         NotRun,
         FetchError,
         ParseError,
-        Stale,
     };
     struct HomeState {
         bool vacationOn;
@@ -20,7 +19,6 @@ class AbstractHomeClient {
 
     virtual ~AbstractHomeClient() {}
 
-    virtual void runFetch() = 0;
     virtual HomeState state() = 0;
 
   protected:

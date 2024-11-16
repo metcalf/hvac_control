@@ -14,6 +14,9 @@ static const char *TAG = "WEATHER";
 
 #define TASK_STACK_SIZE 4096
 #define REQUEST_INTERVAL_MS 30 * 1000
+#define EXPECTED_VERSION 1
+#define EXPECTED_LENGTH 23
+#define URL "http://hass-local.itsshedtime.com/custom-api/states/sensor.custom_thermostat_api_data"
 
 static esp_err_t _http_event_handler(esp_http_client_event_t *evt) {
     return ((HASSClient *)evt->user_data)->_handleHTTPEvent(evt);
@@ -25,18 +28,10 @@ void HASSClient::start() {
     xTaskCreate(taskFn, "homeClientTask_", TASK_STACK_SIZE, this, ESP_TASK_MAIN_PRIO, &task_);
 }
 
-void HASSClient::runFetch() { xTaskNotify(task_, 0, eNoAction); }
-
 void HASSClient::_task() {
     while (1) {
-        // Wait for a request
-        xTaskNotifyWait(0, 0, NULL, portMAX_DELAY);
-
-        char url[256];
-        snprintf(url, sizeof(url), URL_FORMAT, stationIds_[stationIdx_]);
-
         esp_http_client_config_t config = {
-            .url = url,
+            .url = URL,
             .timeout_ms = 5000,
             .event_handler = _http_event_handler,
             .crt_bundle_attach = esp_crt_bundle_attach,
@@ -57,9 +52,9 @@ void HASSClient::_task() {
     }
 }
 
-HASSClient::HomeState HASSClient::lastResult() {
+HASSClient::HomeState HASSClient::state() {
     xSemaphoreTake(mutex_, portMAX_DELAY);
-    HomeState r = lastResult_;
+    HomeState r = state_;
     xSemaphoreGive(mutex_);
     return r;
 }
@@ -124,52 +119,48 @@ esp_err_t HASSClient::_handleHTTPEvent(esp_http_client_event_t *evt) {
 AbstractHomeClient::HomeState HASSClient::parseResponse() {
     HomeState result{.err = Error::OK};
 
-    // Null terminate for strstr
-    outputBuffer_[outputBufferPos_] = 0;
-
-    char *pos = strstr(outputBuffer_, EPOCH_KEY);
-    if (pos != nullptr) {
-        // Move the pointer to the start of the number
-        pos += strlen(EPOCH_KEY);
-
-        // Convert the extracted string to an integer (int64_t)
-        int64_t epoch_time = strtoll(pos, nullptr, 10);
-
-        // Convert the epoch time to a time_point
-        result.obsTime = std::chrono::system_clock::time_point(std::chrono::seconds(epoch_time));
-
-        if (std::chrono::system_clock::now() - result.obsTime > OUTDOOR_TEMP_MAX_AGE) {
-            result.err = Error::Stale;
-        }
-
-    } else {
-        ESP_LOGE(TAG, "Could not parse epoch from JSON: %s", outputBuffer_);
+    if (outputBufferPos_ < EXPECTED_LENGTH) {
+        ESP_LOGE(TAG, "Result is too short (%d < %d)", outputBufferPos_, EXPECTED_LENGTH);
         result.err = Error::ParseError;
         return result;
     }
 
-    pos = strstr(outputBuffer_, EPOCH_KEY);
-    if (pos != nullptr) {
-        // Move the pointer to the start of the number
-        pos += strlen(EPOCH_KEY);
-
-        result.tempC = strtod(pos, nullptr);
-    } else {
-        ESP_LOGE(TAG, "Could not parse temp from JSON: %s", outputBuffer_);
+    // Parse the first 3 characters to determine the version
+    int version;
+    if (sscanf(outputBuffer_, "%3d", &version) != 1) {
+        ESP_LOGE(TAG, "Failed to parse version");
         result.err = Error::ParseError;
         return result;
     }
+
+    // Check the version
+    printf("Version: %d\n", version);
+    if (version != EXPECTED_VERSION) {
+        ESP_LOGE(TAG, "Got version %d, expected %d", version, EXPECTED_VERSION);
+        result.err = Error::ParseError;
+        return result;
+    }
+
+    // Step 2: Parse the rest of the string
+    // Move the input pointer past the first 3 characters and the space
+    long epoch_time;
+
+    // Parse the rest of the string
+    if (sscanf(outputBuffer_ + 4, "%1d %5lf %10ld", (int *)&result.vacationOn, &result.weatherTempC,
+               &epoch_time) != 3) {
+        ESP_LOGE(TAG, "Failed to parse data");
+        result.err = Error::ParseError;
+        return result;
+    }
+
+    result.weatherTempC -= 100; // Transmitted +100C to avoid negative numbers
+    result.weatherObsTime = std::chrono::system_clock::time_point(std::chrono::seconds(epoch_time));
 
     return result;
 }
 
 void HASSClient::setResult(const HomeState &result) {
-    // If we got an error, try the next station next time
-    if (result.err != Error::OK) {
-        stationIdx_ = (stationIdx_ + 1) % std::size(stationIds_);
-    }
-
     xSemaphoreTake(mutex_, portMAX_DELAY);
-    lastResult_ = result;
+    state_ = result;
     xSemaphoreGive(mutex_);
 }

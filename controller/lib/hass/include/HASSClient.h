@@ -13,7 +13,6 @@ class HASSClient : public AbstractHomeClient {
     HASSClient() { mutex_ = xSemaphoreCreateMutex(); }
 
     void start();
-    void runFetch() override;
 
     HomeState state() override;
 
