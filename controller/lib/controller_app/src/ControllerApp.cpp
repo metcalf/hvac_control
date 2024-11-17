@@ -444,7 +444,7 @@ void ControllerApp::logState(const ControllerDomain::FreshAirState &freshAirStat
     esp_log_level_t statusLevel;
     auto now = steadyNow();
     if (now - lastStatusLog_ > STATUS_LOG_INTERVAL) {
-        statusLevel = ESP_LOG_INFO;
+        statusLevel = ESP_LOG_WARN;
         lastStatusLog_ = now;
     } else {
         statusLevel = ESP_LOG_DEBUG;

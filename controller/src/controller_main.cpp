@@ -20,6 +20,7 @@
 #include "Sensors.h"
 #include "UIManager.h"
 #include "ValveCtrl.h"
+#include "remote_logger.h"
 #include "rtc-rx8111.h"
 
 #define INIT_ERR_RESTART_DELAY_TICKS pdMS_TO_TICKS(10 * 1000)
@@ -215,6 +216,8 @@ extern "C" void controller_main() {
     // TODO: Remote logging
     wifi_.init();
     wifi_.connect(config.wifi.ssid, config.wifi.password);
+
+    remote_logger_init(config.wifi.logName, default_log_host);
 
     if (!sensors_.init()) {
         bootErr("Sensor init error");

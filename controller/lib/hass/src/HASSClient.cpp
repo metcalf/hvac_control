@@ -38,6 +38,7 @@ void HASSClient::_task() {
         };
         esp_http_client_handle_t client = esp_http_client_init(&config);
 
+        outputBufferPos_ = 0;
         esp_err_t err = esp_http_client_perform(client);
 
         if (err == ESP_OK) {
@@ -96,7 +97,7 @@ esp_err_t HASSClient::_handleHTTPEvent(esp_http_client_event_t *evt) {
         break;
     case HTTP_EVENT_ON_FINISH: {
         ESP_LOGD(TAG, "HTTP_EVENT_ON_FINISH");
-        // TODO: Maybe should parse after checking the status code in the main loop instead
+        outputBuffer_[outputBufferPos_] = 0; // Null terminate
         HomeState r = parseResponse();
         setResult(r);
         if (r.err != Error::OK) {
