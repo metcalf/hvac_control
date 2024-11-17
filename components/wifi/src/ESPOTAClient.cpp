@@ -25,13 +25,14 @@ ESPOTAClient::ESPOTAClient(const char *name, msgCb_t msgCb, size_t maxMsgLen)
     pathPart_ = url_ + written;
     pathLen_ = std::size(url_) - written;
 
-    strncpy(runningVersion_, esp_app_get_description()->version,
-            std::size(runningVersion_));
+    written = strncpy(runningVersion_, esp_app_get_description()->version,
+                      std::size(runningVersion_));
 }
 
 AbstractOTAClient::Error ESPOTAClient::update() {
     strncat(pathPart_, "latest_version", pathLen_ - 1);
 
+    outputBufferPos_ = 0;
     esp_http_client_config_t httpConfig = {
         .url = url_,
         .cert_pem = (const char *)server_root_pem,
@@ -73,6 +74,7 @@ AbstractOTAClient::Error ESPOTAClient::update() {
     httpConfig.event_handler = NULL;
     esp_https_ota_config_t otaConfig = {
         .http_config = &httpConfig,
+        .timeout_ms = 60000, // 60 second timeout for entire OTA operation
     };
     esp_err_t ret = esp_https_ota(&otaConfig);
     if (ret == ESP_OK) {

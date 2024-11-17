@@ -107,8 +107,10 @@ void otaMsgCb(const char *msg) {
 }
 
 void otaTask() {
-    ota_->update();
-    vTaskDelay(OTA_INTERVAL_TICKS);
+    while (1) {
+        ota_->update();
+        vTaskDelay(OTA_INTERVAL_TICKS);
+    }
 }
 void modbusTask(void *mb) { ((ModbusController *)mb)->task(); }
 
@@ -213,7 +215,6 @@ extern "C" void controller_main() {
         bootErr("RTC init error: %d", err);
     }
 
-    // TODO: Remote logging
     wifi_.init();
     wifi_.connect(config.wifi.ssid, config.wifi.password);
 
@@ -234,6 +235,7 @@ extern "C" void controller_main() {
                 NULL);
     xTaskCreate(modbusTask, "modbusTask", MODBUS_TASK_STACK_SIZE, modbusController_,
                 MODBUS_TASK_PRIO, NULL);
+    xTaskCreate(otaTask, "otaTask", OTA_TASK_STACK_SIZE, NULL, MODBUS_TASK_PRIO, NULL);
 
     // Wait for sensors to have valid data
     while (std::isnan(sensors_.getLatest().tempC)) {

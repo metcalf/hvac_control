@@ -17,6 +17,7 @@
 #include "OutCtrl.h"
 #include "ValveStateManager.h"
 #include "ZCUIManager.h"
+#include "remote_logger.h"
 #include "wifi_credentials.h"
 #include "zone_io_client.h"
 
@@ -309,7 +310,7 @@ extern "C" void zc_main() {
     outIO_.init();
 
     // TODO:
-    // * OTA updaates
+    // * OTA updates
     // * Remote logging
 
     uiEvtQueue_ = xQueueCreate(10, sizeof(ZCUIManager::Event));
@@ -319,6 +320,7 @@ extern "C" void zc_main() {
     outCtrl_ = new OutCtrl(valveStateManager_, *uiManager_);
 
     initWifi();
+    remote_logger_init("zonectrl", default_log_host);
 
     xTaskCreate(uiTask, "uiTask", UI_TASK_STACK_SIZE, uiManager_, UI_TASK_PRIO, NULL);
     xTaskCreate(zone_io_task, "zone_io_task", ZONE_IO_TASK_STACK_SIZE, (void *)inputEvtCb,
