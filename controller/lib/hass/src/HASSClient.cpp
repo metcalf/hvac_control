@@ -10,7 +10,7 @@
 
 #include "ControllerDomain.h"
 
-static const char *TAG = "WEATHER";
+static const char *TAG = "HASS";
 
 #define TASK_STACK_SIZE 4096
 #define REQUEST_INTERVAL_MS 30 * 1000
@@ -41,13 +41,20 @@ void HASSClient::_task() {
         outputBufferPos_ = 0;
         esp_err_t err = esp_http_client_perform(client);
 
-        if (err == ESP_OK) {
-            ESP_LOGD(TAG, "HTTPS Status = %d, content_length = %" PRIu64,
-                     esp_http_client_get_status_code(client),
-                     esp_http_client_get_content_length(client));
-        } else {
+        if (err != ESP_OK) {
             ESP_LOGE(TAG, "Error perform http request %s", esp_err_to_name(err));
+            setResult(HomeState{.err = Error::FetchError});
+        } else {
+            int status = esp_http_client_get_status_code(client);
+            if (status != 200) {
+                ESP_LOGE(TAG, "HTTP error: %d", status);
+                setResult(HomeState{.err = Error::FetchError});
+            } else {
+                HomeState result = parseResponse();
+                setResult(result);
+            }
         }
+
         esp_http_client_cleanup(client);
         vTaskDelay(pdMS_TO_TICKS(REQUEST_INTERVAL_MS));
     }
@@ -97,19 +104,13 @@ esp_err_t HASSClient::_handleHTTPEvent(esp_http_client_event_t *evt) {
         break;
     case HTTP_EVENT_ON_FINISH: {
         ESP_LOGD(TAG, "HTTP_EVENT_ON_FINISH");
-        outputBuffer_[outputBufferPos_] = 0; // Null terminate
-        HomeState r = parseResponse();
-        setResult(r);
-        if (r.err != Error::OK) {
-            return ESP_FAIL;
-        }
         break;
     }
     case HTTP_EVENT_DISCONNECTED:
         ESP_LOGI(TAG, "HTTP_EVENT_DISCONNECTED");
         break;
     case HTTP_EVENT_REDIRECT:
-        ESP_LOGD(TAG, "HTTP_EVENT_REDIRECT");
+        ESP_LOGE(TAG, "Unexpected redirect");
         setResult(HomeState{.err = Error::FetchError});
         return ESP_FAIL;
     }
@@ -118,6 +119,7 @@ esp_err_t HASSClient::_handleHTTPEvent(esp_http_client_event_t *evt) {
 }
 
 AbstractHomeClient::HomeState HASSClient::parseResponse() {
+    outputBuffer_[outputBufferPos_] = 0; // Null terminate
     HomeState result{.err = Error::OK};
 
     if (outputBufferPos_ < EXPECTED_LENGTH) {

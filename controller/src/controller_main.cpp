@@ -33,6 +33,7 @@
 #define MAIN_TASK_STACK_SIZE 4096
 #define SENSOR_TASK_STACK_SIZE 4096
 #define MODBUS_TASK_STACK_SIZE 4096
+#define OTA_TASK_STACK_SIZE 4096
 #define UI_TASK_STACK_SIZE 8192
 
 #define SENSOR_RETRY_INTERVAL_SECS 1
@@ -106,7 +107,7 @@ void otaMsgCb(const char *msg) {
     }
 }
 
-void otaTask() {
+void otaTask(void *) {
     while (1) {
         ota_->update();
         vTaskDelay(OTA_INTERVAL_TICKS);
