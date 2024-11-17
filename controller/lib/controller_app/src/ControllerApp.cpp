@@ -239,7 +239,7 @@ bool ControllerApp::pollUIEvent(bool wait) {
         config_.wifi = uiEvent.payload.wifi;
         cfgStore_->store(config_);
         wifi_->updateSTA(config_.wifi.ssid, config_.wifi.password);
-        // TODO: Update remote logger with name when we have it
+        wifi_->updateName(config_.wifi.logName);
         break;
     case EventType::FanOverride: {
         fanOverrideSpeed_ = uiEvent.payload.fanOverride.speed;

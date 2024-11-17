@@ -29,6 +29,7 @@ class ESPWifi : public AbstractWifi {
         return state;
     }
     void updateSTA(const char *ssid, const char *password) override;
+    void updateName(const char *name) override;
 
     void onWifiEvent(int32_t event_id, void *event_data);
     void onIPEvent(int32_t event_id, void *event_data);
