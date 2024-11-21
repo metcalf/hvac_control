@@ -40,6 +40,7 @@ enum class MsgID {
     HVACLockout,
     Vacation,
     PowerOut,
+    OTA,
     _Last,
 };
 

@@ -11,6 +11,7 @@
 #include "nvs_flash.h"
 
 #include "ESPModbusClient.h"
+#include "ESPOTAClient.h"
 #include "ESPOutIO.h"
 #include "ESPWifi.h"
 #include "FakeModbusClient.h"
@@ -26,6 +27,7 @@
 #define OUTPUT_TASK_PRIORITY ESP_TASK_MAIN_PRIO
 
 #define OUTPUT_TASK_STACK_SIZE 4096
+#define OTA_TASK_STACK_SIZE 4096
 #define UI_TASK_STACK_SIZE 8192
 
 #define OUTPUT_UPDATE_PERIOD_TICKS pdMS_TO_TICKS(500)
@@ -33,6 +35,7 @@
 // Check the CX status every minute to see if it differs from what we expect
 #define CHECK_CX_STATUS_INTERVAL std::chrono::seconds(60)
 #define MAX_VALVE_TRANSITION_INTERVAL std::chrono::minutes(2)
+#define OTA_INTERVAL_TICKS pdMS_TO_TICKS(15 * 60 * 1000)
 
 #define VALVE_STUCK_MSG "valves may be stuck"
 #define VALVE_SW_MSG "valves not consistent with switches"
@@ -52,6 +55,7 @@ static ESPOutIO outIO_;
 // TODO: Switch to real modbus client only when we have the CX
 static ESPModbusClient realMbClient_;
 static FakeModbusClient mbClient_;
+static ESPOTAClient *ota_;
 
 static ValveStateManager valveStateManager_;
 static OutCtrl *outCtrl_;
@@ -79,6 +83,21 @@ void uiTask(void *uiManager) {
         } else {
             vTaskDelay(pdMS_TO_TICKS(delayMs));
         }
+    }
+}
+
+void otaMsgCb(const char *msg) {
+    if (strlen(msg) > 0) {
+        uiManager_->setMessage(static_cast<uint8_t>(MsgID::OTA), false, msg);
+    } else {
+        uiManager_->clearMessage(static_cast<uint8_t>(MsgID::OTA));
+    }
+}
+
+void otaTask(void *) {
+    while (1) {
+        ota_->update();
+        vTaskDelay(OTA_INTERVAL_TICKS);
     }
 }
 
@@ -283,7 +302,7 @@ void outputTask(void *) {
     }
 }
 
-void initWifi() {
+void initNetwork() {
     // Initialize NVS (required internally by wifi driver)
     esp_err_t ret = nvs_flash_init();
     if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
@@ -292,8 +311,13 @@ void initWifi() {
     }
     ESP_ERROR_CHECK(ret);
 
+    ESP_ERROR_CHECK(esp_netif_init());
+    ESP_ERROR_CHECK(esp_event_loop_create_default());
+
     wifi_.init();
     wifi_.connect(default_wifi_ssid, default_wifi_pswd);
+
+    remote_logger_init("zonectrl", default_log_host);
 }
 
 extern "C" void zc_main() {
@@ -309,22 +333,18 @@ extern "C" void zc_main() {
 
     outIO_.init();
 
-    // TODO:
-    // * OTA updates
-    // * Remote logging
-
     uiEvtQueue_ = xQueueCreate(10, sizeof(ZCUIManager::Event));
     SystemState state{};
     uiManager_ = new ZCUIManager(state, static_cast<size_t>(MsgID::_Last), uiEvtCb);
-
+    ota_ = new ESPOTAClient("zonectrl", otaMsgCb, UI_MAX_MSG_LEN);
     outCtrl_ = new OutCtrl(valveStateManager_, *uiManager_);
 
-    initWifi();
-    remote_logger_init("zonectrl", default_log_host);
+    initNetwork();
 
     xTaskCreate(uiTask, "uiTask", UI_TASK_STACK_SIZE, uiManager_, UI_TASK_PRIO, NULL);
     xTaskCreate(zone_io_task, "zone_io_task", ZONE_IO_TASK_STACK_SIZE, (void *)inputEvtCb,
                 ZONE_IO_TASK_PRIORITY, NULL);
     xTaskCreate(outputTask, "output_task", OUTPUT_TASK_STACK_SIZE, NULL, OUTPUT_TASK_PRIORITY,
                 NULL);
+    xTaskCreate(otaTask, "otaTask", OTA_TASK_STACK_SIZE, NULL, MODBUS_TASK_PRIO, NULL);
 }

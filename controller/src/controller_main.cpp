@@ -113,6 +113,7 @@ void otaTask(void *) {
         vTaskDelay(OTA_INTERVAL_TICKS);
     }
 }
+
 void modbusTask(void *mb) { ((ModbusController *)mb)->task(); }
 
 void uiEvtCb(UIManager::Event &evt) { xQueueSend(uiEvtQueue_, &evt, portMAX_DELAY); }
@@ -196,13 +197,12 @@ extern "C" void controller_main() {
     uiEvtQueue_ = xQueueCreate(10, sizeof(UIManager::Event));
 
     Config config = appConfigStore_.load();
+    ota_ = new ESPOTAClient("controller", otaMsgCb, UI_MAX_MSG_LEN);
     uiManager_ = new UIManager(config, ControllerApp::nMsgIds(), uiEvtCb);
     UIManager::setEventsInst(uiManager_);
     uiManager_->setFirmwareVersion(ota_->currentVersion());
     modbusController_ = new ModbusController(config.equipment.hasMakeupDemand);
     valveCtrl_.init();
-    homeCli_.start();
-    ota_ = new ESPOTAClient("controller", otaMsgCb, UI_MAX_MSG_LEN);
 
     app_ = new ControllerApp(config, uiManager_, modbusController_, &sensors_, &valveCtrl_, &wifi_,
                              &appConfigStore_, &homeCli_, ota_, uiEvtRcv);
@@ -232,6 +232,7 @@ extern "C" void controller_main() {
     }
     ESP_LOGI(TAG, "modbus initialized");
 
+    homeCli_.start(); // Must start after network initialization
     xTaskCreate(sensorTask, "sensorTask", SENSOR_TASK_STACK_SIZE, &sensors_, SENSOR_TASK_PRIO,
                 NULL);
     xTaskCreate(modbusTask, "modbusTask", MODBUS_TASK_STACK_SIZE, modbusController_,

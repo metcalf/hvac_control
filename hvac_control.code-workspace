@@ -152,7 +152,8 @@
       "__memory": "cpp",
       "__locale": "cpp",
       "__split_buffer": "cpp",
-      "__tree": "cpp"
+      "__tree": "cpp",
+      "scd4x_i2c.h": "c"
     }
   }
 }

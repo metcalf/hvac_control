@@ -32,7 +32,7 @@ lv_obj_add_flag( ui_comp_get_child(ui_Setting_header1, UI_COMP_SETTING_HEADER_SE
 ui_Container3 = lv_obj_create(ui_Settings);
 lv_obj_remove_style_all(ui_Container3);
 lv_obj_set_width( ui_Container3, 300);
-lv_obj_set_height( ui_Container3, 190);
+lv_obj_set_height( ui_Container3, 180);
 lv_obj_set_x( ui_Container3, 0 );
 lv_obj_set_y( ui_Container3, -6 );
 lv_obj_set_align( ui_Container3, LV_ALIGN_CENTER );
