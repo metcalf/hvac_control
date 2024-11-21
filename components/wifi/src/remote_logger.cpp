@@ -6,6 +6,7 @@
 #include "lwip/sockets.h"
 #include <chrono>
 #include <stdarg.h>
+#include <stdatomic.h>
 #include <stdio.h>
 #include <string.h>
 #include <sys/time.h>
@@ -17,21 +18,17 @@
 #define DNS_ATTEMPT_INTERVAL std::chrono::seconds(15)
 #define SOCKET_TIMEOUT_MS 1000
 
-// Store the original vprintf function
-static vprintf_like_t default_vprintf;
-
 static char name_[64], dest_host_[256];
 
 static int syslog_socket_ = -1;
 struct sockaddr_in resolved_addr_;
-std::chrono::steady_clock::time_point last_resolve_time_;
-std::chrono::steady_clock::time_point last_resolve_attempt_;
+static std::chrono::steady_clock::time_point last_resolve_time_{};
+static std::chrono::steady_clock::time_point last_resolve_attempt_{};
+static atomic_bool syslog_in_use = false;
 
 static const char *TAG = "RLOG";
 
 static esp_err_t resolve_syslog_server(void) {
-    printf("resolve_syslog_server\n");
-
     std::chrono::steady_clock::time_point now =
         std::chrono::steady_clock::now();
 
@@ -75,7 +72,6 @@ static esp_err_t init_syslog_socket(void) {
     if (syslog_socket_ >= 0) {
         return ESP_OK; // Already initialized
     }
-    printf("init_syslog_socket\n");
 
     syslog_socket_ = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
     if (syslog_socket_ < 0) {
@@ -117,17 +113,27 @@ static int get_syslog_severity(esp_log_level_t level) {
 // Send message to syslog server
 static void send_to_syslog(esp_log_level_t level, const char *tag,
                            const char *msg) {
-    printf("send_to_syslog\n");
+    // NB: For the time being we only allow one thread to `send_to_syslog` at a
+    // time and just drop the other messages to keep things simpler and avoid
+    // concurrency issues. A better implementation would probably allow for
+    // queueing writes and have a low priority task sending them.
+    bool expected = false;
+    if (!atomic_compare_exchange_strong(&syslog_in_use, &expected, true)) {
+        ESP_LOGI(TAG, "another thread is logging, dropping line");
+        return;
+    }
+
     if (syslog_socket_ < 0) {
         if (init_syslog_socket() != ESP_OK) {
+            atomic_store(&syslog_in_use, false);
             return;
         }
     }
 
     // Re-resolve if cache has expired
-    // TODO: I think there can be a stack overflow here
     resolve_syslog_server();
     if (last_resolve_time_ == std::chrono::steady_clock::time_point{}) {
+        atomic_store(&syslog_in_use, false);
         return;
     }
 
@@ -151,6 +157,7 @@ static void send_to_syslog(esp_log_level_t level, const char *tag,
 
     if (written <= 0 || written >= sizeof(syslog_msg)) {
         ESP_LOGI(TAG, "Failed to format syslog message");
+        atomic_store(&syslog_in_use, false);
         return;
     }
 
@@ -164,11 +171,12 @@ static void send_to_syslog(esp_log_level_t level, const char *tag,
         close(syslog_socket_);
         syslog_socket_ = -1;
     }
+
+    atomic_store(&syslog_in_use, false);
 }
 
 // Custom logging function
 static int custom_log_vprintf(const char *fmt, va_list args) {
-    printf("custom_log_vprintf\n");
     // Get the log level from the format string
     // ESP log format: {log_level}{tag}: {message}
     char log_level = fmt[0];
@@ -222,7 +230,7 @@ static int custom_log_vprintf(const char *fmt, va_list args) {
         }
     }
 
-    return default_vprintf(fmt, args);
+    return vprintf(fmt, args);
 }
 
 // Function to initialize the custom logging backend
@@ -236,18 +244,18 @@ void remote_logger_init(const char *name, const char *dest_host) {
     last_resolve_time_ = {};
     last_resolve_attempt_ = {};
 
-    esp_err_t err = init_syslog_socket();
-    if (err != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to initialize socket: %d", err);
-    }
-
-    // err = resolve_syslog_server();
+    // esp_err_t err = init_syslog_socket();
     // if (err != ESP_OK) {
-    //   ESP_LOGW(TAG, "Initial DNS resolution failed - will retry on first
-    //   log");
+    //     ESP_LOGE(TAG, "Failed to initialize socket: %d", err);
     // }
 
-    default_vprintf = esp_log_set_vprintf(custom_log_vprintf);
+    // esp_err_t err = resolve_syslog_server();
+    // if (err != ESP_OK) {
+    //     ESP_LOGW(TAG,
+    //              "Initial DNS resolution failed - will retry on first log");
+    // }
+
+    esp_log_set_vprintf(custom_log_vprintf);
     remote_logger_set_name(name);
 }
 

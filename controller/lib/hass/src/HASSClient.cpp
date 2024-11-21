@@ -13,51 +13,46 @@
 static const char *TAG = "HASS";
 
 #define TASK_STACK_SIZE 4096
-#define REQUEST_INTERVAL_MS 30 * 1000
 #define EXPECTED_VERSION 1
-#define EXPECTED_LENGTH 23
+#define EXPECTED_LENGTH 22
 #define URL "http://hass-local.itsshedtime.com/custom-api/states/sensor.custom_thermostat_api_data"
 
 static esp_err_t _http_event_handler(esp_http_client_event_t *evt) {
     return ((HASSClient *)evt->user_data)->_handleHTTPEvent(evt);
 }
 
-void taskFn(void *cli) { ((HASSClient *)cli)->_task(); }
+void HASSClient::fetch() {
+    esp_http_client_config_t config = {
+        .url = URL,
+        .timeout_ms = 5000,
+        .event_handler = _http_event_handler,
+        .user_data = this,
+        .crt_bundle_attach = esp_crt_bundle_attach,
+    };
+    esp_http_client_handle_t client = esp_http_client_init(&config);
 
-void HASSClient::start() {
-    xTaskCreate(taskFn, "homeClientTask_", TASK_STACK_SIZE, this, ESP_TASK_MAIN_PRIO, &task_);
-}
+    outputBufferPos_ = 0;
+    esp_err_t err = esp_http_client_perform(client);
 
-void HASSClient::_task() {
-    while (1) {
-        esp_http_client_config_t config = {
-            .url = URL,
-            .timeout_ms = 5000,
-            .event_handler = _http_event_handler,
-            .crt_bundle_attach = esp_crt_bundle_attach,
-        };
-        esp_http_client_handle_t client = esp_http_client_init(&config);
-
-        outputBufferPos_ = 0;
-        esp_err_t err = esp_http_client_perform(client);
-
-        if (err != ESP_OK) {
-            ESP_LOGE(TAG, "Error perform http request %s", esp_err_to_name(err));
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Error perform http request %s", esp_err_to_name(err));
+        setResult(HomeState{.err = Error::FetchError});
+    } else {
+        int status = esp_http_client_get_status_code(client);
+        if (status != 200) {
+            ESP_LOGE(TAG, "HTTP error: %d", status);
             setResult(HomeState{.err = Error::FetchError});
         } else {
-            int status = esp_http_client_get_status_code(client);
-            if (status != 200) {
-                ESP_LOGE(TAG, "HTTP error: %d", status);
-                setResult(HomeState{.err = Error::FetchError});
-            } else {
-                HomeState result = parseResponse();
-                setResult(result);
-            }
+            HomeState result = parseResponse();
+            ESP_LOGI(TAG, "vacation:%c\tweatherObsTime:%lld\tweatherTempC:%f",
+                     result.vacationOn ? 'y' : 'n',
+                     result.weatherObsTime.time_since_epoch() / std::chrono::seconds(1),
+                     result.weatherTempC);
+            setResult(result);
         }
-
-        esp_http_client_cleanup(client);
-        vTaskDelay(pdMS_TO_TICKS(REQUEST_INTERVAL_MS));
     }
+
+    esp_http_client_cleanup(client);
 }
 
 HASSClient::HomeState HASSClient::state() {
@@ -72,7 +67,6 @@ esp_err_t HASSClient::_handleHTTPEvent(esp_http_client_event_t *evt) {
     switch (evt->event_id) {
     case HTTP_EVENT_ERROR:
         ESP_LOGE(TAG, "HTTP_EVENT_ERROR");
-        setResult(HomeState{.err = Error::FetchError});
         return ESP_FAIL;
     case HTTP_EVENT_ON_CONNECTED:
         ESP_LOGD(TAG, "HTTP_EVENT_ON_CONNECTED");
@@ -91,12 +85,10 @@ esp_err_t HASSClient::_handleHTTPEvent(esp_http_client_event_t *evt) {
              */
         if (esp_http_client_is_chunked_response(evt->client)) {
             ESP_LOGE(TAG, "Unexpected chunked response");
-            setResult(HomeState{.err = Error::FetchError});
             return ESP_FAIL;
         }
         if ((sizeof(outputBuffer_) - outputBufferPos_ - 1) < evt->data_len) {
             ESP_LOGE(TAG, "Response is too long");
-            setResult(HomeState{.err = Error::FetchError});
             return ESP_FAIL;
         }
         memcpy(outputBuffer_ + outputBufferPos_, evt->data, evt->data_len);
@@ -111,7 +103,6 @@ esp_err_t HASSClient::_handleHTTPEvent(esp_http_client_event_t *evt) {
         break;
     case HTTP_EVENT_REDIRECT:
         ESP_LOGE(TAG, "Unexpected redirect");
-        setResult(HomeState{.err = Error::FetchError});
         return ESP_FAIL;
     }
 

@@ -23,6 +23,5 @@ double PIDAlgorithm::getDemand(double deltaC, std::chrono::steady_clock::time_po
     i_ = clamp(i_, 0.0, tiSecs_ * (1 - clamp(err, 1 - maxIDemand_)));
 
     double iDemand = i_ / tiSecs_;
-    printf("idemand: %.2f\n", iDemand);
     return clamp(err + iDemand);
 }

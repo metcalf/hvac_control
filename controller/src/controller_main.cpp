@@ -34,6 +34,7 @@
 #define SENSOR_TASK_STACK_SIZE 4096
 #define MODBUS_TASK_STACK_SIZE 4096
 #define OTA_TASK_STACK_SIZE 4096
+#define HOME_CLIENT_TASK_STACK_SIZE 4096
 #define UI_TASK_STACK_SIZE 8192
 
 #define SENSOR_RETRY_INTERVAL_SECS 1
@@ -41,7 +42,9 @@
 #define CLOCK_POLL_PERIOD_MS 100
 #define CLOCK_WAIT_MS 10 * 1000
 #define RTC_BOOT_TIME_TICKS pdMS_TO_TICKS(40)
+#define CONNECT_WAIT_INTERVAL_TICKS pdMS_TO_TICKS(10 * 1000)
 #define OTA_INTERVAL_TICKS pdMS_TO_TICKS(15 * 60 * 1000)
+#define HOME_REQUEST_INTERVAL_TICKS pdMS_TO_TICKS(30 * 1000)
 
 #define POSIX_TZ_STR "PST8PDT,M3.2.0/2:00:00,M11.1.0/2:00:00"
 
@@ -109,8 +112,25 @@ void otaMsgCb(const char *msg) {
 
 void otaTask(void *) {
     while (1) {
-        ota_->update();
-        vTaskDelay(OTA_INTERVAL_TICKS);
+        if (wifi_.getState() == AbstractWifi::State::Connected) {
+            ota_->update();
+            vTaskDelay(OTA_INTERVAL_TICKS);
+        } else {
+            ESP_LOGI(TAG, "skipping OTA--wifi not connected");
+            vTaskDelay(CONNECT_WAIT_INTERVAL_TICKS);
+        }
+    }
+}
+
+void homeClientTask(void *) {
+    while (1) {
+        if (wifi_.getState() == AbstractWifi::State::Connected) {
+            homeCli_.fetch();
+            vTaskDelay(HOME_REQUEST_INTERVAL_TICKS);
+        } else {
+            ESP_LOGI(TAG, "skipping home client fetch--wifi not connected");
+            vTaskDelay(CONNECT_WAIT_INTERVAL_TICKS);
+        }
     }
 }
 
@@ -219,7 +239,8 @@ extern "C" void controller_main() {
     wifi_.init();
     wifi_.connect(config.wifi.ssid, config.wifi.password);
 
-    remote_logger_init(config.wifi.logName, default_log_host);
+    // TODO: Really need to just rewrite this to use a queue/ringbuffer and be thread safe
+    //remote_logger_init(config.wifi.logName, default_log_host);
 
     if (!sensors_.init()) {
         bootErr("Sensor init error");
@@ -232,12 +253,13 @@ extern "C" void controller_main() {
     }
     ESP_LOGI(TAG, "modbus initialized");
 
-    homeCli_.start(); // Must start after network initialization
     xTaskCreate(sensorTask, "sensorTask", SENSOR_TASK_STACK_SIZE, &sensors_, SENSOR_TASK_PRIO,
                 NULL);
     xTaskCreate(modbusTask, "modbusTask", MODBUS_TASK_STACK_SIZE, modbusController_,
                 MODBUS_TASK_PRIO, NULL);
     xTaskCreate(otaTask, "otaTask", OTA_TASK_STACK_SIZE, NULL, MODBUS_TASK_PRIO, NULL);
+    xTaskCreate(homeClientTask, "homeClientTask_", HOME_CLIENT_TASK_STACK_SIZE, NULL,
+                ESP_TASK_MAIN_PRIO, NULL);
 
     // Wait for sensors to have valid data
     while (std::isnan(sensors_.getLatest().tempC)) {
