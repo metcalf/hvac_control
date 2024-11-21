@@ -113,8 +113,11 @@ void otaMsgCb(const char *msg) {
 void otaTask(void *) {
     while (1) {
         if (wifi_.getState() == AbstractWifi::State::Connected) {
-            ota_->update();
-            vTaskDelay(OTA_INTERVAL_TICKS);
+            if (ota_->update() == AbstractOTAClient::Error::FetchError) {
+                vTaskDelay(CONNECT_WAIT_INTERVAL_TICKS);
+            } else {
+                vTaskDelay(OTA_INTERVAL_TICKS);
+            }
         } else {
             ESP_LOGI(TAG, "skipping OTA--wifi not connected");
             vTaskDelay(CONNECT_WAIT_INTERVAL_TICKS);

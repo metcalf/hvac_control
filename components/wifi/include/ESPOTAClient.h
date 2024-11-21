@@ -29,6 +29,7 @@ class ESPOTAClient : public AbstractOTAClient {
 
     char outputBuffer_[32];
     size_t outputBufferPos_ = 0;
+    bool outputOk_;
 
     char runningVersion_[32];
 

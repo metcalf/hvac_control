@@ -357,6 +357,7 @@ void UIManager::eSaveTempOffsets() {
 }
 
 void UIManager::eSaveWifiSettings() {
+    // TODO: This is probably going to cause problems with strncat repeatedly cating
     // NB: strncat used to ensure null termination
     strncat(wifi_.ssid, lv_textarea_get_text(ui_wifi_ssid), sizeof(wifi_.ssid) - 1);
     strncat(wifi_.logName, lv_textarea_get_text(ui_log_name), sizeof(wifi_.logName) - 1);

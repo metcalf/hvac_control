@@ -22,6 +22,7 @@ class HASSClient : public AbstractHomeClient {
     SemaphoreHandle_t mutex_;
     char outputBuffer_[2048];
     size_t outputBufferPos_ = 0;
+    bool outputOk_ = false;
 
     HomeState parseResponse();
     void setResult(const HomeState &result);

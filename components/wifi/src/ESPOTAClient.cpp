@@ -11,7 +11,7 @@
 
 static const char *TAG = "OTA";
 
-extern const uint8_t server_root_pem[] asm("_binary_isrgrootx1_pem_end");
+extern const uint8_t server_root_pem[] asm("_binary_isrgrootx1_pem_start");
 
 static esp_err_t _http_event_handler(esp_http_client_event_t *evt) {
     return ((ESPOTAClient *)evt->user_data)->_handleHTTPEvent(evt);
@@ -19,7 +19,8 @@ static esp_err_t _http_event_handler(esp_http_client_event_t *evt) {
 
 ESPOTAClient::ESPOTAClient(const char *name, msgCb_t msgCb, size_t maxMsgLen)
     : msgCb_(msgCb), maxMsgLen_(maxMsgLen) {
-    int written = snprintf(url_, std::size(url_), default_ota_url_tmpl, name);
+    int written =
+        snprintf(url_, std::size(url_), default_ota_url_prefix_tmpl, name);
     assert(written < std::size(url_));
 
     pathPart_ = url_ + written;
@@ -30,16 +31,20 @@ ESPOTAClient::ESPOTAClient(const char *name, msgCb_t msgCb, size_t maxMsgLen)
 }
 
 AbstractOTAClient::Error ESPOTAClient::update() {
-    strncat(pathPart_, "latest_version", pathLen_ - 1);
+    snprintf(pathPart_, pathLen_ - 1, "latest_version");
+    ESP_LOGI(TAG, "Downloading version from %s", url_);
 
-    outputBufferPos_ = 0;
     esp_http_client_config_t httpConfig = {
         .url = url_,
         .cert_pem = (const char *)server_root_pem,
         .timeout_ms = 5000,
         .event_handler = _http_event_handler,
+        .user_data = this,
     };
     esp_http_client_handle_t client = esp_http_client_init(&httpConfig);
+    outputBufferPos_ = 0;
+    outputOk_ = true;
+
     esp_err_t err = esp_http_client_perform(client);
 
     int status = esp_http_client_get_status_code(client);
@@ -120,11 +125,15 @@ esp_err_t ESPOTAClient::_handleHTTPEvent(esp_http_client_event_t *evt) {
          */
         if (esp_http_client_is_chunked_response(evt->client)) {
             ESP_LOGE(TAG, "Unexpected chunked response");
-            return ESP_FAIL;
+            outputOk_ = false;
+            return ESP_FAIL; // Note: This is ignored so we set outputOk_ =
+                             // false
         }
         if ((sizeof(outputBuffer_) - outputBufferPos_ - 1) < evt->data_len) {
-            ESP_LOGE(TAG, "Response is too long");
-            return ESP_FAIL;
+            ESP_LOGE(TAG, "Response is too long: %d", evt->data_len);
+            outputOk_ = false;
+            return ESP_FAIL; // Note: This is ignored so we set outputOk_ =
+                             // false
         }
         memcpy(outputBuffer_ + outputBufferPos_, evt->data, evt->data_len);
         outputBufferPos_ += evt->data_len;
@@ -141,7 +150,7 @@ esp_err_t ESPOTAClient::_handleHTTPEvent(esp_http_client_event_t *evt) {
         return ESP_FAIL;
     }
 
-    return ESP_OK;
+    return ESP_OK; // Note: This is ignored
 }
 
 void __attribute__((format(printf, 2, 3)))

@@ -1,4 +1,4 @@
-#!/bin/bash -euxo pipefail
+#!/bin/bash -euo pipefail
 
 if [[ ! -f "platformio.ini" ]]; then
     echo "Please run this script from the root of the platformio project"

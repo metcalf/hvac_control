@@ -4,7 +4,6 @@
 #include <chrono>
 #include <iterator>
 
-#include "esp_crt_bundle.h"
 #include "esp_err.h"
 #include "esp_log.h"
 
@@ -27,11 +26,11 @@ void HASSClient::fetch() {
         .timeout_ms = 5000,
         .event_handler = _http_event_handler,
         .user_data = this,
-        .crt_bundle_attach = esp_crt_bundle_attach,
     };
     esp_http_client_handle_t client = esp_http_client_init(&config);
-
     outputBufferPos_ = 0;
+    outputOk_ = true;
+
     esp_err_t err = esp_http_client_perform(client);
 
     if (err != ESP_OK) {
@@ -42,7 +41,7 @@ void HASSClient::fetch() {
         if (status != 200) {
             ESP_LOGE(TAG, "HTTP error: %d", status);
             setResult(HomeState{.err = Error::FetchError});
-        } else {
+        } else if (outputOk_) {
             HomeState result = parseResponse();
             ESP_LOGI(TAG, "vacation:%c\tweatherObsTime:%lld\tweatherTempC:%f",
                      result.vacationOn ? 'y' : 'n',
@@ -85,11 +84,13 @@ esp_err_t HASSClient::_handleHTTPEvent(esp_http_client_event_t *evt) {
              */
         if (esp_http_client_is_chunked_response(evt->client)) {
             ESP_LOGE(TAG, "Unexpected chunked response");
-            return ESP_FAIL;
+            outputOk_ = false;
+            return ESP_FAIL; // Note: This is ignored so we set outputOk_ = false
         }
         if ((sizeof(outputBuffer_) - outputBufferPos_ - 1) < evt->data_len) {
             ESP_LOGE(TAG, "Response is too long");
-            return ESP_FAIL;
+            outputOk_ = false;
+            return ESP_FAIL; // Note: This is ignored so we set outputOk_ = false
         }
         memcpy(outputBuffer_ + outputBufferPos_, evt->data, evt->data_len);
         outputBufferPos_ += evt->data_len;
@@ -103,7 +104,7 @@ esp_err_t HASSClient::_handleHTTPEvent(esp_http_client_event_t *evt) {
         break;
     case HTTP_EVENT_REDIRECT:
         ESP_LOGE(TAG, "Unexpected redirect");
-        return ESP_FAIL;
+        return ESP_FAIL; // Note: This is ignored
     }
 
     return ESP_OK;
@@ -128,7 +129,6 @@ AbstractHomeClient::HomeState HASSClient::parseResponse() {
     }
 
     // Check the version
-    printf("Version: %d\n", version);
     if (version != EXPECTED_VERSION) {
         ESP_LOGE(TAG, "Got version %d, expected %d", version, EXPECTED_VERSION);
         result.err = Error::ParseError;
