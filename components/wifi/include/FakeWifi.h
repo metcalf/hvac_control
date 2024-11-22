@@ -9,8 +9,9 @@ class FakeWifi : public AbstractWifi {
     void msg(char *msg, size_t n) override { strncpy(msg, "none", n); };
     State getState() override { return state_; }
     void updateSTA(const char *ssid, const char *password) override {
-        strncat(ssid_, ssid, sizeof(ssid_) - 1);
-        strncat(password_, password, sizeof(password_) - 1);
+        // snprintf to ensure null termination
+        snprintf(ssid_, sizeof(ssid_), "%s", ssid);
+        snprintf(password_, sizeof(password_), "%s", password);
     };
 
     void setState(State state) { state_ = state; }

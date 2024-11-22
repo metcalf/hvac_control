@@ -52,9 +52,9 @@ class AppConfigStore : public NVSConfigStore<ControllerDomain::Config> {
             .systemOn = true,
         };
 
-        // NB: strncat used to ensure null termination
-        strncat(cfg.wifi.ssid, default_wifi_ssid, sizeof(cfg.wifi.ssid) - 1);
-        strncat(cfg.wifi.password, default_wifi_pswd, sizeof(cfg.wifi.password) - 1);
+        // snprintf to ensure null termination
+        snprintf(cfg.wifi.ssid, sizeof(cfg.wifi.ssid), "%s", default_wifi_ssid);
+        snprintf(cfg.wifi.password, sizeof(cfg.wifi.password), "%s", default_wifi_pswd);
 
         return cfg;
     }

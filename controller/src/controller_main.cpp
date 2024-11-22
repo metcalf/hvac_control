@@ -242,8 +242,7 @@ extern "C" void controller_main() {
     wifi_.init();
     wifi_.connect(config.wifi.ssid, config.wifi.password);
 
-    // TODO: Really need to just rewrite this to use a queue/ringbuffer and be thread safe
-    //remote_logger_init(config.wifi.logName, default_log_host);
+    remote_logger_init(config.wifi.logName, default_log_host);
 
     if (!sensors_.init()) {
         bootErr("Sensor init error");
@@ -260,9 +259,9 @@ extern "C" void controller_main() {
                 NULL);
     xTaskCreate(modbusTask, "modbusTask", MODBUS_TASK_STACK_SIZE, modbusController_,
                 MODBUS_TASK_PRIO, NULL);
-    xTaskCreate(otaTask, "otaTask", OTA_TASK_STACK_SIZE, NULL, MODBUS_TASK_PRIO, NULL);
+    xTaskCreate(otaTask, "otaTask", OTA_TASK_STACK_SIZE, NULL, ESP_TASK_PRIO_MIN, NULL);
     xTaskCreate(homeClientTask, "homeClientTask_", HOME_CLIENT_TASK_STACK_SIZE, NULL,
-                ESP_TASK_MAIN_PRIO, NULL);
+                ESP_TASK_PRIO_MIN, NULL);
 
     // Wait for sensors to have valid data
     while (std::isnan(sensors_.getLatest().tempC)) {

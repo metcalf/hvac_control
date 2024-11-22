@@ -2,6 +2,7 @@
 
 #include "esp_log.h"
 #include "esp_netif.h"
+#include "freertos/ringbuf.h"
 #include "lwip/netdb.h"
 #include "lwip/sockets.h"
 #include <chrono>
@@ -17,6 +18,8 @@
 #define DNS_CACHE_DURATION std::chrono::hours(60)
 #define DNS_ATTEMPT_INTERVAL std::chrono::seconds(15)
 #define SOCKET_TIMEOUT_MS 1000
+#define TASK_STACK_SIZE 4092
+#define RING_BUFFER_SIZE REMOTE_LOG_MESSAGE_LEN * 10
 
 static char name_[64], dest_host_[256];
 
@@ -24,7 +27,7 @@ static int syslog_socket_ = -1;
 struct sockaddr_in resolved_addr_;
 static std::chrono::steady_clock::time_point last_resolve_time_{};
 static std::chrono::steady_clock::time_point last_resolve_attempt_{};
-static atomic_bool syslog_in_use = false;
+static RingbufHandle_t ring_buffer_ = NULL;
 
 static const char *TAG = "RLOG";
 
@@ -55,6 +58,7 @@ static esp_err_t resolve_syslog_server(void) {
 
     int err = getaddrinfo(dest_host_, NULL, &hints, &result);
     if (err != 0 || result == NULL) {
+        ESP_LOGD(TAG, "getaddrinfo: %d", err);
         return ESP_FAIL;
     }
 
@@ -111,21 +115,9 @@ static int get_syslog_severity(esp_log_level_t level) {
 }
 
 // Send message to syslog server
-static void send_to_syslog(esp_log_level_t level, const char *tag,
-                           const char *msg) {
-    // NB: For the time being we only allow one thread to `send_to_syslog` at a
-    // time and just drop the other messages to keep things simpler and avoid
-    // concurrency issues. A better implementation would probably allow for
-    // queueing writes and have a low priority task sending them.
-    bool expected = false;
-    if (!atomic_compare_exchange_strong(&syslog_in_use, &expected, true)) {
-        ESP_LOGI(TAG, "another thread is logging, dropping line");
-        return;
-    }
-
+static void send_to_syslog(const char *msg, const size_t len) {
     if (syslog_socket_ < 0) {
         if (init_syslog_socket() != ESP_OK) {
-            atomic_store(&syslog_in_use, false);
             return;
         }
     }
@@ -133,37 +125,12 @@ static void send_to_syslog(esp_log_level_t level, const char *tag,
     // Re-resolve if cache has expired
     resolve_syslog_server();
     if (last_resolve_time_ == std::chrono::steady_clock::time_point{}) {
-        atomic_store(&syslog_in_use, false);
-        return;
-    }
-
-    // Get current time
-    struct timeval tv;
-    gettimeofday(&tv, NULL);
-    time_t t = tv.tv_sec;
-    struct tm timeinfo;
-    localtime_r(&t, &timeinfo);
-
-    // Format according to RFC 5424 syslog protocol
-    char syslog_msg[REMOTE_LOG_MESSAGE_LEN + 100];
-    int priority = (FACILITY * 8) + get_syslog_severity(level);
-
-    int written =
-        snprintf(syslog_msg, sizeof(syslog_msg),
-                 "<%d>1 %04d-%02d-%02dT%02d:%02d:%02d.%03ldZ %s %s - - - %s",
-                 priority, timeinfo.tm_year + 1900, timeinfo.tm_mon + 1,
-                 timeinfo.tm_mday, timeinfo.tm_hour, timeinfo.tm_min,
-                 timeinfo.tm_sec, tv.tv_usec / 1000, name_, tag, msg);
-
-    if (written <= 0 || written >= sizeof(syslog_msg)) {
-        ESP_LOGI(TAG, "Failed to format syslog message");
-        atomic_store(&syslog_in_use, false);
         return;
     }
 
     ssize_t sent =
-        sendto(syslog_socket_, syslog_msg, written, 0,
-               (struct sockaddr *)&resolved_addr_, sizeof(resolved_addr_));
+        sendto(syslog_socket_, msg, len, 0, (struct sockaddr *)&resolved_addr_,
+               sizeof(resolved_addr_));
 
     if (sent < 0) {
         ESP_LOGI(TAG, "Failed to send syslog message: errno %d", errno);
@@ -171,19 +138,55 @@ static void send_to_syslog(esp_log_level_t level, const char *tag,
         close(syslog_socket_);
         syslog_socket_ = -1;
     }
+}
 
-    atomic_store(&syslog_in_use, false);
+static void queue_for_syslog(esp_log_level_t level, const char *fmt,
+                             va_list args) {
+    char buffer[REMOTE_LOG_MESSAGE_LEN];
+
+    // Extract the tag and advance the format string to after the tag
+    const char *fmt_after_tag = strstr(fmt, ": ") + 2;
+    va_arg(args, unsigned int);
+    char *tag = va_arg(args, char *);
+
+    int priority = (FACILITY * 8) + get_syslog_severity(level);
+
+    ESP_LOGD(TAG, "got tag: %s", tag);
+
+    // Minimal rsyslog format, time is inserted server-side
+    int prefix_written =
+        snprintf(buffer, sizeof(buffer), "<%d>%s %s: ", priority, name_, tag);
+
+    if (prefix_written <= 0 || prefix_written >= sizeof(buffer)) {
+        ESP_LOGI(TAG, "Failed to format syslog message");
+        return;
+    }
+
+    int msg_written =
+        vsnprintf(buffer + prefix_written, sizeof(buffer) - prefix_written,
+                  fmt_after_tag, args);
+
+    if (msg_written > 0) {
+        if (!xRingbufferSend(ring_buffer_, buffer, prefix_written + msg_written,
+                             0)) {
+            ESP_LOGI(TAG, "Failed to enqueue message");
+        }
+    }
 }
 
 // Custom logging function
 static int custom_log_vprintf(const char *fmt, va_list args) {
     // Get the log level from the format string
     // ESP log format: {log_level}{tag}: {message}
-    char log_level = fmt[0];
+    char log_level_char = fmt[0];
+
+    if (log_level_char == 27) {
+        printf("RLOG: Must disable log coloring");
+    }
 
     // Convert ESP log level character to enum
     esp_log_level_t level;
-    switch (log_level) {
+    switch (log_level_char) {
     case 'E':
         level = ESP_LOG_ERROR;
         break;
@@ -205,32 +208,35 @@ static int custom_log_vprintf(const char *fmt, va_list args) {
     }
 
     if (level <= ESP_LOG_WARN && level != ESP_LOG_NONE) {
-        // Format the message
-        char buffer[REMOTE_LOG_MESSAGE_LEN];
-        int written = vsnprintf(buffer, sizeof(buffer), fmt, args);
-
-        if (written > 0) {
-            // Extract the tag
-            const char *tag_start = fmt + 1;
-            const char *tag_end = strstr(fmt, ": ");
-
-            char tag[MAX_TAG_LENGTH];
-            if (tag_end) {
-                size_t tag_len =
-                    std::min<size_t>(tag_end - tag_start, MAX_TAG_LENGTH - 1);
-                memcpy(tag, tag_start, tag_len);
-                tag[tag_len] = '\0';
-            } else {
-                strncpy(tag, "UNKNOWN", MAX_TAG_LENGTH - 1);
-                tag[MAX_TAG_LENGTH - 1] = '\0';
-            }
-
-            // Send to syslog server
-            send_to_syslog(level, tag, buffer);
-        }
+        queue_for_syslog(level, fmt, args);
     }
 
     return vprintf(fmt, args);
+}
+
+static void remote_logger_task(void *) {
+    esp_err_t err;
+
+    err = init_syslog_socket();
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to initialize socket: %d", err);
+    }
+
+    err = resolve_syslog_server();
+    if (err != ESP_OK) {
+        ESP_LOGI(TAG,
+                 "Initial DNS resolution failed - will retry on first log");
+    }
+
+    while (1) {
+        size_t size;
+        char *item =
+            (char *)xRingbufferReceive(ring_buffer_, &size, portMAX_DELAY);
+        if (item != NULL && size > 0) {
+            send_to_syslog(item, size);
+        }
+        vRingbufferReturnItem(ring_buffer_, item);
+    }
 }
 
 // Function to initialize the custom logging backend
@@ -244,19 +250,23 @@ void remote_logger_init(const char *name, const char *dest_host) {
     last_resolve_time_ = {};
     last_resolve_attempt_ = {};
 
-    // esp_err_t err = init_syslog_socket();
-    // if (err != ESP_OK) {
-    //     ESP_LOGE(TAG, "Failed to initialize socket: %d", err);
-    // }
+    remote_logger_set_name(name);
 
-    // esp_err_t err = resolve_syslog_server();
-    // if (err != ESP_OK) {
-    //     ESP_LOGW(TAG,
-    //              "Initial DNS resolution failed - will retry on first log");
-    // }
+    // Allocate ring buffer data structure and storage area into external RAM
+    StaticRingbuffer_t *buffer_struct = (StaticRingbuffer_t *)heap_caps_malloc(
+        sizeof(StaticRingbuffer_t), MALLOC_CAP_SPIRAM);
+    uint8_t *buffer_storage = (uint8_t *)heap_caps_malloc(
+        sizeof(uint8_t) * RING_BUFFER_SIZE, MALLOC_CAP_SPIRAM);
+
+    // Create a ring buffer with manually allocated memory
+    ring_buffer_ = xRingbufferCreateStatic(
+        RING_BUFFER_SIZE, RINGBUF_TYPE_NOSPLIT, buffer_storage, buffer_struct);
+    assert(ring_buffer_ != NULL);
 
     esp_log_set_vprintf(custom_log_vprintf);
-    remote_logger_set_name(name);
+
+    xTaskCreate(remote_logger_task, "remoteLogger", TASK_STACK_SIZE, NULL,
+                ESP_TASK_PRIO_MIN, NULL);
 }
 
 void remote_logger_set_name(const char *name) {

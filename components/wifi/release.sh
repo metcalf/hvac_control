@@ -5,6 +5,11 @@ if [[ ! -f "platformio.ini" ]]; then
     exit 1
 fi
 
+if ! command -v pio &> /dev/null; then
+    echo "Please run this script within a PlatformIO shell"
+    exit 1
+fi
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 FIRMWARE_PATH=.pio/build/esp32s3/firmware.bin
 REMOTE_ROOT="/var/www/local/esp-ota"

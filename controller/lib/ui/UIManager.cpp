@@ -357,14 +357,13 @@ void UIManager::eSaveTempOffsets() {
 }
 
 void UIManager::eSaveWifiSettings() {
-    // TODO: This is probably going to cause problems with strncat repeatedly cating
-    // NB: strncat used to ensure null termination
-    strncat(wifi_.ssid, lv_textarea_get_text(ui_wifi_ssid), sizeof(wifi_.ssid) - 1);
-    strncat(wifi_.logName, lv_textarea_get_text(ui_log_name), sizeof(wifi_.logName) - 1);
+    // snprintf to ensure null termination
+    snprintf(wifi_.ssid, sizeof(wifi_.ssid), "%s", lv_textarea_get_text(ui_wifi_ssid));
+    snprintf(wifi_.logName, sizeof(wifi_.logName), "%s", lv_textarea_get_text(ui_log_name));
 
     const char *pswd = lv_textarea_get_text(ui_wifi_password);
     if (strlen(pswd) > 0) {
-        strncat(wifi_.password, pswd, sizeof(wifi_.password) - 1);
+        snprintf(wifi_.password, sizeof(wifi_.password), "%s", pswd);
     }
 
     Event evt{
