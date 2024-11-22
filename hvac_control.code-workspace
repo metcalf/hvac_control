@@ -153,7 +153,9 @@
       "__locale": "cpp",
       "__split_buffer": "cpp",
       "__tree": "cpp",
-      "scd4x_i2c.h": "c"
+      "scd4x_i2c.h": "c",
+      "execution": "cpp",
+      "queue": "cpp"
     }
   }
 }

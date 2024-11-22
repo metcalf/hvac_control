@@ -45,6 +45,7 @@
 #define CONNECT_WAIT_INTERVAL_TICKS pdMS_TO_TICKS(10 * 1000)
 #define OTA_INTERVAL_TICKS pdMS_TO_TICKS(15 * 60 * 1000)
 #define HOME_REQUEST_INTERVAL_TICKS pdMS_TO_TICKS(30 * 1000)
+#define HEAP_LOG_INTERVAL std::chrono::minutes(15)
 
 #define POSIX_TZ_STR "PST8PDT,M3.2.0/2:00:00,M11.1.0/2:00:00"
 
@@ -62,6 +63,17 @@ static ESPWifi wifi_;
 static AppConfigStore appConfigStore_;
 static HASSClient homeCli_;
 static ESPOTAClient *ota_;
+
+void log_heap_stats() {
+    // Get current heap stats
+    size_t free_heap = heap_caps_get_free_size(MALLOC_CAP_DEFAULT);
+    size_t min_free_heap = heap_caps_get_minimum_free_size(MALLOC_CAP_DEFAULT);
+    size_t largest_free_block = heap_caps_get_largest_free_block(MALLOC_CAP_DEFAULT);
+
+    // Log key metrics
+    ESP_LOGW("HEAP", "free=%ub\tmin_free=%ub\tlargest_block=%ub", free_heap, min_free_heap,
+             largest_free_block);
+}
 
 void sensorTask(void *sensors) {
     while (1) {
@@ -87,6 +99,9 @@ void uiTask(void *uiManager) {
 void mainTask(void *app) {
     bool first = true;
 
+    log_heap_stats();
+    std::chrono::steady_clock::time_point last_logged_heap = std::chrono::steady_clock::now();
+
     // Wait a bit of time to get a valid clock before loading
     for (int i = 0; i < (CLOCK_WAIT_MS / CLOCK_POLL_PERIOD_MS); i++) {
         if (app_->clockReady()) {
@@ -99,6 +114,12 @@ void mainTask(void *app) {
     while (1) {
         ((ControllerApp *)app)->task(first);
         first = false;
+
+        std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now();
+        if ((now - last_logged_heap) > HEAP_LOG_INTERVAL) {
+            log_heap_stats();
+            last_logged_heap = now;
+        }
     }
 }
 
