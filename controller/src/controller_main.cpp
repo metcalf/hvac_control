@@ -6,6 +6,7 @@
 #include "esp_log.h"
 #include "esp_sntp.h"
 #include "esp_task.h"
+#include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/queue.h"
 #include "freertos/task.h"
@@ -33,19 +34,22 @@
 #define MAIN_TASK_STACK_SIZE 4096
 #define SENSOR_TASK_STACK_SIZE 4096
 #define MODBUS_TASK_STACK_SIZE 4096
-#define OTA_TASK_STACK_SIZE 4096
-#define HOME_CLIENT_TASK_STACK_SIZE 4096
+#define NET_TASK_STACK_SIZE 4096
 #define UI_TASK_STACK_SIZE 8192
 
-#define SENSOR_RETRY_INTERVAL_SECS 1
-#define SENSOR_UPDATE_INTERVAL_SECS 30
-#define CLOCK_POLL_PERIOD_MS 100
-#define CLOCK_WAIT_MS 10 * 1000
+#define SENSOR_RETRY_INTERVAL_TICKS pdMS_TO_TICKS(1 * 1000)
+#define SENSOR_UPDATE_INTERVAL_TICKS pdMS_TO_TICKS(30 * 1000)
+#define CLOCK_POLL_PERIOD_TICKS pdMS_TO_TICKS(100)
+#define CLOCK_WAIT_TICKS pdMS_TO_TICKS(10 * 1000)
 #define RTC_BOOT_TIME_TICKS pdMS_TO_TICKS(40)
 #define CONNECT_WAIT_INTERVAL_TICKS pdMS_TO_TICKS(10 * 1000)
-#define OTA_INTERVAL_TICKS pdMS_TO_TICKS(15 * 60 * 1000)
-#define HOME_REQUEST_INTERVAL_TICKS pdMS_TO_TICKS(30 * 1000)
 #define HEAP_LOG_INTERVAL std::chrono::minutes(15)
+#define WIFI_POLL_INTERVAL_TICKS pdMS_TO_TICKS(1000)
+#define WIFI_RETRY_INTERVAL_TICKS pdMS_TO_TICKS(60 * 1000)
+
+#define OTA_INTERVAL_MS (15 * 60 * 1000)
+#define OTA_FETCH_ERR_INTERVAL_MS (60 * 1000)
+#define HOME_REQUEST_INTERVAL_MS (30 * 1000)
 
 #define POSIX_TZ_STR "PST8PDT,M3.2.0/2:00:00,M11.1.0/2:00:00"
 
@@ -78,9 +82,9 @@ void log_heap_stats() {
 void sensorTask(void *sensors) {
     while (1) {
         if (((Sensors *)sensors)->poll()) {
-            vTaskDelay(pdMS_TO_TICKS(SENSOR_UPDATE_INTERVAL_SECS * 1000));
+            vTaskDelay(SENSOR_UPDATE_INTERVAL_TICKS);
         } else {
-            vTaskDelay(pdMS_TO_TICKS(SENSOR_RETRY_INTERVAL_SECS * 1000));
+            vTaskDelay(SENSOR_RETRY_INTERVAL_TICKS);
         }
     }
 }
@@ -103,11 +107,11 @@ void mainTask(void *app) {
     std::chrono::steady_clock::time_point last_logged_heap = std::chrono::steady_clock::now();
 
     // Wait a bit of time to get a valid clock before loading
-    for (int i = 0; i < (CLOCK_WAIT_MS / CLOCK_POLL_PERIOD_MS); i++) {
+    for (int i = 0; i < (CLOCK_WAIT_TICKS / CLOCK_POLL_PERIOD_TICKS); i++) {
         if (app_->clockReady()) {
             break;
         }
-        vTaskDelay(pdMS_TO_TICKS(CLOCK_POLL_PERIOD_MS));
+        vTaskDelay(CLOCK_POLL_PERIOD_TICKS);
     }
     ESP_LOGI(TAG, "clock ready, starting app");
 
@@ -131,29 +135,54 @@ void otaMsgCb(const char *msg) {
     }
 }
 
-void otaTask(void *) {
-    while (1) {
-        if (wifi_.getState() == AbstractWifi::State::Connected) {
-            if (ota_->update() == AbstractOTAClient::Error::FetchError) {
-                vTaskDelay(CONNECT_WAIT_INTERVAL_TICKS);
-            } else {
-                vTaskDelay(OTA_INTERVAL_TICKS);
-            }
-        } else {
-            ESP_LOGI(TAG, "skipping OTA--wifi not connected");
-            vTaskDelay(CONNECT_WAIT_INTERVAL_TICKS);
-        }
+void netTask(void *) {
+    uint64_t ota_due_ms, hass_due_ms;
+    uint64_t *tasks_due_ms[] = {&ota_due_ms, &hass_due_ms};
+    for (int i = 0; i < std::size(tasks_due_ms); i++) {
+        *tasks_due_ms[i] = esp_timer_get_time() / 1000;
     }
-}
 
-void homeClientTask(void *) {
     while (1) {
-        if (wifi_.getState() == AbstractWifi::State::Connected) {
+        AbstractWifi::State wifi_state;
+
+        while ((wifi_state = wifi_.getState()) != AbstractWifi::State::Connected) {
+            switch (wifi_state) {
+            case AbstractWifi::State::Inactive:
+                ESP_LOGE(TAG, "wifi must be active in net loop");
+                assert(false);
+            case AbstractWifi::State::Connecting:
+                vTaskDelay(WIFI_POLL_INTERVAL_TICKS);
+                break;
+            case AbstractWifi::State::Connected:
+                __builtin_unreachable();
+            case AbstractWifi::State::Err:
+                vTaskDelay(WIFI_RETRY_INTERVAL_TICKS);
+                ESP_LOGI(TAG, "retrying wifi connection");
+                wifi_.retry();
+                break;
+            }
+        }
+
+        int64_t next_due_ms = INT64_MAX;
+        for (int i = 0; i < std::size(tasks_due_ms); i++) {
+            next_due_ms = std::min(next_due_ms, (int64_t)*tasks_due_ms[i]);
+        }
+        int64_t wait_ms = next_due_ms - esp_timer_get_time() / 1000;
+        if (wait_ms > 0) {
+            vTaskDelay(pdMS_TO_TICKS(wait_ms) + 1);
+        }
+
+        uint64_t now_ms = esp_timer_get_time() / 1000;
+        if (hass_due_ms < now_ms) {
             homeCli_.fetch();
-            vTaskDelay(HOME_REQUEST_INTERVAL_TICKS);
-        } else {
-            ESP_LOGI(TAG, "skipping home client fetch--wifi not connected");
-            vTaskDelay(CONNECT_WAIT_INTERVAL_TICKS);
+            hass_due_ms = now_ms + HOME_REQUEST_INTERVAL_MS;
+        }
+        if (ota_due_ms < now_ms) {
+            if (ota_->update() == AbstractOTAClient::Error::FetchError) {
+                ota_due_ms = now_ms + OTA_FETCH_ERR_INTERVAL_MS;
+            } else {
+                ota_due_ms = now_ms + OTA_INTERVAL_MS;
+            }
         }
     }
 }
@@ -280,9 +309,7 @@ extern "C" void controller_main() {
                 NULL);
     xTaskCreate(modbusTask, "modbusTask", MODBUS_TASK_STACK_SIZE, modbusController_,
                 MODBUS_TASK_PRIO, NULL);
-    xTaskCreate(otaTask, "otaTask", OTA_TASK_STACK_SIZE, NULL, ESP_TASK_PRIO_MIN, NULL);
-    xTaskCreate(homeClientTask, "homeClientTask_", HOME_CLIENT_TASK_STACK_SIZE, NULL,
-                ESP_TASK_PRIO_MIN, NULL);
+    xTaskCreate(netTask, "netTask", NET_TASK_STACK_SIZE, NULL, ESP_TASK_PRIO_MIN, NULL);
 
     // Wait for sensors to have valid data
     while (std::isnan(sensors_.getLatest().tempC)) {

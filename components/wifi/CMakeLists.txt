@@ -1,4 +1,8 @@
-file(GLOB SOURCES src/*.cpp)
+if(ESP_PLATFORM)
+    file(GLOB SOURCES src/*.cpp)
+else()
+    file(GLOB SOURCES src/Abstract*.cpp src/Fake*.cpp)
+endif()
 
 idf_component_register(
     SRCS ${SOURCES}

@@ -1,5 +1,6 @@
 #include "zone_io_client.h"
 
+// TODO: Use selective compilation in a component instead of this guard
 #if defined(ESP_PLATFORM)
 
 #include "driver/uart.h"

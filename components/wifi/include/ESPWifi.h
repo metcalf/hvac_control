@@ -8,6 +8,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
 
+// NB: Maybe need to set CONFIG_ESP_SYSTEM_EVENT_TASK_STACK_SIZE >= 3584?
 class ESPWifi : public AbstractWifi {
   public:
     ESPWifi() { mutex_ = xSemaphoreCreateMutex(); }
@@ -16,12 +17,9 @@ class ESPWifi : public AbstractWifi {
     void init();
     void connect(const char *ssid, const char *password);
     void disconnect();
+    void retry();
 
-    void msg(char *msg, size_t n) override {
-        xSemaphoreTake(mutex_, portMAX_DELAY);
-        strncpy(msg, msg_, n);
-        xSemaphoreGive(mutex_);
-    }
+    void msg(char *msg, size_t n) override;
     State getState() override {
         xSemaphoreTake(mutex_, portMAX_DELAY);
         State state = state_;
@@ -39,5 +37,9 @@ class ESPWifi : public AbstractWifi {
     int retryNum_;
     wifi_config_t config_;
     char msg_[32] = "";
+    int reason_ = 0;
     SemaphoreHandle_t mutex_;
+
+    void doRetry(int reason = 0);
+    void setState(State state, char *msg, int reason = 0);
 };

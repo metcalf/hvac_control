@@ -1,4 +1,3 @@
-#if defined(ESP_PLATFORM)
 #include "ESPWifi.h"
 
 #include <cstring>
@@ -34,10 +33,7 @@ void ESPWifi::connect(const char *ssid, const char *password) {
     memcpy(config_.sta.ssid, ssid, sizeof(config_.sta.ssid));
     memcpy(config_.sta.password, password, sizeof(config_.sta.password));
 
-    xSemaphoreTake(mutex_, portMAX_DELAY);
-    state_ = State::Connecting;
-    msg_[0] = '\0';
-    xSemaphoreGive(mutex_);
+    setState(State::Connecting, "");
 
     config_.sta.threshold.authmode = WIFI_AUTH_WPA2_PSK;
     config_.sta.pmf_cfg = {.capable = true, .required = false};
@@ -70,9 +66,30 @@ void ESPWifi::init() {
 void ESPWifi::disconnect() {
     ESP_ERROR_CHECK(esp_wifi_stop());
 
+    setState(State::Inactive, "");
+}
+
+void ESPWifi::retry() {
     xSemaphoreTake(mutex_, portMAX_DELAY);
-    state_ = State::Inactive;
-    msg_[0] = '\0';
+    State state = state_;
+    xSemaphoreGive(mutex_);
+
+    if (state != State::Err) {
+        ESP_LOGW(TAG, "retry it only valid from the Err state");
+        return;
+    }
+    retryNum_ = 0;
+    doRetry();
+}
+
+void ESPWifi::msg(char *msg, size_t n) {
+    xSemaphoreTake(mutex_, portMAX_DELAY);
+    if (reason_ == 0) {
+        strncpy(msg, msg_, n);
+
+    } else {
+        snprintf(msg, n, "%s (%d)", msg_, reason_);
+    }
     xSemaphoreGive(mutex_);
 }
 
@@ -90,33 +107,13 @@ void ESPWifi::onWifiEvent(int32_t eventId, void *eventData) {
         break;
     case WIFI_EVENT_STA_DISCONNECTED: {
         uint8_t reason = ((wifi_event_sta_disconnected_t *)eventData)->reason;
-        ESP_LOGI(TAG, "reason: %d", reason);
-        // TODO: Arduino doesn't retry on AUTH_FAIL but sometime this seems
-        // necessary... if (reason == WIFI_REASON_AUTH_FAIL) {
-
-        //   esp_wifi_connect();
-        //   ESP_LOGW(TAG, "wifi auth failed, not retrying");
-        // } else
-        const char *stateMsg;
-        State state;
+        ESP_LOGI(TAG, "disconnected (%d)", reason);
         if (retryNum_ < MAX_RETRIES) {
-            esp_wifi_connect();
             retryNum_++;
-            stateMsg = "retrying";
-            state = State::Connecting;
+            doRetry(reason);
         } else {
-            stateMsg = "failed";
-            // TODO: Periodically retry?
-            state = State::Err;
+            setState(State::Err, "failed", reason);
         }
-
-        xSemaphoreTake(mutex_, portMAX_DELAY);
-        snprintf(msg_, sizeof(msg_), "%s (%d)", stateMsg, reason);
-        state_ = state;
-        xSemaphoreGive(mutex_);
-
-        ESP_LOGW(TAG, "%s", msg_);
-
         break;
     }
     }
@@ -135,21 +132,25 @@ void ESPWifi::onIPEvent(int32_t eventId, void *eventData) {
         }
         esp_sntp_init();
 
-        xSemaphoreTake(mutex_, portMAX_DELAY);
-        state_ = State::Connected;
-        xSemaphoreGive(mutex_);
+        setState(State::Connected, "");
+
         break;
     }
     case IP_EVENT_STA_LOST_IP:
-        xSemaphoreTake(mutex_, portMAX_DELAY);
-        state_ = State::Err;
-        snprintf(msg_, sizeof(msg_), "lost IP");
-        xSemaphoreGive(mutex_);
-
-        ESP_LOGW(TAG, "%s", msg_);
-        // TODO: Do we try a reconnect here?
+        setState(State::Err, "lost IP", eventId);
         break;
     }
 }
 
-#endif // defined(ESP_PLATFORM)
+void ESPWifi::doRetry(int reason) {
+    esp_wifi_connect();
+    setState(State::Connecting, "retrying", reason);
+}
+
+void ESPWifi::setState(State state, char *msg, int reason) {
+    xSemaphoreTake(mutex_, portMAX_DELAY);
+    strncpy(msg_, msg, sizeof(msg_));
+    reason_ = reason;
+    state_ = state;
+    xSemaphoreGive(mutex_);
+}

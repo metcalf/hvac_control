@@ -6,6 +6,7 @@
 #include "FakeConfigStore.h"
 #include "FakeHomeClient.h"
 #include "FakeModbusController.h"
+#include "FakeOTAClient.h"
 #include "FakeSensors.h"
 #include "FakeValveCtrl.h"
 #include "FakeWifi.h"
@@ -57,9 +58,9 @@ class ControllerAppTest : public testing::Test {
   protected:
     void SetUp() override {
         using namespace std::placeholders;
-        app_ = new TestControllerApp(default_test_config(), &uiManager_, &modbusController_,
-                                     &sensors_, &valveCtrl_, &wifi_, &cfgStore_, &homeCli_,
-                                     std::bind(&ControllerAppTest::uiEvtRcv, this, _1, _2));
+        app_ = new TestControllerApp(
+            default_test_config(), &uiManager_, &modbusController_, &sensors_, &valveCtrl_, &wifi_,
+            &cfgStore_, &homeCli_, &otaCli_, std::bind(&ControllerAppTest::uiEvtRcv, this, _1, _2));
 
         setRealNow(std::tm{
             .tm_hour = 2,
@@ -121,6 +122,7 @@ class ControllerAppTest : public testing::Test {
     FakeWifi wifi_;
     FakeConfigStore<Config> cfgStore_;
     FakeHomeClient homeCli_;
+    FakeOTAClient otaCli_;
 
     AbstractUIManager::Event *evt_;
     Config savedConfig_;

@@ -19,7 +19,8 @@
 #define DNS_ATTEMPT_INTERVAL std::chrono::seconds(15)
 #define SOCKET_TIMEOUT_MS 1000
 #define TASK_STACK_SIZE 4092
-#define RING_BUFFER_SIZE REMOTE_LOG_MESSAGE_LEN * 10
+#define RING_BUFFER_SIZE                                                       \
+    (REMOTE_LOG_MESSAGE_LEN + 8) * 10 // 8 byte header per item
 
 static char name_[64], dest_host_[256];
 
@@ -142,7 +143,13 @@ static void send_to_syslog(const char *msg, const size_t len) {
 
 static void queue_for_syslog(esp_log_level_t level, const char *fmt,
                              va_list args) {
-    char buffer[REMOTE_LOG_MESSAGE_LEN];
+    if (xPortInIsrContext()) {
+        // Until there's a
+        // xRingbufferSendAcquireFromISR/xRingbufferSendCompleteFromISR we just
+        // won't support this.
+        printf("RLOG: Cannot queue to remote logger from ISR\n");
+        return;
+    }
 
     // Extract the tag and advance the format string to after the tag
     const char *fmt_after_tag = strstr(fmt, ": ") + 2;
@@ -151,26 +158,42 @@ static void queue_for_syslog(esp_log_level_t level, const char *fmt,
 
     int priority = (FACILITY * 8) + get_syslog_severity(level);
 
-    ESP_LOGD(TAG, "got tag: %s", tag);
+    // NB: We use xRingbufferSendAcquire here instead of a stack-allocated
+    // buffer since we don't know how much stack the caller has available.
+    char *item;
+    if (!xRingbufferSendAcquire(ring_buffer_, (void **)&item,
+                                REMOTE_LOG_MESSAGE_LEN, 0)) {
+        printf("RLOG: Failed to acquire memory for item\n");
+        return;
+    }
 
     // Minimal rsyslog format, time is inserted server-side
-    int prefix_written =
-        snprintf(buffer, sizeof(buffer), "<%d>%s %s: ", priority, name_, tag);
+    int prefix_written = snprintf(item, REMOTE_LOG_MESSAGE_LEN,
+                                  "<%d>%s %s: ", priority, name_, tag);
 
-    if (prefix_written <= 0 || prefix_written >= sizeof(buffer)) {
+    if (prefix_written <= 0 || prefix_written >= REMOTE_LOG_MESSAGE_LEN - 1) {
+        // Write an empty message to indicate an error
+        item[0] = '\0';
         ESP_LOGI(TAG, "Failed to format syslog message");
+        if (!xRingbufferSendComplete(ring_buffer_, &item)) {
+            ESP_LOGI(TAG, "failed to enqueue aborted message");
+        }
         return;
     }
 
     int msg_written =
-        vsnprintf(buffer + prefix_written, sizeof(buffer) - prefix_written,
-                  fmt_after_tag, args);
+        vsnprintf(item + prefix_written,
+                  REMOTE_LOG_MESSAGE_LEN - prefix_written, fmt_after_tag, args);
 
-    if (msg_written > 0) {
-        if (!xRingbufferSend(ring_buffer_, buffer, prefix_written + msg_written,
-                             0)) {
-            ESP_LOGI(TAG, "Failed to enqueue message");
-        }
+    if (msg_written <= 0) {
+        // Write an empty message to indicate an error. Note we do not treat
+        // message truncation as an error here since it's still useful to send
+        // truncated messages.
+        item[0] = '\0';
+    }
+
+    if (!xRingbufferSendComplete(ring_buffer_, item)) {
+        ESP_LOGI(TAG, "failed to enqueue message");
     }
 }
 
@@ -181,7 +204,7 @@ static int custom_log_vprintf(const char *fmt, va_list args) {
     char log_level_char = fmt[0];
 
     if (log_level_char == 27) {
-        printf("RLOG: Must disable log coloring");
+        printf("RLOG: Must disable log coloring\n");
     }
 
     // Convert ESP log level character to enum
@@ -233,7 +256,10 @@ static void remote_logger_task(void *) {
         char *item =
             (char *)xRingbufferReceive(ring_buffer_, &size, portMAX_DELAY);
         if (item != NULL && size > 0) {
-            send_to_syslog(item, size);
+            size_t len = strnlen(item, size);
+            if (len > 0) {
+                send_to_syslog(item, len);
+            }
         }
         vRingbufferReturnItem(ring_buffer_, item);
     }
