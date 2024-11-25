@@ -43,7 +43,7 @@ void HASSClient::fetch() {
             setResult(HomeState{.err = Error::FetchError});
         } else if (outputOk_) {
             HomeState result = parseResponse();
-            ESP_LOGI(TAG, "vacation:%c\tweatherObsTime:%lld\tweatherTempC:%f",
+            ESP_LOGI(TAG, "vacation:%c\tweatherObsTime:%lld\tweatherTempC:%.1f",
                      result.vacationOn ? 'y' : 'n',
                      result.weatherObsTime.time_since_epoch() / std::chrono::seconds(1),
                      result.weatherTempC);

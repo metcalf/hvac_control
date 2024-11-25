@@ -642,7 +642,8 @@ Setpoints ControllerApp::getCurrentSetpoints() {
                 setpointReason_ = "precooling";
                 setpoints.coolTempC = precoolC;
                 setMessageF(MsgID::Precooling, true, "Cooling to %d by %02d:%02d%s",
-                            ABS_C_TO_F(setpoints.coolTempC), SCHEDULE_TIME_STR_ARGS(nextSchedule));
+                            static_cast<int>(ABS_C_TO_F(setpoints.coolTempC) + 0.5),
+                            SCHEDULE_TIME_STR_ARGS(nextSchedule));
 
                 return setpoints;
             }
@@ -661,14 +662,16 @@ void ControllerApp::setTempOverride(AbstractUIManager::TempOverride to) {
     int idx = getScheduleIdx(1);
     if (idx == -1) {
         tempOverrideUntilScheduleIdx_ = 0;
-        setMessageF(MsgID::TempOverride, true, "Hold %d/%d", ABS_C_TO_F(tempOverride_.heatC),
-                    ABS_C_TO_F(tempOverride_.coolC));
+        setMessageF(MsgID::TempOverride, true, "Hold %d/%d",
+                    static_cast<int>(ABS_C_TO_F(tempOverride_.heatC) + 0.5),
+                    static_cast<int>(ABS_C_TO_F(tempOverride_.coolC) + 0.5));
     } else {
         tempOverrideUntilScheduleIdx_ = idx;
         Config::Schedule schedule = config_.schedules[tempOverrideUntilScheduleIdx_];
 
         setMessageF(MsgID::TempOverride, true, "Hold %d/%d until %02d:%02d%s",
-                    ABS_C_TO_F(tempOverride_.heatC), ABS_C_TO_F(tempOverride_.coolC),
+                    static_cast<int>(ABS_C_TO_F(tempOverride_.heatC) + 0.5),
+                    static_cast<int>(ABS_C_TO_F(tempOverride_.coolC) + 0.5),
                     SCHEDULE_TIME_STR_ARGS(schedule));
     }
 }

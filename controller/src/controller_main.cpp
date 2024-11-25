@@ -75,8 +75,8 @@ void log_heap_stats() {
     size_t largest_free_block = heap_caps_get_largest_free_block(MALLOC_CAP_DEFAULT);
 
     // Log key metrics
-    ESP_LOGW("HEAP", "free=%ub\tmin_free=%ub\tlargest_block=%ub", free_heap, min_free_heap,
-             largest_free_block);
+    ESP_LOGW("HEAP", "uptime=%llus\tfree=%ub\tmin_free=%ub\tlargest_block=%ub",
+             esp_timer_get_time() / 1000 / 1000, free_heap, min_free_heap, largest_free_block);
 }
 
 void sensorTask(void *sensors) {

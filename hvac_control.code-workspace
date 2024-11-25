@@ -155,7 +155,8 @@
       "__tree": "cpp",
       "scd4x_i2c.h": "c",
       "execution": "cpp",
-      "queue": "cpp"
+      "queue": "cpp",
+      "init_display.h": "c"
     }
   }
 }
