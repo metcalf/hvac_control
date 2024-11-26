@@ -41,5 +41,5 @@ class ESPWifi : public AbstractWifi {
     SemaphoreHandle_t mutex_;
 
     void doRetry(int reason = 0);
-    void setState(State state, char *msg, int reason = 0);
+    void setState(State state, const char *msg, int reason = 0);
 };

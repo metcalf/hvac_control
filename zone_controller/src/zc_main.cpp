@@ -88,9 +88,9 @@ void uiTask(void *uiManager) {
 
 void otaMsgCb(const char *msg) {
     if (strlen(msg) > 0) {
-        uiManager_->setMessage(static_cast<uint8_t>(MsgID::OTA), false, msg);
+        uiManager_->setMessage(MsgID::OTA, false, msg);
     } else {
-        uiManager_->clearMessage(static_cast<uint8_t>(MsgID::OTA));
+        uiManager_->clearMessage(MsgID::OTA);
     }
 }
 
@@ -346,5 +346,5 @@ extern "C" void zc_main() {
                 ZONE_IO_TASK_PRIORITY, NULL);
     xTaskCreate(outputTask, "output_task", OUTPUT_TASK_STACK_SIZE, NULL, OUTPUT_TASK_PRIORITY,
                 NULL);
-    xTaskCreate(otaTask, "otaTask", OTA_TASK_STACK_SIZE, NULL, MODBUS_TASK_PRIO, NULL);
+    xTaskCreate(otaTask, "otaTask", OTA_TASK_STACK_SIZE, NULL, ESP_TASK_PRIO_MIN, NULL);
 }

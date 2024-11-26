@@ -15,6 +15,10 @@ class MessageManager {
 public:
   typedef void (*cancelCb_t)(uint8_t);
 
+  // TODO: A better interface here might be to dynamically allocate the message
+  // containers and return a handle to the instantiator rather than requiring a
+  // centralized list of message IDs. Alternatively, could consider making this
+  // a template so at least the message IDs are typed.
   MessageManager(size_t nMsgIds, lv_obj_t *msgsContainer,
                  const lv_font_t *closeSymbolFont, cancelCbFn_t *cancelCb);
   ~MessageManager() {

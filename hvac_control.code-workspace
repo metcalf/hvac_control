@@ -156,7 +156,8 @@
       "scd4x_i2c.h": "c",
       "execution": "cpp",
       "queue": "cpp",
-      "init_display.h": "c"
+      "init_display.h": "c",
+      "scd4x_sensirion_common.h": "c"
     }
   }
 }

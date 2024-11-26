@@ -1,5 +1,0 @@
-{
-  "name": "zone_io_client",
-  "version": "0.0.0",
-  "headers": ["zone_io_client.h"]
-}

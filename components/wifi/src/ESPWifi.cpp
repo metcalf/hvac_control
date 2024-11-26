@@ -147,7 +147,7 @@ void ESPWifi::doRetry(int reason) {
     setState(State::Connecting, "retrying", reason);
 }
 
-void ESPWifi::setState(State state, char *msg, int reason) {
+void ESPWifi::setState(State state, const char *msg, int reason) {
     xSemaphoreTake(mutex_, portMAX_DELAY);
     strncpy(msg_, msg, sizeof(msg_));
     reason_ = reason;
