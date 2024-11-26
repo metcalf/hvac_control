@@ -1,5 +1,0 @@
-{
-  "name": "cxi_client",
-  "version": "0.0.0",
-  "headers": ["cxi_client.h"]
-}

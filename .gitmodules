@@ -1,5 +1,5 @@
 [submodule "fresh_air_control/lib/BME280/src"]
-	path = shared_libs/BME280/src
+	path = components/BME280/src
 	url = https://github.com/boschsensortec/BME280_driver.git
 [submodule "components/esp-modbus"]
 	path = components/esp-modbus
@@ -16,11 +16,11 @@
 	path = components/i2c_manager
 	url = https://github.com/metcalf/i2c_manager.git
 [submodule "shared_libs/scd40"]
-	path = shared_libs/scd40
+	path = components/scd40
 	url = git@github.com:metcalf/embedded-i2c-scd4x.git
 [submodule "controller/lib/date"]
 	path = controller/lib/date
 	url = https://github.com/HowardHinnant/date
 [submodule "shared_libs/embedded-sts"]
-	path = shared_libs/embedded-sts
+	path = components/embedded-sts
 	url = git@github.com:metcalf/sensirion-embedded-sts.git

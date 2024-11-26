@@ -28,7 +28,7 @@ MessageManager::MessageManager(size_t nMsgIds, lv_obj_t *msgsContainer,
   for (int i = 0; i < nMsgIds; i++) {
     messages_[i] = new MessageContainer(
         msgsContainer_, closeSymbolFont,
-        new __intCancelCbFn_t([this, i]() { onCancelMessage(i); }));
+        new __intCancelCbFn_t([this, i]() { this->onCancelMessage(i); }));
   }
 
   lv_obj_set_scroll_snap_y(msgsContainer_, LV_SCROLL_SNAP_START);
