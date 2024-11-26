@@ -1,9 +1,13 @@
+# Old backup paths
+controller_pio/
+
 # These contain user-specific paths
 /.pio/
 /.vscode/
 wifi_credentials.h
 remote_spec.cfg
 sdkconfig.esp32s3.old
+build/
 
 # Prerequisites
 *.d
