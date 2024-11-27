@@ -6,13 +6,8 @@
 #include "LinearFancoilAlgorithm.h"
 #include "ValveAlgorithm.h"
 
-#include "esp_log.h"
-#if defined(ESP_PLATFORM)
 #include "esp_err.h"
-#else
-typedef int esp_err_t;
-#define ESP_OK 0
-#endif
+#include "esp_log.h"
 
 #define SCHEDULE_TIME_STR_ARGS(s) (s.startHr - 1) % 12 + 1, s.startMin, s.startHr < 12 ? "AM" : "PM"
 

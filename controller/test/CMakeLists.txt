@@ -5,6 +5,7 @@ file(GLOB TEST_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/../components/controller_app/src/*.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/../../components/wifi/Abstract*.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/../../components/wifi/Fake*.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../components/esp_local_test_helpers/src/*.cpp
 )
 
 
@@ -50,6 +51,7 @@ target_include_directories(
     PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../components/controller_app/include
     PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/helpers/include
     PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../../components/wifi/include
+    PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../../components/esp_local_test_helpers/include
 )
 
 # Add tests to CTest

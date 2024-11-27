@@ -2,12 +2,7 @@
 
 #include <chrono>
 
-#if defined(ESP_PLATFORM)
 #include "esp_err.h"
-#else
-typedef int esp_err_t;
-#define ESP_OK 0
-#endif
 
 #include "ControllerDomain.h"
 

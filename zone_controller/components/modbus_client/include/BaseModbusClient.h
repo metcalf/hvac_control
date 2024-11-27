@@ -1,10 +1,6 @@
 #pragma once
 
-#if defined(ESP_PLATFORM)
 #include <esp_err.h>
-#else
-#include <native_err.h>
-#endif
 
 #include "CxRegisters.h"
 

@@ -4,7 +4,7 @@ file(GLOB TEST_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/helpers/src/*.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/../components/out_ctrl/src/*.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/../components/modbus_client/src/*.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../components/zone_io_client/src/zone_io_client.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../components/esp_local_test_helpers/src/*.cpp
 )
 
 
@@ -51,6 +51,7 @@ target_include_directories(
     PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../components/out_ctrl/include
     PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../components/modbus_client/include
     PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../../components/zone_io_client/include
+    PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../../components/esp_local_test_helpers/include
 )
 
 # Add tests to CTest
