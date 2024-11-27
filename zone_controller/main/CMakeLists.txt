@@ -1,3 +1,9 @@
-FILE(GLOB_RECURSE app_sources ${CMAKE_SOURCE_DIR}/src/*.*)
+# This file was automatically generated for projects
+# without default 'CMakeLists.txt' file.
 
-idf_component_register(SRCS ${app_sources})
+FILE(GLOB app_sources *.c *.cpp)
+
+idf_component_register(
+    SRCS ${app_sources}
+    INCLUDE_DIRS "include"
+)
