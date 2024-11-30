@@ -20,6 +20,10 @@
 #include "PIDAlgorithm.h"
 #include "SetpointHandler.h"
 
+// Keep HVAC on in the same mode for at least this time to avoid excessive valve wear
+// and detect potential control system issues.
+#define MIN_HVAC_ON_INTERVAL std::chrono::minutes(5)
+
 class ControllerApp {
   public:
     typedef void (*cfgUpdateCb_t)(ControllerDomain::Config &config);

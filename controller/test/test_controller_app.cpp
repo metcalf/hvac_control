@@ -250,6 +250,7 @@ TEST_F(ControllerAppTest, CallsForValveHVAC) {
 
     // Turns off
     sensors_.setLatest({.tempC = 19.1, .humidity = 2.0, .co2 = 500});
+    app_->steadyNow_ += MIN_HVAC_ON_INTERVAL; // allowHVACChange
     app_->task();
     EXPECT_TRUE(valveCtrl_.set_);
     valveCtrl_.set_ = false;
@@ -272,7 +273,7 @@ double fcCallTempSeq[] = {
     23.0, // Establish cooling demand below the "ac on" threshold
     25.0, // Establish cooling demand at a high enough level to trigger "ac on"
     22.3, // With reduced cooling demand, AC should stay on
-    22.0, // With low enough demand, AC should turn off
+    21.5, // With low enough demand, AC should turn off
 };
 int nHvacCalls = std::size(fcCallTempSeq);
 
@@ -292,8 +293,8 @@ TEST_F(ControllerAppTest, CallsForFancoilHVAC) {
     using FancoilRequest = ControllerDomain::FancoilRequest;
 
     for (int i = 0; i < nHvacCalls; i++) {
-        // Establish heating demand
         sensors_.setLatest({.tempC = fcCallTempSeq[i], .humidity = 2.0, .co2 = 500});
+        app_->steadyNow_ += MIN_HVAC_ON_INTERVAL; // allowHVACChange
         app_->task();
 
         auto actual = modbusController_.getFancoilRequest();

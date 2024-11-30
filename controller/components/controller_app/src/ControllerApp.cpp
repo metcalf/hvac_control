@@ -32,9 +32,6 @@
 #define MAKEUP_MAX_AGE std::chrono::minutes(5)
 // Ignore fancoil states older than this
 #define FANCOIL_STATE_MAX_AGE std::chrono::minutes(5)
-// Keep HVAC on in the same mode for at least this time to avoid excessive valve wear
-// and detect potential control system issues.
-#define MIN_HVAC_ON_INTERVAL std::chrono::minutes(5)
 // Turn A/C on if we have cooling demand and the coil temp is below this
 #define COIL_COLD_TEMP_C ABS_F_TO_C(60.0)
 // Turn the A/C on if temp exceeds setpoint by this amount
@@ -453,7 +450,7 @@ bool ControllerApp::allowHVACChange(bool cool, bool on) {
             hvacLastCool_ = cool;
             hvacLastTurnedOn_ = now;
         }
-    } else if (now - hvacLastTurnedOn_ > MIN_HVAC_ON_INTERVAL) {
+    } else if (now - hvacLastTurnedOn_ >= MIN_HVAC_ON_INTERVAL) {
         // Always allow transitions if the last turn on time was long enough ago
         allow = true;
 
