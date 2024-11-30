@@ -77,6 +77,7 @@ class ControllerApp {
         HomeClientErr,
         OTA,
         Vacation,
+        HVACChangeLimit,
         _Last,
     };
 
@@ -145,6 +146,8 @@ class ControllerApp {
             return "OTA";
         case MsgID::Vacation:
             return "Vacation";
+        case MsgID::HVACChangeLimit:
+            return "HVACChangeLimit";
         case MsgID::_Last:
             return "";
             break;
@@ -182,6 +185,9 @@ class ControllerApp {
     FancoilSpeed getSpeedForDemand(bool cool, double demand);
     bool isCoilCold();
     void setVacation(bool on);
+    bool allowHVACChange(bool cool, bool on);
+    void resetHVACChangeLimit() { hvacLastTurnedOn_ = {}; }
+    const char *hvacModeStr(bool cool, bool on);
 
     Config config_;
     bool vacationOn_ = false;
@@ -211,6 +217,10 @@ class ControllerApp {
         fanMaxSpeedStarted_{};
 
     std::chrono::steady_clock::time_point lastStatusLog_{};
+
+    std::chrono::steady_clock::time_point hvacLastTurnedOn_{};
+    bool hvacLastCool_;
+    Setpoints lastSetpoints_{};
 
     // Delta from setpoint in the direction we're aiming to correct
     // e.g. when heating, the amount by which the indoor temp is below the setpoint

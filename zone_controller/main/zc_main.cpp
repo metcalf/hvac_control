@@ -15,6 +15,7 @@
 #include "ESPOutIO.h"
 #include "ESPWifi.h"
 #include "FakeModbusClient.h"
+#include "NetworkTaskManager.h"
 #include "OutCtrl.h"
 #include "ValveStateManager.h"
 #include "ZCUIManager.h"
@@ -35,7 +36,8 @@
 // Check the CX status every minute to see if it differs from what we expect
 #define CHECK_CX_STATUS_INTERVAL std::chrono::seconds(60)
 #define MAX_VALVE_TRANSITION_INTERVAL std::chrono::minutes(2)
-#define OTA_INTERVAL_TICKS pdMS_TO_TICKS(15 * 60 * 1000)
+#define OTA_INTERVAL_MS (15 * 60 * 1000)
+#define OTA_FETCH_ERR_INTERVAL_MS (60 * 1000)
 
 #define VALVE_STUCK_MSG "valves may be stuck"
 #define VALVE_SW_MSG "valves not consistent with switches"
@@ -56,6 +58,7 @@ static ESPOutIO outIO_;
 static ESPModbusClient realMbClient_;
 static FakeModbusClient mbClient_;
 static ESPOTAClient *ota_;
+static NetworkTaskManager netTaskMgr_(wifi_);
 
 static ValveStateManager valveStateManager_;
 static OutCtrl *outCtrl_;
@@ -67,6 +70,14 @@ static CxOpMode lastCxOpMode_ = CxOpMode::Unknown;
 static std::chrono::steady_clock::time_point lastCheckedCxOpMode_;
 
 static std::chrono::steady_clock::time_point valveLastSet_[4];
+
+uint64_t otaFn() {
+    if (ota_->update() == AbstractOTAClient::Error::FetchError) {
+        return OTA_FETCH_ERR_INTERVAL_MS;
+    } else {
+        return OTA_INTERVAL_MS;
+    }
+}
 
 void inputEvtCb() {
     ZCUIManager::Event evt{ZCUIManager::EventType::InputUpdate, 0};
@@ -91,13 +102,6 @@ void otaMsgCb(const char *msg) {
         uiManager_->setMessage(MsgID::OTA, false, msg);
     } else {
         uiManager_->clearMessage(MsgID::OTA);
-    }
-}
-
-void otaTask(void *) {
-    while (1) {
-        ota_->update();
-        vTaskDelay(OTA_INTERVAL_TICKS);
     }
 }
 
@@ -346,5 +350,5 @@ extern "C" void zc_main() {
                 ZONE_IO_TASK_PRIORITY, NULL);
     xTaskCreate(outputTask, "output_task", OUTPUT_TASK_STACK_SIZE, NULL, OUTPUT_TASK_PRIORITY,
                 NULL);
-    xTaskCreate(otaTask, "otaTask", OTA_TASK_STACK_SIZE, NULL, ESP_TASK_PRIO_MIN, NULL);
+    netTaskMgr_.start();
 }

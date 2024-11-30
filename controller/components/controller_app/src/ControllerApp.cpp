@@ -32,6 +32,9 @@
 #define MAKEUP_MAX_AGE std::chrono::minutes(5)
 // Ignore fancoil states older than this
 #define FANCOIL_STATE_MAX_AGE std::chrono::minutes(5)
+// Keep HVAC on in the same mode for at least this time to avoid excessive valve wear
+// and detect potential control system issues.
+#define MIN_HVAC_ON_INTERVAL std::chrono::minutes(5)
 // Turn A/C on if we have cooling demand and the coil temp is below this
 #define COIL_COLD_TEMP_C ABS_F_TO_C(60.0)
 // Turn the A/C on if temp exceeds setpoint by this amount
@@ -198,6 +201,7 @@ bool ControllerApp::pollUIEvent(bool wait) {
         break;
     case EventType::SetSystemPower:
         ESP_LOGI(TAG, "SetSystemPower:\t%d", uiEvent.payload.systemPower);
+        resetHVACChangeLimit();
         config_.systemOn = uiEvent.payload.systemPower;
         cfgStore_->store(config_);
         if (config_.systemOn) {
@@ -259,6 +263,7 @@ bool ControllerApp::pollUIEvent(bool wait) {
         break;
     }
     case EventType::ACOverride:
+        resetHVACChangeLimit();
         switch (uiEvent.payload.acOverride) {
         case AbstractUIManager::ACOverride::Normal:
             ESP_LOGI(TAG, "ACOverride: NORMAL");
@@ -351,33 +356,44 @@ ControllerDomain::HVACState ControllerApp::setHVAC(double heatDemand, double coo
     // TODO: Somewhat awkardly, the hysteresis for fancoils is handled in ControllerApp and
     // the hysteresis for valves is handled by the ValveAlgorithm. Probably should move
     // all hysteresis to the algo.
+    // NB: With `allowHVACChange` false, it would be nice to slow any running fancoil
+    // down to the minimum available speed without changing the mode. That logic is reasonably
+    // complicated for a case that should rarely occur so it may not be worth bothering with.
     switch (hvacType) {
     case Config::HVACType::None:
-        valveCtrl_->setMode(false, false); // Make sure valve is off
+        if (allowHVACChange(cool, false)) {
+            // Make sure everything is off
+            valveCtrl_->setMode(false, false);
+            modbusController_->setFancoil(FancoilRequest{FancoilSpeed::Off, false});
+        }
         break;
     case Config::HVACType::Fancoil: {
         FancoilSpeed speed = getSpeedForDemand(cool, demand);
-        modbusController_->setFancoil(FancoilRequest{speed, cool});
 
-        // HACK: If the demand is high, turn on the valve even in fancoil mode. We use
-        // this in the MBA for supplemental electric resistance heating.
-        if (speed == FancoilSpeed::High) {
-            valveCtrl_->setMode(cool, true);
-        } else {
-            // Turn off valves
-            valveCtrl_->setMode(false, false);
+        if (allowHVACChange(cool, speed != FancoilSpeed::Off)) {
+            modbusController_->setFancoil(FancoilRequest{speed, cool});
+
+            // HACK: If the demand is high, turn on the valve even in fancoil mode. We use
+            // this in the MBA for supplemental electric resistance heating.
+            if (speed == FancoilSpeed::High) {
+                valveCtrl_->setMode(cool, true);
+            } else {
+                // Turn off valves
+                valveCtrl_->setMode(false, false);
+            }
         }
 
         break;
     }
     case Config::HVACType::Valve:
-        valveCtrl_->setMode(cool, demand > ON_DEMAND_THRESHOLD);
+        bool wantOn = demand > ON_DEMAND_THRESHOLD;
+        if (allowHVACChange(cool, wantOn)) {
+            valveCtrl_->setMode(cool, wantOn);
+            if (otherType == Config::HVACType::Fancoil) {
+                modbusController_->setFancoil(FancoilRequest{FancoilSpeed::Off, false});
+            }
+        }
         break;
-    }
-
-    if (hvacType != Config::HVACType::Fancoil && otherType == Config::HVACType::Fancoil) {
-        // Turn off the fancoil if we didn't set it already and the other mode is a fancoil
-        modbusController_->setFancoil(FancoilRequest{FancoilSpeed::Off, false});
     }
 
     return state;
@@ -421,6 +437,62 @@ void ControllerApp::setVacation(bool on) {
     }
 
     vacationOn_ = on;
+}
+
+bool ControllerApp::allowHVACChange(bool cool, bool on) {
+    bool wasOn = (hvacLastTurnedOn_ != std::chrono::steady_clock::time_point{});
+    std::chrono::steady_clock::time_point now = steadyNow();
+
+    bool allow;
+
+    if (!wasOn) {
+        // Always allow transitions from the off state
+        allow = true;
+
+        if (on) {
+            hvacLastCool_ = cool;
+            hvacLastTurnedOn_ = now;
+        }
+    } else if (now - hvacLastTurnedOn_ > MIN_HVAC_ON_INTERVAL) {
+        // Always allow transitions if the last turn on time was long enough ago
+        allow = true;
+
+        if (on) {
+            hvacLastCool_ = cool;
+            hvacLastTurnedOn_ = now;
+        } else {
+            hvacLastTurnedOn_ = {};
+        }
+    } else if (on && hvacLastCool_ == cool) {
+        // Allow transitions within the same mode (heat->heat, cool->cool)
+        // no need to update the tracking variables here since we're staying within
+        // the same state.
+
+        allow = true;
+    } else {
+        allow = false;
+    }
+
+    if (allow) {
+        clearMessage(MsgID::HVACChangeLimit);
+    } else {
+        setErrMessageF(MsgID::HVACChangeLimit, true, "delaying switch from %s to %s",
+                       hvacModeStr(hvacLastCool_, wasOn), hvacModeStr(cool, on));
+    }
+
+    return allow;
+}
+
+const char *ControllerApp::hvacModeStr(bool cool, bool on) {
+    if (on) {
+        if (cool) {
+            return "cool";
+        } else {
+            return "heat";
+        }
+    } else {
+        return "off";
+    }
 }
 
 uint16_t ControllerApp::localMinOfDay() {
@@ -778,6 +850,12 @@ void ControllerApp::task(bool firstTime) {
     handleFreshAirState(&freshAirState);
 
     Setpoints setpoints = getCurrentSetpoints();
+    if (setpoints.coolTempC != lastSetpoints_.coolTempC ||
+        setpoints.heatTempC != lastSetpoints_.heatTempC) {
+        // If the setpoints have changed, allow changes to HVAC state immediately
+        resetHVACChangeLimit();
+    }
+    lastSetpoints_ = setpoints;
     uiManager_->setCurrentSetpoints(setpoints.heatTempC, setpoints.coolTempC);
 
     SensorData sensorData = sensors_->getLatest();
