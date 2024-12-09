@@ -522,3 +522,4 @@ TEST_F(ControllerAppTest, Precooling) {
 // Indoor and outdoor temp offsets?
 // Setpoints with invalid time?
 // Separate tests for PID algorithm?
+// allowHVACChange (and consequences)

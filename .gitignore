@@ -7,6 +7,8 @@ controller_pio/
 wifi_credentials.h
 remote_spec.cfg
 sdkconfig.esp32s3.old
+sdkconfig.old
+sdkconfig
 build/
 
 # Prerequisites
