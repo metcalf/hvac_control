@@ -17,7 +17,7 @@ void app_main() {
     // esp_log_level_set("VLV", ESP_LOG_DEBUG);
     // esp_log_level_set("sntp", ESP_LOG_DEBUG);
     // esp_log_level_set("RLOG", ESP_LOG_DEBUG);
-    esp_log_level_set("NTM", ESP_LOG_DEBUG);
+    // esp_log_level_set("NTM", ESP_LOG_DEBUG);
     vTaskDelay(2000 / portTICK_PERIOD_MS);
 
     lvgl_i2c_locking(i2c_manager_locking());

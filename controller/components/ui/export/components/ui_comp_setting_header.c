@@ -13,7 +13,7 @@ lv_obj_t *ui_Setting_header_create(lv_obj_t *comp_parent) {
 lv_obj_t *cui_Setting_header;
 cui_Setting_header = lv_obj_create(comp_parent);
 lv_obj_set_width( cui_Setting_header, 300);
-lv_obj_set_height( cui_Setting_header, 35);
+lv_obj_set_height( cui_Setting_header, 40);
 lv_obj_set_align( cui_Setting_header, LV_ALIGN_TOP_MID );
 lv_obj_clear_flag( cui_Setting_header, LV_OBJ_FLAG_SCROLLABLE );    /// Flags
 lv_obj_set_style_bg_color(cui_Setting_header, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT );
