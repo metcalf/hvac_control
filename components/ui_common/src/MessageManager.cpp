@@ -1,7 +1,11 @@
 #include "MessageManager.h"
 #include "ui_utils.h"
 
+#include "esp_log.h"
+
 #define MSG_SCROLL_MS 5 * 1000
+
+static const char *TAG = "UI";
 
 void pauseTimer(lv_event_t *e) { lv_timer_pause((lv_timer_t *)e->user_data); }
 
@@ -35,10 +39,11 @@ MessageManager::MessageManager(size_t nMsgIds, lv_obj_t *msgsContainer,
   msgHeight_ = messages_[0]->getHeight();
   msgTimer_ = lv_timer_create(messageTimerCb, MSG_SCROLL_MS, this);
 
-  lv_obj_add_event_cb(msgsContainer_, pauseTimer, LV_EVENT_SCROLL_BEGIN,
-                      msgTimer_);
-  lv_obj_add_event_cb(msgsContainer_, resetAndResumeTimer, LV_EVENT_SCROLL_END,
-                      msgTimer_);
+  // lv_obj_add_event_cb(msgsContainer_, pauseTimer, LV_EVENT_SCROLL_BEGIN,
+  //                     msgTimer_);
+  // lv_obj_add_event_cb(msgsContainer_, resetAndResumeTimer,
+  // LV_EVENT_SCROLL_END,
+  //                     msgTimer_);
 }
 
 void MessageManager::setMessage(uint8_t msgID, bool allowCancel,
@@ -94,6 +99,7 @@ MessageManager::MessageContainer *MessageManager::focusedMessage() {
 }
 
 void MessageManager::onCancelMessage(uint8_t msgID) {
+  ESP_LOGD(TAG, "cancel msg: %d", msgID);
   clearMessage(msgID);
   if (cancelCb_ != nullptr) {
     (*cancelCb_)(msgID);
@@ -104,48 +110,49 @@ MessageManager::MessageContainer::MessageContainer(
     lv_obj_t *parent, const lv_font_t *closeSymbolFont,
     __intCancelCbFn_t *cancelCb)
     : parent_(parent), cancelCb_(cancelCb) {
-  lv_obj_t *ui_message_container, *ui_message_close, *ui_message_text;
-  lv_obj_t *ui_Footer = parent; // Gross but allows for copy-paste
 
   // BEGIN copy-paste from ui_Home.c
-  ui_message_container = lv_obj_create(ui_Footer);
-  lv_obj_remove_style_all(ui_message_container);
-  lv_obj_set_width(ui_message_container, lv_pct(100));
-  lv_obj_set_height(ui_message_container, lv_pct(100));
-  lv_obj_set_align(ui_message_container, LV_ALIGN_CENTER);
-  lv_obj_set_flex_flow(ui_message_container, LV_FLEX_FLOW_ROW);
-  lv_obj_set_flex_align(ui_message_container, LV_FLEX_ALIGN_CENTER,
-                        LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-  lv_obj_clear_flag(ui_message_container, LV_OBJ_FLAG_SCROLLABLE); /// Flags
+  container_ = lv_obj_create(parent);
+  lv_obj_remove_style_all(container_);
+  lv_obj_set_width(container_, lv_pct(100));
+  lv_obj_set_height(container_, lv_pct(100));
+  lv_obj_set_align(container_, LV_ALIGN_CENTER);
+  lv_obj_set_flex_flow(container_, LV_FLEX_FLOW_ROW);
+  lv_obj_set_flex_align(container_, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER,
+                        LV_FLEX_ALIGN_CENTER);
+  lv_obj_clear_flag(container_, LV_OBJ_FLAG_SCROLLABLE); /// Flags
 
-  ui_message_close = lv_label_create(ui_message_container);
-  lv_obj_set_width(ui_message_close, LV_SIZE_CONTENT);  /// 1
-  lv_obj_set_height(ui_message_close, LV_SIZE_CONTENT); /// 1
-  lv_obj_set_align(ui_message_close, LV_ALIGN_CENTER);
-  lv_label_set_text(ui_message_close, "");
-  lv_obj_set_style_text_font(ui_message_close, closeSymbolFont,
+  // NB: Thjs diverages from SquareLine since I added a container around
+  // the cancel button but don't have a license to add more widgets in
+  // SquareLine
+  cancel_ = lv_obj_create(container_);
+  lv_obj_remove_style_all(cancel_);
+  lv_obj_set_width(cancel_, 45);
+  lv_obj_set_height(cancel_, lv_pct(100));
+  lv_obj_set_align(cancel_, LV_ALIGN_CENTER);
+  lv_obj_add_flag(cancel_, LV_OBJ_FLAG_CLICKABLE); /// Flags
+  lv_obj_clear_flag(cancel_, LV_OBJ_FLAG_PRESS_LOCK |
+                                 LV_OBJ_FLAG_CLICK_FOCUSABLE |
+                                 LV_OBJ_FLAG_SCROLLABLE |
+                                 LV_OBJ_FLAG_GESTURE_BUBBLE); /// Flags
+
+  lv_obj_t *label = lv_label_create(cancel_);
+  lv_obj_set_width(label, LV_SIZE_CONTENT);  /// 1
+  lv_obj_set_height(label, LV_SIZE_CONTENT); /// 1
+  lv_obj_set_align(label, LV_ALIGN_CENTER);
+  lv_label_set_text(label, "");
+  lv_obj_set_style_text_font(label, closeSymbolFont,
                              LV_PART_MAIN | LV_STATE_DEFAULT);
-  lv_obj_set_style_pad_left(ui_message_close, 0,
-                            LV_PART_MAIN | LV_STATE_DEFAULT);
-  lv_obj_set_style_pad_right(ui_message_close, 3,
-                             LV_PART_MAIN | LV_STATE_DEFAULT);
-  lv_obj_set_style_pad_top(ui_message_close, 1,
-                           LV_PART_MAIN | LV_STATE_DEFAULT);
-  lv_obj_set_style_pad_bottom(ui_message_close, 0,
-                              LV_PART_MAIN | LV_STATE_DEFAULT);
+  lv_obj_set_style_pad_left(label, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
+  lv_obj_set_style_pad_right(label, 3, LV_PART_MAIN | LV_STATE_DEFAULT);
+  lv_obj_set_style_pad_top(label, 1, LV_PART_MAIN | LV_STATE_DEFAULT);
+  lv_obj_set_style_pad_bottom(label, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
 
-  ui_message_text = lv_label_create(ui_message_container);
-  lv_obj_set_width(ui_message_text, LV_SIZE_CONTENT);  /// 1
-  lv_obj_set_height(ui_message_text, LV_SIZE_CONTENT); /// 100
-  lv_obj_set_align(ui_message_text, LV_ALIGN_CENTER);
-  lv_label_set_text(ui_message_text, "MESSAGE");
-  // END copy-paste from ui_Home.c
-
-  // NB: This is a bit awkard but allows directly copy-pasting from the
-  // Squareline generated code
-  container_ = ui_message_container;
-  cancel_ = ui_message_close;
-  text_ = ui_message_text;
+  text_ = lv_label_create(container_);
+  lv_obj_set_width(text_, LV_SIZE_CONTENT);  /// 1
+  lv_obj_set_height(text_, LV_SIZE_CONTENT); /// 100
+  lv_obj_set_align(text_, LV_ALIGN_CENTER);
+  lv_label_set_text(text_, "MESSAGE");
 
   lv_obj_add_event_cb(cancel_, msgCancelCb, LV_EVENT_CLICKED,
                       (void *)cancelCb_);

@@ -193,6 +193,7 @@ lv_obj_set_width( ui_message_close, LV_SIZE_CONTENT);  /// 1
 lv_obj_set_height( ui_message_close, LV_SIZE_CONTENT);   /// 1
 lv_obj_set_align( ui_message_close, LV_ALIGN_CENTER );
 lv_label_set_text(ui_message_close,"");
+lv_obj_add_flag( ui_message_close, LV_OBJ_FLAG_CLICKABLE );   /// Flags
 lv_obj_set_style_text_font(ui_message_close, &ui_font_MaterialSymbols24, LV_PART_MAIN| LV_STATE_DEFAULT);
 lv_obj_set_style_pad_left(ui_message_close, 0, LV_PART_MAIN| LV_STATE_DEFAULT);
 lv_obj_set_style_pad_right(ui_message_close, 3, LV_PART_MAIN| LV_STATE_DEFAULT);

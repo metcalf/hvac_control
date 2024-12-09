@@ -9,8 +9,8 @@
 #include "ControllerDomain.h"
 #include "MessageManager.h"
 #include "SleepManager.h"
-#include "ui.h"
-#include "ui_events.h"
+#include "export/ui.h"
+#include "export/ui_events.h"
 
 class UIManager : public AbstractUIManager {
   public:
