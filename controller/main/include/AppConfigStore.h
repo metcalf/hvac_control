@@ -27,7 +27,7 @@ class AppConfigStore : public NVSConfigStore<ControllerDomain::Config> {
                 {
                     .ssid = "",
                     .password = "",
-                    .logName = "unnamed_hvac_ctrl",
+                    .logName = "hvac_ctrl_unnamed",
                 },
             .schedules =
                 {
