@@ -1,19 +1,21 @@
 #!/bin/bash -euo pipefail
 
-if [[ ! -f "platformio.ini" ]]; then
-    echo "Please run this script from the root of the platformio project"
+if [[ ! -f "sdkconfig" ]]; then
+    echo "Please run this script from the root of the ESP IDF project"
     exit 1
 fi
 
-if ! command -v pio &> /dev/null; then
-    echo "Please run this script within a PlatformIO shell"
+if ! command -v idf.py &> /dev/null; then
+    echo "Please run this script within an ESP IDF shell"
     exit 1
 fi
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-FIRMWARE_PATH=.pio/build/esp32s3/firmware.bin
+# NB: This relies on the project name being the same as the directory name
+PROJECT_NAME="$(basename "$PWD")"
+FIRMWARE_PATH="build/${PROJECT_NAME}.bin"
 REMOTE_ROOT="/var/www/local/esp-ota"
-REMOTE_PATH="${REMOTE_ROOT}/hvac_control_$(basename "$PWD")"
+REMOTE_PATH="${REMOTE_ROOT}/hvac_control_${PROJECT_NAME}"
 # This should contain a single string with an SCP target of the form user@host
 # Newlines stripped for convenience.
 REMOTE_SPEC=$(cat ${SCRIPT_DIR}/remote_spec.cfg | tr -d '\n')
@@ -38,7 +40,7 @@ fi
 echo "removing old firmware and running build"
 # Remove old file so we ensure we're building to the right place
 rm -f "${FIRMWARE_PATH}"
-pio run -e esp32s3
+idf.py build
 
 if ! strings "${FIRMWARE_PATH}" | grep "${version}"; then
     echo "version ${version} not found in ${FIRMWARE_PATH}"
