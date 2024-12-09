@@ -38,8 +38,6 @@ if [[ $version == *"-dirty" ]]; then
 fi
 
 echo "removing old firmware and running build"
-# Remove old file so we ensure we're building to the right place
-rm -f "${FIRMWARE_PATH}"
 idf.py build
 
 if ! strings "${FIRMWARE_PATH}" | grep "${version}"; then
