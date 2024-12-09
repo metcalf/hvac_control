@@ -59,7 +59,7 @@ static ESPOutIO outIO_;
 static ESPModbusClient realMbClient_;
 static FakeModbusClient mbClient_;
 static ESPOTAClient *ota_;
-static NetworkTaskManager netTaskMgr_(wifi_);
+static NetworkTaskManager *netTaskMgr_;
 
 static ValveStateManager valveStateManager_;
 static OutCtrl *outCtrl_;
@@ -332,6 +332,9 @@ void initNetwork() {
     wifi_.init();
     wifi_.connect(default_wifi_ssid, default_wifi_pswd);
 
+    netTaskMgr_ = new NetworkTaskManager(wifi_);
+    netTaskMgr_->addTask(otaFn);
+
     remote_logger_init("zonectrl", default_log_host);
 }
 
@@ -361,5 +364,5 @@ extern "C" void zc_main() {
                 ZONE_IO_TASK_PRIORITY, NULL);
     xTaskCreate(outputTask, "output_task", OUTPUT_TASK_STACK_SIZE, NULL, OUTPUT_TASK_PRIORITY,
                 NULL);
-    netTaskMgr_.start();
+    netTaskMgr_->start();
 }

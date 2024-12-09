@@ -11,5 +11,6 @@
   "idf.port": "/dev/cu.usbmodem*",
   "idf.pythonBinPath": "/Users/andrew/.espressif/python_env/idf5.1_py3.13_env/bin/python",
   "idf.toolsPath": "/Users/andrew/.espressif",
-  "idf.monitorNoReset": true
+  "idf.monitorNoReset": true,
+  "idf.flashType": ""
 }

@@ -65,7 +65,7 @@ static ESPWifi wifi_;
 static AppConfigStore appConfigStore_;
 static HASSClient homeCli_;
 static ESPOTAClient *ota_;
-static NetworkTaskManager netTaskMgr_(wifi_);
+static NetworkTaskManager *netTaskMgr_;
 
 uint64_t otaFn() {
     if (ota_->update() == AbstractOTAClient::Error::FetchError) {
@@ -241,8 +241,9 @@ extern "C" void controller_main() {
     wifi_.init();
     wifi_.connect(config.wifi.ssid, config.wifi.password);
     remote_logger_init(config.wifi.logName, default_log_host);
-    netTaskMgr_.addTask(otaFn);
-    netTaskMgr_.addTask(hassFn);
+    netTaskMgr_ = new NetworkTaskManager(wifi_);
+    netTaskMgr_->addTask(otaFn);
+    netTaskMgr_->addTask(hassFn);
 
     if (!sensors_.init()) {
         bootErr("Sensor init error");
@@ -259,7 +260,7 @@ extern "C" void controller_main() {
                 NULL);
     xTaskCreate(modbusTask, "modbusTask", MODBUS_TASK_STACK_SIZE, modbusController_,
                 MODBUS_TASK_PRIO, NULL);
-    netTaskMgr_.start();
+    netTaskMgr_->start();
 
     // Wait for sensors to have valid data
     while (std::isnan(sensors_.getLatest().tempC)) {
