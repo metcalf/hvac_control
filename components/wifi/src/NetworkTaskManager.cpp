@@ -23,6 +23,7 @@ void NetworkTaskManager::poll() {
     // needed.
     AbstractWifi::State wifi_state;
     while ((wifi_state = wifi_.getState()) != AbstractWifi::State::Connected) {
+        ESP_LOGD(TAG, "wifi: %d", static_cast<int>(wifi_state));
         switch (wifi_state) {
         case AbstractWifi::State::Inactive:
             ESP_LOGE(TAG, "wifi must be active in net loop");
@@ -46,6 +47,7 @@ void NetworkTaskManager::poll() {
         next_due_ms = std::min(next_due_ms, task.dueMs);
     }
     int64_t wait_ms = next_due_ms - esp_timer_get_time() / 1000;
+    ESP_LOGD(TAG, "wait: %lld", wait_ms);
     if (wait_ms > 0) {
         vTaskDelay(pdMS_TO_TICKS(wait_ms) + 1);
     }

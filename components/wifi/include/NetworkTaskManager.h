@@ -28,5 +28,5 @@ class NetworkTaskManager {
     };
 
     std::vector<Task> tasks_;
-    ESPWifi wifi_;
+    ESPWifi &wifi_;
 };
