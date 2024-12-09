@@ -8,7 +8,8 @@
   },
   "idf.espIdfPath": "/Users/andrew/esp/v5.1.5/esp-idf",
   "idf.openOcdConfigs": ["board/esp32-wrover-kit-3.3v.cfg"],
-  "idf.port": "/dev/tty.wlan-debug",
+  "idf.port": "/dev/cu.usbmodem*",
   "idf.pythonBinPath": "/Users/andrew/.espressif/python_env/idf5.1_py3.13_env/bin/python",
-  "idf.toolsPath": "/Users/andrew/.espressif"
+  "idf.toolsPath": "/Users/andrew/.espressif",
+  "idf.monitorNoReset": true
 }
