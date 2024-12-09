@@ -67,17 +67,6 @@ static HASSClient homeCli_;
 static ESPOTAClient *ota_;
 static NetworkTaskManager netTaskMgr_(wifi_);
 
-void log_heap_stats() {
-    // Get current heap stats
-    size_t free_heap = heap_caps_get_free_size(MALLOC_CAP_DEFAULT);
-    size_t min_free_heap = heap_caps_get_minimum_free_size(MALLOC_CAP_DEFAULT);
-    size_t largest_free_block = heap_caps_get_largest_free_block(MALLOC_CAP_DEFAULT);
-
-    // Log key metrics
-    ESP_LOGW("HEAP", "uptime=%llus\tfree=%ub\tmin_free=%ub\tlargest_block=%ub",
-             esp_timer_get_time() / 1000 / 1000, free_heap, min_free_heap, largest_free_block);
-}
-
 uint64_t otaFn() {
     if (ota_->update() == AbstractOTAClient::Error::FetchError) {
         return OTA_FETCH_ERR_INTERVAL_MS;

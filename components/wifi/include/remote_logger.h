@@ -7,3 +7,6 @@
 
 void remote_logger_init(const char *name, const char *dest_host);
 void remote_logger_set_name(const char *name);
+
+// Totally random place to put this but meh
+void log_heap_stats();

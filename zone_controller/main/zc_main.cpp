@@ -38,6 +38,7 @@
 #define MAX_VALVE_TRANSITION_INTERVAL std::chrono::minutes(2)
 #define OTA_INTERVAL_MS (15 * 60 * 1000)
 #define OTA_FETCH_ERR_INTERVAL_MS (60 * 1000)
+#define HEAP_LOG_INTERVAL std::chrono::minutes(15)
 
 #define VALVE_STUCK_MSG "valves may be stuck"
 #define VALVE_SW_MSG "valves not consistent with switches"
@@ -276,6 +277,10 @@ void checkValveErrors(ValveSWState sws[2]) {
 
 void outputTask(void *) {
     InputState lastZioState;
+
+    log_heap_stats();
+    std::chrono::steady_clock::time_point last_logged_heap = std::chrono::steady_clock::now();
+
     while (1) {
         InputState zioState = zone_io_get_state();
         if (!zone_io_state_eq(zioState, lastZioState)) {
@@ -302,6 +307,12 @@ void outputTask(void *) {
             // the control logic.
             while (pollUIEvent(false))
                 ;
+        }
+
+        std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now();
+        if ((now - last_logged_heap) > HEAP_LOG_INTERVAL) {
+            log_heap_stats();
+            last_logged_heap = now;
         }
     }
 }
