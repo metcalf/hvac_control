@@ -13,10 +13,10 @@ void app_main() {
     // TODO: Remove this when we're done debugging
     // esp_log_level_set("ILI9341", ESP_LOG_DEBUG);
     // esp_log_level_set("LV", ESP_LOG_DEBUG);
-    esp_log_level_set("MAIN", ESP_LOG_DEBUG);
-    esp_log_level_set("UI", ESP_LOG_DEBUG);
-    esp_log_level_set("CTRL", ESP_LOG_DEBUG);
-    esp_log_level_set("ZIO", ESP_LOG_DEBUG);
+    // esp_log_level_set("MAIN", ESP_LOG_DEBUG);
+    // esp_log_level_set("UI", ESP_LOG_DEBUG);
+    // esp_log_level_set("CTRL", ESP_LOG_DEBUG);
+    // esp_log_level_set("ZIO", ESP_LOG_DEBUG);
     vTaskDelay(2000 / portTICK_PERIOD_MS);
 
     lvgl_i2c_locking(i2c_manager_locking());
