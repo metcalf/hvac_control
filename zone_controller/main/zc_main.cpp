@@ -351,7 +351,7 @@ extern "C" void zc_main() {
     uiEvtQueue_ = xQueueCreate(10, sizeof(ZCUIManager::Event));
     SystemState state{};
     uiManager_ = new ZCUIManager(state, static_cast<size_t>(MsgID::_Last), uiEvtCb);
-    ota_ = new ESPOTAClient("zonectrl", otaMsgCb, UI_MAX_MSG_LEN);
+    ota_ = new ESPOTAClient("zone_controller", otaMsgCb, UI_MAX_MSG_LEN);
     outCtrl_ = new OutCtrl(valveStateManager_, *uiManager_);
 
     initNetwork();
