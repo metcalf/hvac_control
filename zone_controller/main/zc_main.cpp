@@ -276,6 +276,7 @@ void checkValveErrors(ValveSWState sws[2]) {
 }
 
 void outputTask(void *) {
+    bool firstTime = false;
     InputState lastZioState;
 
     log_heap_stats();
@@ -313,6 +314,11 @@ void outputTask(void *) {
         if ((now - last_logged_heap) > HEAP_LOG_INTERVAL) {
             log_heap_stats();
             last_logged_heap = now;
+        }
+
+        if (firstTime) {
+            ota_->markValid();
+            firstTime = false;
         }
     }
 }

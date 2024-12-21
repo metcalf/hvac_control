@@ -158,6 +158,9 @@
       "queue": "cpp",
       "init_display.h": "c",
       "scd4x_sensirion_common.h": "c"
+    },
+    "search.exclude": {
+      "**/build": true
     }
   }
 }
