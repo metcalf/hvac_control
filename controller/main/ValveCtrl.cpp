@@ -21,12 +21,7 @@ void ValveCtrl::init() {
     ESP_ERROR_CHECK(gpio_config(&io_conf));
 }
 
-void ValveCtrl::setMode(bool cool, bool on) {
-    // Always turn off the valve we're not setting (e.g. turn off the heat valve if
-    // `cool` is true).
-    bool heatVlv = !cool && on;
-    bool coolVlv = cool && on;
-
+void ValveCtrl::set(bool heatVlv, bool coolVlv) {
     ESP_LOGD(TAG, "heat=%d cool=%d", heatVlv, coolVlv);
 
     ESP_ERROR_CHECK(gpio_set_level(HEAT_VLV_GPIO, heatVlv));

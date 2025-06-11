@@ -4,11 +4,11 @@
 
 class FakeValveCtrl : public AbstractValveCtrl {
   public:
-    bool cool_, on_, set_ = false;
+    bool cool_, heat_, set_ = false;
 
-    void setMode(bool cool, bool on) override {
+    void set(bool heatVlv, bool coolVlv) override {
         set_ = true;
-        cool_ = cool;
-        on_ = on;
+        cool_ = coolVlv;
+        heat_ = heatVlv;
     };
 };

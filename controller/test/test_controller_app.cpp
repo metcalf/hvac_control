@@ -13,10 +13,14 @@
 #include "MockUIManager.h"
 
 using ::testing::_;
+using ::testing::AllOf;
 using ::testing::AtMost;
+using ::testing::DoubleNear;
 using ::testing::ExpectationSet;
+using ::testing::Ge;
 using ::testing::InSequence;
 using ::testing::IsNan;
+using ::testing::Le;
 using Config = ControllerDomain::Config;
 using FancoilSpeed = ControllerDomain::FancoilSpeed;
 
@@ -230,7 +234,7 @@ TEST_F(ControllerAppTest, CallsForValveHVAC) {
     app_->task();
     EXPECT_TRUE(valveCtrl_.set_);
     valveCtrl_.set_ = false;
-    EXPECT_FALSE(valveCtrl_.on_);
+    EXPECT_FALSE(valveCtrl_.heat_);
 
     // Turn heat on
     sensors_.setLatest({.tempC = 18.5, .humidity = 2.0, .co2 = 500});
@@ -238,7 +242,7 @@ TEST_F(ControllerAppTest, CallsForValveHVAC) {
     EXPECT_TRUE(valveCtrl_.set_);
     valveCtrl_.set_ = false;
     EXPECT_FALSE(valveCtrl_.cool_);
-    EXPECT_TRUE(valveCtrl_.on_);
+    EXPECT_TRUE(valveCtrl_.heat_);
 
     // Stays on from hysteresis
     sensors_.setLatest({.tempC = 18.8, .humidity = 2.0, .co2 = 500});
@@ -246,7 +250,7 @@ TEST_F(ControllerAppTest, CallsForValveHVAC) {
     EXPECT_TRUE(valveCtrl_.set_);
     valveCtrl_.set_ = false;
     EXPECT_FALSE(valveCtrl_.cool_);
-    EXPECT_TRUE(valveCtrl_.on_);
+    EXPECT_TRUE(valveCtrl_.heat_);
 
     // Turns off
     sensors_.setLatest({.tempC = 19.1, .humidity = 2.0, .co2 = 500});
@@ -254,7 +258,8 @@ TEST_F(ControllerAppTest, CallsForValveHVAC) {
     app_->task();
     EXPECT_TRUE(valveCtrl_.set_);
     valveCtrl_.set_ = false;
-    EXPECT_FALSE(valveCtrl_.on_);
+    EXPECT_FALSE(valveCtrl_.cool_);
+    EXPECT_FALSE(valveCtrl_.heat_);
 
     // Cools
     sensors_.setLatest({.tempC = 25.0, .humidity = 2.0, .co2 = 500});
@@ -262,7 +267,7 @@ TEST_F(ControllerAppTest, CallsForValveHVAC) {
     EXPECT_TRUE(valveCtrl_.set_);
     valveCtrl_.set_ = false;
     EXPECT_TRUE(valveCtrl_.cool_);
-    EXPECT_TRUE(valveCtrl_.on_);
+    EXPECT_FALSE(valveCtrl_.heat_);
 }
 
 double fcCallTempSeq[] = {
@@ -518,8 +523,28 @@ TEST_F(ControllerAppTest, Precooling) {
     EXPECT_EQ(FancoilSpeed::High, fcReq.speed);
 }
 
+TEST_F(ControllerAppTest, VacationSetpoints) {
+    AbstractHomeClient::HomeState homeState = {
+        .vacationOn = true,
+        .err = AbstractHomeClient::Error::OK,
+    };
+
+    homeCli_.setState(homeState);
+    EXPECT_CALL(uiManager_,
+                setCurrentSetpoints(AllOf(Ge(12.0), Le(17.8)), AllOf(Ge(26.0), Le(37.0))));
+    app_->task();
+}
+
+TEST_F(ControllerAppTest, InvalidTimeSetpoints) {
+    EXPECT_CALL(uiManager_, setCurrentSetpoints(DoubleNear(19.0, 0.1), DoubleNear(25.0, 0.1)));
+
+    // Set an invalid time
+    app_->realNow_ = std::chrono::system_clock::time_point{};
+
+    app_->task();
+}
+
 // TODO: Write lots more tests!!
 // Indoor and outdoor temp offsets?
-// Setpoints with invalid time?
 // Separate tests for PID algorithm?
 // allowHVACChange (and consequences)

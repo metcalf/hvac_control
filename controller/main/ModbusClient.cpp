@@ -28,7 +28,6 @@ enum class CID {
 
 enum class SlaveID {
     FreshAir = 0x11,
-    Fancoil = 0x20,
     MakeupDemand = 0x22,
 };
 

@@ -165,7 +165,7 @@ class ControllerApp {
     void setFanSpeed(FanSpeed);
     bool pollUIEvent(bool wait);
     void handleCancelMessage(MsgID id);
-    HVACState setHVAC(double heatDemand, double coolDemand);
+    HVACState setHVAC(double heatDemand, double coolDemand, FanSpeed fanSpeed);
     void setErrMessageF(MsgID msgID, bool allowCancel, const char *fmt, ...);
     void setMessageF(MsgID msgID, bool allowCancel, const char *fmt, ...);
     void setMessage(MsgID msgID, bool allowCancel, const char *msg);

@@ -5,5 +5,5 @@
 class ValveCtrl : public AbstractValveCtrl {
   public:
     void init();
-    void setMode(bool cool, bool on) override;
+    void set(bool heatVlv, bool coolVlv) override;
 };

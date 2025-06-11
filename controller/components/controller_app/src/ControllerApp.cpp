@@ -38,6 +38,9 @@
 #define AC_ON_THRESHOLD_C REL_F_TO_C(4.0)
 #define ON_DEMAND_THRESHOLD 0.01
 
+// If fan is above this speed, turn on exhaust fan for extra cooling
+#define FAN_SPEED_EXHAUST_THRESHOLD (FanSpeed)180
+// Fan speed for makeup air
 #define MAKEUP_FAN_SPEED (FanSpeed)120
 #define MIN_FAN_SPEED_VALUE (FanSpeed)10
 #define MIN_FAN_RUNNING_RPM 900
@@ -320,7 +323,8 @@ void ControllerApp::handleCancelMessage(MsgID id) {
     }
 }
 
-ControllerDomain::HVACState ControllerApp::setHVAC(double heatDemand, double coolDemand) {
+ControllerDomain::HVACState ControllerApp::setHVAC(double heatDemand, double coolDemand,
+                                                   FanSpeed fanSpeed) {
     bool cool = coolDemand > heatDemand;
     double demand = 0;
     if (coolDemand > ON_DEMAND_THRESHOLD && heatDemand > ON_DEMAND_THRESHOLD) {
@@ -370,14 +374,24 @@ ControllerDomain::HVACState ControllerApp::setHVAC(double heatDemand, double coo
         if (allowHVACChange(cool, speed != FancoilSpeed::Off)) {
             modbusController_->setFancoil(FancoilRequest{speed, cool});
 
-            // HACK: If the demand is high, turn on the valve even in fancoil mode. We use
-            // this in the MBA for supplemental electric resistance heating.
-            if (speed == FancoilSpeed::High) {
-                valveCtrl_->setMode(cool, true);
-            } else {
-                // Turn off valves
-                valveCtrl_->setMode(false, false);
+            // HACK: in the PBR we abuse the valve outputs to control other things
+            bool heatVlv = false, coolVlv = false;
+
+            // If demand is high in heating mode, turn on the heat valve to trigger
+            // supplemental kickspace heaters in the bathroom.
+            if (speed == FancoilSpeed::High && !cool) {
+                heatVlv = true;
             }
+
+            // If the fan speed is above a threshold, turn on the cool valve to trigger
+            // the bath fan to run to assist with fan cooling. We check that there's
+            // cooling demand just to limit the risk of problematic behavior in some
+            // future configuration of the system if I forget about this hack.
+            if (cool && fanSpeed > FAN_SPEED_EXHAUST_THRESHOLD) {
+                coolVlv = true;
+            }
+
+            valveCtrl_->set(heatVlv, coolVlv);
         }
 
         break;
@@ -661,7 +675,7 @@ Setpoints ControllerApp::getCurrentSetpoints() {
     if (vacationOn_) {
         Setpoints setpoints{
             .heatTempC = ABS_F_TO_C(60),
-            .coolTempC = ABS_C_TO_F(90),
+            .coolTempC = ABS_F_TO_C(90),
             .co2 = config_.co2Target,
         };
         setpointReason_ = "vacation";
@@ -672,8 +686,8 @@ Setpoints ControllerApp::getCurrentSetpoints() {
     // If we don't have valid time, pick the least active setpoints from the schedules and return it
     if (idx == -1) {
         Setpoints setpoints{
-            .heatTempC = ABS_F_TO_C(72),
-            .coolTempC = ABS_C_TO_F(68),
+            .heatTempC = ABS_F_TO_C(68),
+            .coolTempC = ABS_F_TO_C(72),
             .co2 = config_.co2Target,
         };
         for (int i = 0; i < NUM_SCHEDULE_TIMES; i++) {
@@ -685,8 +699,6 @@ Setpoints ControllerApp::getCurrentSetpoints() {
         return setpoints;
     }
 
-    // We search for the first schedule *after* the current time and then look to the
-    // previous schedule.
     Config::Schedule schedule = config_.schedules[idx];
     Config::Schedule nextSchedule = config_.schedules[getScheduleIdx(1)];
 
@@ -810,8 +822,8 @@ ControllerApp::setErrMessageF(MsgID msgID, bool allowCancel, const char *fmt, ..
     setMessage(msgID, allowCancel, msg);
     ESP_LOGE(TAG, "%s", msg);
 }
-void __attribute__((format(printf, 4, 5)))
-ControllerApp::setMessageF(MsgID msgID, bool allowCancel, const char *fmt, ...) {
+void __attribute__((format(printf, 4, 5))) ControllerApp::setMessageF(MsgID msgID, bool allowCancel,
+                                                                      const char *fmt, ...) {
     char msg[UI_MAX_MSG_LEN];
 
     va_list args;
@@ -887,7 +899,7 @@ void ControllerApp::task(bool firstTime) {
     setFanSpeed(speed);
 
     updateACMode(coolDemand, coolSetpointDelta);
-    HVACState hvacState = setHVAC(heatDemand, coolDemand);
+    HVACState hvacState = setHVAC(heatDemand, coolDemand, speed);
 
     checkModbusErrors();
 
