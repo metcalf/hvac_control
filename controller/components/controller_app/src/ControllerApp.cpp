@@ -55,7 +55,7 @@ void ControllerApp::bootErr(const char *msg) {
     uiManager_->bootErr(msg);
 }
 
-void ControllerApp::updateACMode(double coolDemand, double coolSetpointDelta) {
+void ControllerApp::updateACMode(double coolDemand, double coolSetpointDeltaC) {
     if (!config_.systemOn) {
         acMode_ = ACMode::Standby;
         clearMessage(MsgID::ACMode);
@@ -65,8 +65,8 @@ void ControllerApp::updateACMode(double coolDemand, double coolSetpointDelta) {
     case ACMode::Off:
         break;
     case ACMode::Standby:
-        // If we're demanding HIGH A/C or the coil is cold anyway, turn the A/C on
-        if (coolSetpointDelta > AC_ON_THRESHOLD_C || (coolDemand > 0 && isCoilCold())) {
+        // If we're too far off the cool setpoint or the coil is cold anyway, turn the A/C on
+        if (coolSetpointDeltaC > AC_ON_THRESHOLD_C || (coolDemand > 0 && isCoilCold())) {
             acMode_ = ACMode::On;
         }
         break;
@@ -889,16 +889,16 @@ void ControllerApp::task(bool firstTime) {
         setMessage(MsgID::SensorErr, false, sensorData.errMsg);
     }
 
-    double coolSetpointDelta = sensorData.tempC - setpoints.coolTempC;
+    double coolSetpointDeltaC = sensorData.tempC - setpoints.coolTempC;
 
-    bool wantOutdoorTemp = (coolSetpointDelta > 0 && (std::isnan(rawOutdoorTempC_) ||
-                                                      (steadyNow() - lastOutdoorTempUpdate_) >
-                                                          OUTDOOR_TEMP_UPDATE_INTERVAL));
+    bool wantOutdoorTemp = (coolSetpointDeltaC > 0 && (std::isnan(rawOutdoorTempC_) ||
+                                                       (steadyNow() - lastOutdoorTempUpdate_) >
+                                                           OUTDOOR_TEMP_UPDATE_INTERVAL));
 
     FanSpeed speed = computeFanSpeed(ventDemand, fanCoolDemand, wantOutdoorTemp);
     setFanSpeed(speed);
 
-    updateACMode(coolDemand, coolSetpointDelta);
+    updateACMode(coolDemand, coolSetpointDeltaC);
     HVACState hvacState = setHVAC(heatDemand, coolDemand, speed);
 
     checkModbusErrors();
