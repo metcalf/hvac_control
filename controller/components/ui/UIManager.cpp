@@ -140,9 +140,11 @@ void UIManager::handleTempRollerChange(bool heatChanged, lv_obj_t *heatRoller,
 }
 
 void UIManager::setupTempRoller(lv_obj_t *roller, uint8_t minDeg, uint8_t maxDeg) {
-
-    assert(maxDeg > minDeg);
-    assert(maxDeg < 100);
+    if (maxDeg >= 100 || maxDeg <= minDeg || minDeg <= 0) {
+        ESP_LOGE(TAG, "Invalid temp roller range: %d to %d", maxDeg, minDeg);
+        maxDeg = 70;
+        minDeg = 70;
+    }
 
     char opts[300] = "";
     size_t pos = 0;
@@ -224,13 +226,13 @@ void UIManager::eTargetCO2() {
 void UIManager::eSchedule() {
     currSchedules_[0] = {
         .heatC = getHeatRollerValueC(ui_Day_heat_setpoint),
-        .coolC = getHeatRollerValueC(ui_Day_cool_setpoint),
+        .coolC = getCoolRollerValueC(ui_Day_cool_setpoint),
         .startHr = (uint8_t)lv_roller_get_selected(ui_Day_hr),
         .startMin = (uint8_t)lv_roller_get_selected(ui_Day_min),
     };
     currSchedules_[1] = {
         .heatC = getHeatRollerValueC(ui_Night_heat_setpoint),
-        .coolC = getHeatRollerValueC(ui_Night_cool_setpoint),
+        .coolC = getCoolRollerValueC(ui_Night_cool_setpoint),
         .startHr = (uint8_t)(lv_roller_get_selected(ui_Night_hr) + 12),
         .startMin = (uint8_t)lv_roller_get_selected(ui_Night_min),
     };
@@ -302,11 +304,10 @@ void UIManager::eSaveEquipmentSettings() {
 }
 
 void UIManager::eSaveTempLimits() {
-    double maxHeatC = ABS_F_TO_C(maxHeatDeg_);
-    double minCoolC = ABS_F_TO_C(minCoolDeg_);
-
     updateTempLimits(lv_roller_get_selected(ui_heat_limit) + TEMP_LIMIT_ROLLER_START,
                      lv_roller_get_selected(ui_cool_limit) + TEMP_LIMIT_ROLLER_START);
+    double maxHeatC = ABS_F_TO_C(maxHeatDeg_);
+    double minCoolC = ABS_F_TO_C(minCoolDeg_);
     Event evt{EventType::SetTempLimits, EventPayload{.tempLimits = {
                                                          .maxHeatC = maxHeatC,
                                                          .minCoolC = minCoolC,
@@ -483,6 +484,7 @@ UIManager::UIManager(ControllerDomain::Config config, size_t nMsgIds, eventCb_t 
 
     setInTempC(std::nan(""));
     setOutTempC(std::nan(""));
+    setSystemPower(config.systemOn);
 
     for (int i = 0; i < nWifiTextareas; i++) {
         lv_obj_add_event_cb(*wifiTextareas[i], wifiTextareaEventCb, LV_EVENT_ALL, this);
