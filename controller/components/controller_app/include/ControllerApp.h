@@ -47,6 +47,7 @@ class ControllerApp {
         coolAlgo_ = new NullAlgorithm();
 
         setConfig(config);
+        setSystemPower(config_.systemOn);
     }
     ~ControllerApp() {
         delete ventAlgo_;
@@ -108,6 +109,19 @@ class ControllerApp {
     using Config = ControllerDomain::Config;
 
     enum class ACMode { Off, On, Standby };
+
+    const char *acModeToS(ACMode acMode) {
+        switch (acMode) {
+        case ACMode::Off:
+            return "OFF";
+        case ACMode::On:
+            return "ON";
+        case ACMode::Standby:
+            return "STBY";
+        }
+
+        __builtin_unreachable();
+    }
 
     const char *msgIDToS(MsgID id) {
         switch (id) {
@@ -189,6 +203,7 @@ class ControllerApp {
     FancoilSpeed getSpeedForDemand(bool cool, double demand);
     bool isCoilCold();
     void setVacation(bool on);
+    void setSystemPower(bool on);
     bool allowHVACChange(bool cool, bool on);
     void resetHVACChangeLimit() { hvacLastTurnedOn_ = {}; }
     const char *hvacModeStr(bool cool, bool on);

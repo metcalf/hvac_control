@@ -34,14 +34,19 @@ void ModbusController::doSetFreshAir() {
 }
 
 void ModbusController::doGetFreshAir() {
-    if (freshAirModelId_ == 0) {
-        client_.getFreshAirModelId(&freshAirModelId_);
+    xSemaphoreTake(mutex_, portMAX_DELAY);
+    uint16_t modelId = freshAirModelId_;
+    xSemaphoreGive(mutex_);
+
+    if (modelId == 0) {
+        client_.getFreshAirModelId(&modelId);
     }
 
     FreshAirState freshAirState;
     esp_err_t err = client_.getFreshAirState(&freshAirState);
 
     xSemaphoreTake(mutex_, portMAX_DELAY);
+    freshAirModelId_ = modelId;
     freshAirStateErr_ = err;
     if (freshAirStateErr_ == ESP_OK) {
         freshAirState_ = freshAirState;

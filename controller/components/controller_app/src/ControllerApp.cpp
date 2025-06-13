@@ -201,17 +201,11 @@ bool ControllerApp::pollUIEvent(bool wait) {
         break;
     case EventType::SetSystemPower:
         ESP_LOGI(TAG, "SetSystemPower:\t%d", uiEvent.payload.systemPower);
-        resetHVACChangeLimit();
+
         config_.systemOn = uiEvent.payload.systemPower;
         cfgStore_->store(config_);
-        if (config_.systemOn) {
-            clearMessage(MsgID::SystemOff);
-        } else {
-            setMessage(MsgID::SystemOff, true, "System turned off");
+        setSystemPower(config_.systemOn);
 
-            tempOverrideUntilScheduleIdx_ = -1;
-            clearMessage(MsgID::TempOverride);
-        }
         break;
     case EventType::SetTempLimits:
         config_.maxHeatC = uiEvent.payload.tempLimits.maxHeatC;
@@ -450,6 +444,19 @@ void ControllerApp::setVacation(bool on) {
     vacationOn_ = on;
 }
 
+void ControllerApp::setSystemPower(bool on) {
+    if (on) {
+        clearMessage(MsgID::SystemOff);
+    } else {
+        resetHVACChangeLimit();
+
+        setMessage(MsgID::SystemOff, true, "System turned off");
+
+        tempOverrideUntilScheduleIdx_ = -1;
+        clearMessage(MsgID::TempOverride);
+    }
+}
+
 bool ControllerApp::allowHVACChange(bool cool, bool on) {
     bool wasOn = (hvacLastTurnedOn_ != std::chrono::steady_clock::time_point{});
     std::chrono::steady_clock::time_point now = steadyNow();
@@ -543,7 +550,7 @@ void ControllerApp::logState(const ControllerDomain::FreshAirState &freshAirStat
                   // DemandRequest
                   "\tvent_d=%.2f\tfancool_d=%.2f\theat_d=%.2f\tcool_d=%.2f"
                   // HVACState
-                  "\thvac=%s",
+                  "\thvac=%s\tac=%s",
                   // Sensors
                   sensorData.tempC, config_.inTempOffsetC, sensorData.humidity,
                   sensorData.pressurePa, sensorData.co2,
@@ -552,7 +559,7 @@ void ControllerApp::logState(const ControllerDomain::FreshAirState &freshAirStat
                   // Demands
                   ventDemand, fanCoolDemand, heatDemand, coolDemand,
                   // HVACState
-                  ControllerDomain::hvacStateToS(hvacState));
+                  ControllerDomain::hvacStateToS(hvacState), acModeToS(acMode_));
 }
 
 void ControllerApp::checkWifiState() {
