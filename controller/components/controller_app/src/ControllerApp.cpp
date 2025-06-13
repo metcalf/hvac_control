@@ -303,15 +303,18 @@ void ControllerApp::handleCancelMessage(MsgID id) {
     case MsgID::ACMode:
         acMode_ = ACMode::Standby;
         break;
-    case MsgID::Precooling: {
-        // We stop precooling by setting a temperature override
-        Config::Schedule schedule = config_.schedules[getScheduleIdx(0)];
-        setTempOverride(AbstractUIManager::TempOverride{
-            .heatC = schedule.heatC,
-            .coolC = schedule.coolC,
-        });
-        break;
-    }
+        // We originally allowed cancelling precooling and implemented by setting a temperature
+        // override to the current schedule, but that was awkward and maybe not needed.
+        // If we want to add this back, we should probably have a dedicated flag and message that gets cleared
+        // at the next schedule change.
+        // case MsgID::Precooling: {
+        //     Config::Schedule schedule = config_.schedules[getScheduleIdx(0)];
+        //     setTempOverride(AbstractUIManager::TempOverride{
+        //         .heatC = schedule.heatC,
+        //         .coolC = schedule.coolC,
+        //     });
+        //     break;
+        //}
     default:
         ESP_LOGE(TAG, "Unexpected message cancellation for: %d", static_cast<int>(id));
     }
@@ -671,6 +674,7 @@ Setpoints ControllerApp::getCurrentSetpoints() {
         clearMessage(MsgID::TempOverride);
     } else if (tempOverrideUntilScheduleIdx_ != -1) {
         setpointReason_ = "override";
+        clearMessage(MsgID::Precooling);
         return Setpoints{
             .heatTempC = tempOverride_.heatC,
             .coolTempC = tempOverride_.coolC,
@@ -724,7 +728,7 @@ Setpoints ControllerApp::getCurrentSetpoints() {
             if (precoolC < setpoints.coolTempC) {
                 setpointReason_ = "precooling";
                 setpoints.coolTempC = precoolC;
-                setMessageF(MsgID::Precooling, true, "Cooling to %d by %02d:%02d%s",
+                setMessageF(MsgID::Precooling, false, "Cooling to %d by %02d:%02d%s",
                             static_cast<int>(ABS_C_TO_F(setpoints.coolTempC) + 0.5),
                             SCHEDULE_TIME_STR_ARGS(nextSchedule));
 
