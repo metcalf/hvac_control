@@ -178,7 +178,7 @@ bool ControllerApp::pollUIEvent(bool wait) {
     case EventType::SetSchedule: {
         ControllerDomain::Config::Schedule *schedules = uiEvent.payload.schedules;
         ESP_LOGI(
-            TAG, "SetSchedule:\t%.1f/%.1f@%02d:%02d\t%.1f/%.1f@%02d:%02d",
+            TAG, "SetSchedule: %.1f/%.1f@%02d:%02d %.1f/%.1f@%02d:%02d",
             // Day
             schedules[0].heatC, schedules[0].coolC, schedules[0].startHr, schedules[0].startMin,
             // Night
@@ -195,12 +195,12 @@ bool ControllerApp::pollUIEvent(bool wait) {
         break;
     }
     case EventType::SetCO2Target:
-        ESP_LOGI(TAG, "SetCO2Target:\t%u", uiEvent.payload.co2Target);
+        ESP_LOGI(TAG, "SetCO2Target: %u", uiEvent.payload.co2Target);
         config_.co2Target = uiEvent.payload.co2Target;
         cfgStore_->store(config_);
         break;
     case EventType::SetSystemPower:
-        ESP_LOGI(TAG, "SetSystemPower:\t%d", uiEvent.payload.systemPower);
+        ESP_LOGI(TAG, "SetSystemPower: %d", uiEvent.payload.systemPower);
 
         config_.systemOn = uiEvent.payload.systemPower;
         cfgStore_->store(config_);
@@ -210,14 +210,14 @@ bool ControllerApp::pollUIEvent(bool wait) {
     case EventType::SetTempLimits:
         config_.maxHeatC = uiEvent.payload.tempLimits.maxHeatC;
         config_.minCoolC = uiEvent.payload.tempLimits.minCoolC;
-        ESP_LOGI(TAG, "SetTempLimits:\tmaxHeatC: %.1fC\tminCoolC: %0.1fC", config_.maxHeatC,
+        ESP_LOGI(TAG, "SetTempLimits: maxHeatC: %.1fC minCoolC: %0.1fC", config_.maxHeatC,
                  config_.minCoolC);
         cfgStore_->store(config_);
         break;
     case EventType::SetTempOffsets:
         config_.inTempOffsetC = uiEvent.payload.tempOffsets.inTempOffsetC;
         config_.outTempOffsetC = uiEvent.payload.tempOffsets.outTempOffsetC;
-        ESP_LOGI(TAG, "SetTempOffsets:\tinTempC: %.1fC\toutTempC: %0.1fC", config_.inTempOffsetC,
+        ESP_LOGI(TAG, "SetTempOffsets: inTempC: %.1fC outTempC: %0.1fC", config_.inTempOffsetC,
                  config_.outTempOffsetC);
         cfgStore_->store(config_);
         break;
@@ -238,7 +238,7 @@ bool ControllerApp::pollUIEvent(bool wait) {
         fanOverrideSpeed_ = uiEvent.payload.fanOverride.speed;
         fanOverrideUntil_ =
             steadyNow() + std::chrono::minutes{uiEvent.payload.fanOverride.timeMins};
-        ESP_LOGI(TAG, "FanOveride:\tspeed=%u\tmins=%u", fanOverrideSpeed_,
+        ESP_LOGI(TAG, "FanOveride: speed=%u mins=%u", fanOverrideSpeed_,
                  uiEvent.payload.fanOverride.timeMins);
 
         struct tm nowLocalTm;
@@ -251,7 +251,7 @@ bool ControllerApp::pollUIEvent(bool wait) {
         break;
     }
     case EventType::TempOverride: {
-        ESP_LOGI(TAG, "TempOverride:\theat=%.1f\tcool=%.1f", uiEvent.payload.tempOverride.heatC,
+        ESP_LOGI(TAG, "TempOverride: heat=%.1f cool=%.1f", uiEvent.payload.tempOverride.heatC,
                  uiEvent.payload.tempOverride.coolC);
         setTempOverride(uiEvent.payload.tempOverride);
         break;
@@ -539,21 +539,21 @@ void ControllerApp::logState(const ControllerDomain::FreshAirState &freshAirStat
     }
 
     ESP_LOG_LEVEL(statusLevel, TAG,
-                  "FreshAir:\traw_t=%.1f\tout_t=%.1f\tt_off=%0.1f\th=%.1f\tp=%lu\trpm=%"
-                  "u\ttarget_speed=%u\treason=%s",
+                  "FreshAir: raw_t=%.1f out_t=%.1f t_off=%0.1f h=%.1f p=%lu rpm=%"
+                  "u target_speed=%u reason=%s",
                   freshAirState.tempC, outdoorTempC(), config_.outTempOffsetC,
                   freshAirState.humidity, freshAirState.pressurePa, freshAirState.fanRpm, fanSpeed,
                   fanSpeedReason_);
     ESP_LOG_LEVEL(statusLevel, TAG,
                   "ctrl:"
                   // Sensors
-                  "\tt=%0.1f\tt_off=%0.1f\th=%0.1f\tp=%lu\tco2=%u"
+                  " t=%0.1f t_off=%0.1f h=%0.1f p=%lu co2=%u"
                   // Setpoints
-                  "\tset_h=%.1f\tset_c=%.1f\tset_co2=%u\tset_r=%s"
+                  " set_h=%.1f set_c=%.1f set_co2=%u set_r=%s"
                   // DemandRequest
-                  "\tvent_d=%.2f\tfancool_d=%.2f\theat_d=%.2f\tcool_d=%.2f"
+                  " vent_d=%.2f fancool_d=%.2f heat_d=%.2f cool_d=%.2f"
                   // HVACState
-                  "\thvac=%s\tac=%s",
+                  " hvac=%s ac=%s",
                   // Sensors
                   sensorData.tempC, config_.inTempOffsetC, sensorData.humidity,
                   sensorData.pressurePa, sensorData.co2,
