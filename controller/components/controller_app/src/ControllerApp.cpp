@@ -42,6 +42,7 @@
 #define FAN_SPEED_EXHAUST_THRESHOLD (FanSpeed)180
 // Fan speed for makeup air
 #define MAKEUP_FAN_SPEED (FanSpeed)120
+#define FAN_ON_THRESHOLD (FanSpeed)25
 #define MIN_FAN_SPEED_VALUE (FanSpeed)10
 #define MIN_FAN_RUNNING_RPM 900
 
@@ -124,11 +125,14 @@ FanSpeed ControllerApp::computeFanSpeed(double ventDemand, double coolDemand,
         }
         fanSpeed = UINT8_MAX * demand;
 
-        // Hysteresis around the turn-off point
-        if (fanSpeed > 0 && fanSpeed < MIN_FAN_SPEED_VALUE) {
-            if (fanIsOn_) {
+        if (fanIsOn_) {
+            // Turn off hysteresis--maintain minimum speed until demand goes to zero
+            if (fanSpeed > 0 && fanSpeed < MIN_FAN_SPEED_VALUE) {
                 fanSpeed = MIN_FAN_SPEED_VALUE;
-            } else {
+            }
+        } else {
+            // Turn on hysteresis--delay turn on to reduce short cycling
+            if (fanSpeed < FAN_ON_THRESHOLD) {
                 fanSpeed = 0;
             }
         }
