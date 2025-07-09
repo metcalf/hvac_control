@@ -379,6 +379,7 @@ ControllerDomain::HVACState ControllerApp::setHVAC(const double heatDemand, cons
             // Make sure everything is off
             valveCtrl_->setMode(false, false);
             modbusController_->setFancoil(FancoilRequest{FancoilSpeed::Off, false});
+            lastHvacSpeed_ = FancoilSpeed::Off;
         }
         break;
     case Config::HVACType::Fancoil: {
@@ -386,6 +387,7 @@ ControllerDomain::HVACState ControllerApp::setHVAC(const double heatDemand, cons
 
         if (allowHVACChange(cool, speed != FancoilSpeed::Off)) {
             modbusController_->setFancoil(FancoilRequest{speed, cool});
+            lastHvacSpeed_ = speed;
 
             // HACK: in the PBR we abuse the valve outputs to control other things
             bool heatVlv = false, coolVlv = false;
@@ -412,6 +414,7 @@ ControllerDomain::HVACState ControllerApp::setHVAC(const double heatDemand, cons
     case Config::HVACType::Valve:
         bool wantOn = demand > ON_DEMAND_THRESHOLD;
         if (allowHVACChange(cool, wantOn)) {
+            lastHvacSpeed_ = FancoilSpeed::High; // Use `high` for valve on
             valveCtrl_->setMode(cool, wantOn);
             if (otherType == Config::HVACType::Fancoil) {
                 modbusController_->setFancoil(FancoilRequest{FancoilSpeed::Off, false});
@@ -569,7 +572,7 @@ void ControllerApp::logState(const ControllerDomain::FreshAirState &freshAirStat
                   // DemandRequest
                   " vent_d=%.2f fancool_d=%.2f heat_d=%.2f cool_d=%.2f"
                   // HVACState
-                  " hvac=%s ac=%s",
+                  " hvac=%s speed=%s ac=%s",
                   // Sensors
                   sensorData.tempC, config_.inTempOffsetC, sensorData.humidity,
                   sensorData.pressurePa, sensorData.co2,
@@ -578,7 +581,8 @@ void ControllerApp::logState(const ControllerDomain::FreshAirState &freshAirStat
                   // Demands
                   ventDemand, fanCoolDemand, heatDemand, coolDemand,
                   // HVACState
-                  ControllerDomain::hvacStateToS(hvacState), acModeToS(acMode_));
+                  ControllerDomain::hvacStateToS(hvacState),
+                  ControllerDomain::fancoilSpeedToS(lastHvacSpeed_), acModeToS(acMode_));
 }
 
 void ControllerApp::checkWifiState() {
@@ -779,27 +783,31 @@ void ControllerApp::setTempOverride(AbstractUIManager::TempOverride to) {
     }
 }
 
-void ControllerApp::handleFreshAirState(ControllerDomain::FreshAirState *freshAirState) {
+ControllerDomain::FreshAirState ControllerApp::getFreshAirState() {
+    ControllerDomain::FreshAirState freshAirState{};
     std::chrono::steady_clock::time_point fasTime, now = steadyNow();
-    esp_err_t err = modbusController_->getFreshAirState(freshAirState, &fasTime);
+    esp_err_t err = modbusController_->getFreshAirState(&freshAirState, &fasTime);
+
+    freshAirState.tempC += config_.outTempOffsetC;
+
     if (err == ESP_OK) {
-        if (freshAirState->fanRpm > MIN_FAN_RUNNING_RPM) {
+        if (freshAirState.fanRpm > MIN_FAN_RUNNING_RPM) {
             if (fanLastStarted_ == std::chrono::steady_clock::time_point{}) {
                 fanLastStopped_ = {};
                 fanLastStarted_ = fasTime;
             } else if ((modbusController_->getFreshAirModelId() ==
                         ControllerDomain::FreshAirModel::SP) &&
                        now - fanLastStarted_ > OUTDOOR_TEMP_MIN_FAN_TIME) {
-                rawOutdoorTempC_ = freshAirState->tempC;
+                rawOutdoorTempC_ = freshAirState.tempC;
                 uiManager_->setOutTempC(outdoorTempC());
                 lastOutdoorTempUpdate_ = fasTime;
             }
-        } else if (freshAirState->fanRpm == 0) {
+        } else if (freshAirState.fanRpm == 0) {
             if (fanLastStopped_ == std::chrono::steady_clock::time_point{}) {
                 fanLastStopped_ = fanLastStarted_ = fasTime;
                 fanLastStarted_ = {};
             }
-            stoppedPressurePa_ = freshAirState->pressurePa;
+            stoppedPressurePa_ = freshAirState.pressurePa;
         }
         clearMessage(MsgID::GetFreshAirStateErr);
     } else {
@@ -815,9 +823,9 @@ void ControllerApp::handleFreshAirState(ControllerDomain::FreshAirState *freshAi
                 fanMaxSpeedStarted_ = speedT;
             } else if (speedT - fanMaxSpeedStarted_ > STATIC_PRESSURE_MIN_FAN_TIME &&
                        stoppedPressurePa_ > 0) {
-                if (stoppedPressurePa_ > freshAirState->pressurePa) {
+                if (stoppedPressurePa_ > freshAirState.pressurePa) {
                     ESP_LOGW(TAG, "est fresh air static pressure (pa): %lu",
-                             (stoppedPressurePa_ - freshAirState->pressurePa));
+                             (stoppedPressurePa_ - freshAirState.pressurePa));
                 } else {
                     ESP_LOGE(TAG, "Unexpected negative static pressure estimate");
                 }
@@ -835,6 +843,8 @@ void ControllerApp::handleFreshAirState(ControllerDomain::FreshAirState *freshAi
         rawOutdoorTempC_ = std::nan("");
         uiManager_->setOutTempC(outdoorTempC());
     }
+
+    return freshAirState;
 }
 
 void __attribute__((format(printf, 4, 5)))
@@ -874,8 +884,7 @@ void ControllerApp::setConfig(ControllerDomain::Config config) {
 
 void ControllerApp::task(bool firstTime) {
     handleHomeClient();
-    ControllerDomain::FreshAirState freshAirState{};
-    handleFreshAirState(&freshAirState);
+    ControllerDomain::FreshAirState freshAirState = getFreshAirState();
 
     Setpoints setpoints = getCurrentSetpoints();
     if (setpoints.coolTempC != lastSetpoints_.coolTempC ||

@@ -186,7 +186,7 @@ class ControllerApp {
     void clearMessage(MsgID msgID);
     void checkModbusErrors();
     void handleHomeClient();
-    void handleFreshAirState(ControllerDomain::FreshAirState *);
+    ControllerDomain::FreshAirState getFreshAirState();
     int getScheduleIdx(int offset);
     Setpoints getCurrentSetpoints();
     void setTempOverride(AbstractUIManager::TempOverride);
@@ -240,6 +240,7 @@ class ControllerApp {
     std::chrono::steady_clock::time_point hvacLastTurnedOn_{};
     bool hvacLastCool_;
     Setpoints lastSetpoints_{};
+    FancoilSpeed lastHvacSpeed_ = FancoilSpeed::Off; // High == valve on
 
     // Delta from setpoint in the direction we're aiming to correct
     // e.g. when heating, the amount by which the indoor temp is below the setpoint

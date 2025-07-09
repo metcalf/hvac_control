@@ -3,6 +3,7 @@
 #include <chrono>
 
 #define POLL_INTERVAL_SECS 5
+#define FRESH_AIR_TEMP_OFFSET_C -REL_F_TO_C(2.5)
 
 void ModbusController::doMakeup() {
     bool makeupDemand;
@@ -49,6 +50,10 @@ void ModbusController::doGetFreshAir() {
     freshAirModelId_ = modelId;
     freshAirStateErr_ = err;
     if (freshAirStateErr_ == ESP_OK) {
+        // All current fresh air models report temperature too high due to self-heating
+        // we adjust this here so that we could handle future models differently based on
+        // the modelId
+        freshAirState.tempC -= FRESH_AIR_TEMP_OFFSET_C;
         freshAirState_ = freshAirState;
         lastFreshAirState_ = std::chrono::steady_clock::now();
     }
