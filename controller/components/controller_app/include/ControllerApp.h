@@ -35,18 +35,17 @@ class ControllerApp {
                   AbstractValveCtrl *valveCtrl, AbstractWifi *wifi,
                   AbstractConfigStore<ControllerDomain::Config> *cfgStore,
                   AbstractHomeClient *homeCli, AbstractOTAClient *ota, const uiEvtRcv_t &uiEvtRcv)
-        : uiManager_(uiManager), modbusController_(modbusController), sensors_(sensors),
-          valveCtrl_(valveCtrl), wifi_(wifi), cfgStore_(cfgStore), homeCli_(homeCli), ota_(ota),
-          uiEvtRcv_(uiEvtRcv),
+        : config_(config), uiManager_(uiManager), modbusController_(modbusController),
+          sensors_(sensors), valveCtrl_(valveCtrl), wifi_(wifi), cfgStore_(cfgStore),
+          homeCli_(homeCli), ota_(ota), uiEvtRcv_(uiEvtRcv),
           fancoilCoolHandler_(fancoilCoolCutoffs_, std::size(fancoilCoolCutoffs_)),
           fancoilHeatHandler_(fancoilHeatCutoffs_, std::size(fancoilHeatCutoffs_)) {
         ventAlgo_ = new LinearVentAlgorithm();
         fanCoolAlgo_ = new PIDAlgorithm(false);
         fanCoolLimitAlgo_ = new FanCoolLimitAlgorithm(fanCoolAlgo_);
-        heatAlgo_ = new NullAlgorithm();
-        coolAlgo_ = new NullAlgorithm();
+        heatAlgo_ = getAlgoForEquipment(config_.equipment.heatType, true);
+        coolAlgo_ = getAlgoForEquipment(config_.equipment.coolType, false);
 
-        setConfig(config);
         setSystemPower(config_.systemOn);
     }
     ~ControllerApp() {
