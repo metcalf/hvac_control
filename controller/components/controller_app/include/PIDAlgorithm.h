@@ -6,7 +6,7 @@
 
 class PIDAlgorithm : public AbstractDemandAlgorithm {
   public:
-    PIDAlgorithm(bool isHeater, double pRangeC = REL_F_TO_C(2.0), double tiSecs = 60 * 60,
+    PIDAlgorithm(bool isHeater, double pRangeC = REL_F_TO_C(3.0), double tiSecs = 30 * 60,
                  std::chrono::seconds maxInterval = std::chrono::minutes(10))
         : isHeater_(isHeater), pRangeC_(pRangeC), tiSecs_(tiSecs), maxInterval_(maxInterval) {};
 
