@@ -55,7 +55,19 @@ void ControllerApp::bootErr(const char *msg) {
     uiManager_->bootErr(msg);
 }
 
-void ControllerApp::updateACMode(double coolDemand, double coolSetpointDeltaC) {
+void ControllerApp::updateEquipment(ControllerDomain::Config::Equipment equipment) {
+    if (equipment.heatType != config_.equipment.heatType) {
+        delete heatAlgo_;
+        heatAlgo_ = getAlgoForEquipment(equipment.heatType, true);
+    }
+    if (equipment.coolType != config_.equipment.coolType) {
+        delete coolAlgo_;
+        coolAlgo_ = getAlgoForEquipment(equipment.coolType, false);
+    }
+    modbusController_->setHasMakeupDemand(config_.equipment.hasMakeupDemand);
+}
+
+void ControllerApp::updateACMode(const double coolDemand, const double coolSetpointDeltaC) {
     if (!config_.systemOn) {
         acMode_ = ACMode::Standby;
         clearMessage(MsgID::ACMode);
@@ -222,10 +234,10 @@ bool ControllerApp::pollUIEvent(bool wait) {
         cfgStore_->store(config_);
         break;
     case EventType::SetEquipment: {
-        // NB: We don't handle change of controller type, instead we reboot from the UIManager
+        updateEquipment(uiEvent.payload.equipment);
         config_.equipment = uiEvent.payload.equipment;
         cfgStore_->store(config_);
-        modbusController_->setHasMakeupDemand(config_.equipment.hasMakeupDemand);
+
         break;
     }
     case EventType::SetWifi:
@@ -320,8 +332,8 @@ void ControllerApp::handleCancelMessage(MsgID id) {
     }
 }
 
-ControllerDomain::HVACState ControllerApp::setHVAC(double heatDemand, double coolDemand,
-                                                   FanSpeed fanSpeed) {
+ControllerDomain::HVACState ControllerApp::setHVAC(const double heatDemand, const double coolDemand,
+                                                   const FanSpeed fanSpeed) {
     bool cool = coolDemand > heatDemand;
     double demand = 0;
     if (coolDemand > ON_DEMAND_THRESHOLD && heatDemand > ON_DEMAND_THRESHOLD) {
@@ -852,15 +864,7 @@ void ControllerApp::clearMessage(MsgID msgID) {
 }
 
 void ControllerApp::setConfig(ControllerDomain::Config config) {
-    if (config.equipment.heatType != config_.equipment.heatType) {
-        delete heatAlgo_;
-        heatAlgo_ = getAlgoForEquipment(config.equipment.heatType, true);
-    }
-    if (config.equipment.coolType != config_.equipment.coolType) {
-        delete coolAlgo_;
-        coolAlgo_ = getAlgoForEquipment(config.equipment.coolType, false);
-    }
-
+    updateEquipment(config.equipment);
     config_ = config;
 }
 

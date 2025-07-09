@@ -174,12 +174,13 @@ class ControllerApp {
         __builtin_unreachable();
     }
 
-    void updateACMode(double coolDemand, double coolSetpointDelta);
+    void updateEquipment(ControllerDomain::Config::Equipment equipment);
+    void updateACMode(const double coolDemand, const double coolSetpointDelta);
     FanSpeed computeFanSpeed(double ventDemand, double coolDemand, bool wantOutdoorTemp);
     void setFanSpeed(FanSpeed);
     bool pollUIEvent(bool wait);
     void handleCancelMessage(MsgID id);
-    HVACState setHVAC(double heatDemand, double coolDemand, FanSpeed fanSpeed);
+    HVACState setHVAC(const double heatDemand, const double coolDemand, const FanSpeed fanSpeed);
     void setErrMessageF(MsgID msgID, bool allowCancel, const char *fmt, ...);
     void setMessageF(MsgID msgID, bool allowCancel, const char *fmt, ...);
     void setMessage(MsgID msgID, bool allowCancel, const char *msg);
