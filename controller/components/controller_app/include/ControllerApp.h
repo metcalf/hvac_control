@@ -41,7 +41,7 @@ class ControllerApp {
           fancoilCoolHandler_(fancoilCoolCutoffs_, std::size(fancoilCoolCutoffs_)),
           fancoilHeatHandler_(fancoilHeatCutoffs_, std::size(fancoilHeatCutoffs_)) {
         ventAlgo_ = new LinearVentAlgorithm();
-        fanCoolAlgo_ = new PIDAlgorithm(false);
+        fanCoolAlgo_ = new PIDAlgorithm(false, REL_F_TO_C(4.0));
         fanCoolLimitAlgo_ = new FanCoolLimitAlgorithm(fanCoolAlgo_);
         heatAlgo_ = getAlgoForEquipment(config_.equipment.heatType, true);
         coolAlgo_ = getAlgoForEquipment(config_.equipment.coolType, false);
