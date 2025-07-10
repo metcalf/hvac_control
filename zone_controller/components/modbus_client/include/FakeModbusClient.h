@@ -9,6 +9,7 @@ class FakeModbusClient : public BaseModbusClient {
     FakeModbusClient() {
         setParam(CxRegister::SwitchOnOff, 0);
         setParam(CxRegister::ACMode, 0);
+        setParam(CxRegister::ACOutletWaterTemp, 0);
         setParam(CxRegister::CompressorFrequency, 0);
     }
 

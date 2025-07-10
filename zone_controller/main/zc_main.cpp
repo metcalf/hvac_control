@@ -14,7 +14,6 @@
 #include "ESPOTAClient.h"
 #include "ESPOutIO.h"
 #include "ESPWifi.h"
-#include "FakeModbusClient.h"
 #include "NetworkTaskManager.h"
 #include "OutCtrl.h"
 #include "ValveStateManager.h"
@@ -56,9 +55,7 @@ static ZCUIManager *uiManager_;
 static ESPWifi wifi_;
 static QueueHandle_t uiEvtQueue_;
 static ESPOutIO outIO_;
-// TODO: Switch to real modbus client only when we have the CX
-static ESPModbusClient realMbClient_;
-static FakeModbusClient mbClient_;
+static ESPModbusClient mbClient_;
 static ESPOTAClient *ota_;
 static NetworkTaskManager *netTaskMgr_;
 
@@ -399,9 +396,7 @@ void initNetwork() {
 extern "C" void zc_main() {
     zone_io_init();
 
-    // We initialize the real mb client to exercise that code path
-    // even though we never actually use the client for now
-    esp_err_t err = realMbClient_.init();
+    esp_err_t err = mbClient_.init();
     if (err != ESP_OK) {
         bootErr("Modbus init error: %d", err);
     }
