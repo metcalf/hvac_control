@@ -544,9 +544,9 @@ uint16_t ControllerApp::localMinOfDay() {
 }
 
 void ControllerApp::logState(const ControllerDomain::FreshAirState &freshAirState,
-                             const ControllerDomain::SensorData &sensorData, double ventDemand,
-                             double fanCoolDemand, double heatDemand, double coolDemand,
-                             const ControllerDomain::Setpoints &setpoints,
+                             const ControllerDomain::SensorData &sensorData, double rawInTempC,
+                             double ventDemand, double fanCoolDemand, double heatDemand,
+                             double coolDemand, const ControllerDomain::Setpoints &setpoints,
                              const ControllerDomain::HVACState hvacState, const FanSpeed fanSpeed) {
     esp_log_level_t statusLevel;
     auto now = steadyNow();
@@ -566,16 +566,16 @@ void ControllerApp::logState(const ControllerDomain::FreshAirState &freshAirStat
     ESP_LOG_LEVEL(statusLevel, TAG,
                   "ctrl:"
                   // Sensors
-                  " t=%0.1f t_off=%0.1f h=%0.1f p=%lu co2=%u"
+                  " t=%0.2f raw_t=%0.2f h=%0.1f p=%lu co2=%u"
                   // Setpoints
-                  " set_h=%.1f set_c=%.1f set_co2=%u set_r=%s"
+                  " set_h=%.2f set_c=%.2f set_co2=%u set_r=%s"
                   // DemandRequest
                   " vent_d=%.2f fancool_d=%.2f heat_d=%.2f cool_d=%.2f"
                   // HVACState
                   " hvac=%s speed=%s ac=%s",
                   // Sensors
-                  sensorData.tempC, config_.inTempOffsetC, sensorData.humidity,
-                  sensorData.pressurePa, sensorData.co2,
+                  sensorData.tempC, rawInTempC, sensorData.humidity, sensorData.pressurePa,
+                  sensorData.co2,
                   // Setpoints
                   setpoints.heatTempC, setpoints.coolTempC, setpoints.co2, setpointReason_,
                   // Demands
@@ -896,6 +896,7 @@ void ControllerApp::task(bool firstTime) {
     uiManager_->setCurrentSetpoints(setpoints.heatTempC, setpoints.coolTempC);
 
     SensorData sensorData = sensors_->getLatest();
+    double rawInTempC = sensorData.tempC;
     sensorData.tempC += config_.inTempOffsetC;
 
     double ventDemand = 0, fanCoolDemand = 0, heatDemand = 0, coolDemand = 0;
@@ -935,8 +936,8 @@ void ControllerApp::task(bool firstTime) {
         uiManager_->bootDone();
     }
 
-    logState(freshAirState, sensorData, ventDemand, fanCoolDemand, heatDemand, coolDemand,
-             setpoints, hvacState, speed);
+    logState(freshAirState, sensorData, rawInTempC, ventDemand, fanCoolDemand, heatDemand,
+             coolDemand, setpoints, hvacState, speed);
 
     if (pollUIEvent(true)) {
         // If we found something in the queue, clear the queue before proceeeding with
