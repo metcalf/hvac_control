@@ -24,10 +24,10 @@ double PIDAlgorithm::getDemand(double deltaC, std::chrono::steady_clock::time_po
         std::min(std::chrono::duration_cast<std::chrono::seconds>(now - lastTime_), maxInterval_);
     lastTime_ = now;
 
-    // Do not integrate when 0 < err < deadband to avoid windup close to setpoint
+    // Do not integrate when 0 < deltaC < deadband to avoid windup close to setpoint
     // causing fans to oscillate on/off. We continue to integrate negative
     // errors since we want to keep recovery from overshoot smooth.
-    if (err < 0 || err > iDeadbandC_) {
+    if (deltaC < 0 || deltaC > iDeadbandC_) {
         i_ += err * deltaS.count();
     }
 
