@@ -20,7 +20,7 @@
 class OutCtrl {
   public:
     OutCtrl(ValveStateManager &valveStateManager, AbstractMessageUI &messageUI)
-        : valveStateManager_(valveStateManager), messageUI_(messageUI){};
+        : valveStateManager_(valveStateManager), messageUI_(messageUI) {};
 
     ZCDomain::SystemState update(bool systemOn, const InputState &zioState);
     void resetLockout() {
@@ -47,11 +47,6 @@ class OutCtrl {
 
     HeatPumpMode lastHeatPumpMode_ = HeatPumpMode::Off;
     std::chrono::steady_clock::time_point lastHeat_{}, lastCool_{};
-
-    static constexpr const char *HeatPumpModeStrings[] = {"off", "standby", "cool", "heat"};
-    const char *stringForHeatPumpMode(HeatPumpMode mode) {
-        return HeatPumpModeStrings[static_cast<int>(mode)];
-    };
 
     bool checkModeLockout(std::chrono::steady_clock::time_point lastTargetMode,
                           std::chrono::steady_clock::time_point lastOtherMode,

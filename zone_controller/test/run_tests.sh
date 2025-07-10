@@ -54,7 +54,7 @@ main() {
     # Ensure we're in the script's directory
     cd "$(dirname "$0")"
 
-    mkdir -p build
+    prepare_build
     configure_cmake
     build_tests
     run_tests "$@"

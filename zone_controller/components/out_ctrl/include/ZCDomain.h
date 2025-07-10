@@ -15,10 +15,9 @@ struct ValveState {
     // change states, power should be on
     bool on() { return target ^ (action == ValveAction::Wait); }
 
+    bool operator==(const ValveState &) const = default;
+
     // For testing
-    bool operator==(const ValveState &other) const {
-        return (target == other.target && action == other.action);
-    }
     friend void PrintTo(const ValveState &vs, std::ostream *os);
 };
 struct SystemState {
@@ -28,6 +27,8 @@ struct SystemState {
     bool zonePump;
     bool fcPump;
     HeatPumpMode heatPumpMode;
+
+    bool operator==(const SystemState &) const = default;
 };
 
 enum class MsgID {
@@ -45,5 +46,8 @@ enum class MsgID {
 };
 
 bool callForMode(Call call, HeatPumpMode hpMode);
+const char *stringForHeatPumpMode(ZCDomain::HeatPumpMode mode);
+int writeCallStates(const Call calls[4], char *buffer, size_t bufferSize);
+int writeValveStates(const ValveState valves[4], char *buffer, size_t bufferSize);
 
 } // namespace ZCDomain

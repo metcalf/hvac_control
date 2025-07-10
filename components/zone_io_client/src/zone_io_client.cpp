@@ -25,7 +25,7 @@ union BitByte {
 };
 
 void zone_io_log_state(InputState s) {
-    ESP_LOGI(TAG, "FC:%d%d|%d%d|%d%d|%d%d V:%c%c|%c%c|%c%c|%c%c SW: %d|%d",
+    ESP_LOGW(TAG, "FC:%d%d|%d%d|%d%d|%d%d V:%c%c|%c%c|%c%c|%c%c SW: %d|%d",
              // Fancoils
              s.fc[0].v, s.fc[0].ob, s.fc[1].v, s.fc[1].ob, s.fc[2].v,
              s.fc[2].ob, s.fc[3].v, s.fc[3].ob,

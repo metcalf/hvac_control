@@ -39,6 +39,7 @@
 #define OTA_INTERVAL_MS (15 * 60 * 1000)
 #define OTA_FETCH_ERR_INTERVAL_MS (60 * 1000)
 #define HEAP_LOG_INTERVAL std::chrono::minutes(15)
+#define SYSTEM_STATE_LOG_INTERVAL std::chrono::minutes(1)
 
 #define VALVE_STUCK_MSG "valves may be stuck"
 #define VALVE_SW_MSG "valves not consistent with switches"
@@ -275,16 +276,62 @@ void checkValveErrors(ValveSWState sws[2]) {
     }
 }
 
+#define CHECK_STRING_ERROR_AND_ADVANCE(wrote, pos)                                                 \
+    if (wrote < 0) {                                                                               \
+        ESP_LOGE(TAG, "Error writing to state log buffer: %d", wrote);                             \
+        return;                                                                                    \
+    }                                                                                              \
+    pos += wrote;
+
+void logSystemState(SystemState state) {
+    char buffer[1024];
+    size_t pos = 0;
+    int wrote;
+
+    wrote = snprintf(buffer, sizeof(buffer) - pos, "ts=");
+    CHECK_STRING_ERROR_AND_ADVANCE(wrote, pos)
+
+    wrote = ZCDomain::writeCallStates(state.thermostats, buffer + pos, sizeof(buffer) - pos);
+    CHECK_STRING_ERROR_AND_ADVANCE(wrote, pos)
+
+    wrote = snprintf(buffer, sizeof(buffer) - pos, "vlvs=");
+    CHECK_STRING_ERROR_AND_ADVANCE(wrote, pos)
+
+    wrote = ZCDomain::writeValveStates(state.valves, buffer + pos, sizeof(buffer) - pos);
+    CHECK_STRING_ERROR_AND_ADVANCE(wrote, pos)
+
+    wrote = snprintf(buffer, sizeof(buffer) - pos, "fc=");
+    CHECK_STRING_ERROR_AND_ADVANCE(wrote, pos)
+
+    wrote = ZCDomain::writeCallStates(state.fancoils, buffer + pos, sizeof(buffer) - pos);
+    CHECK_STRING_ERROR_AND_ADVANCE(wrote, pos)
+
+    double hpOutT = -1;
+    uint16_t hpHz = UINT16_MAX;
+    mbClient_.getCxAcOutletWaterTemp(&hpOutT);
+    mbClient_.getCxCompressorFrequency(&hpHz);
+
+    wrote =
+        snprintf(buffer, sizeof(buffer) - pos,
+                 "zone_pump=%d fc_pump=%d hp_mode=%s hp_out_t=%0.1f hp_hz=%d", state.zonePump,
+                 state.fcPump, ZCDomain::stringForHeatPumpMode(state.heatPumpMode), hpOutT, hpHz);
+    CHECK_STRING_ERROR_AND_ADVANCE(wrote, pos)
+
+    ESP_LOGW(TAG, "%s", buffer);
+}
+
 void outputTask(void *) {
     bool firstTime = false;
     InputState lastZioState;
+    SystemState lastState;
+    std::chrono::steady_clock::time_point lastLoggedSystemState{};
 
     log_heap_stats();
     std::chrono::steady_clock::time_point last_logged_heap = std::chrono::steady_clock::now();
 
     while (1) {
         InputState zioState = zone_io_get_state();
-        if (!zone_io_state_eq(zioState, lastZioState)) {
+        if (zioState != lastZioState) {
             zone_io_log_state(zioState);
         }
         lastZioState = zioState;
@@ -295,6 +342,13 @@ void outputTask(void *) {
         } else {
             currentState_ = outCtrl_->update(systemOn_, zioState);
         }
+
+        if (currentState_ != lastState || (std::chrono::steady_clock::now() -
+                                           lastLoggedSystemState) > SYSTEM_STATE_LOG_INTERVAL) {
+            logSystemState(currentState_);
+            lastLoggedSystemState = std::chrono::steady_clock::now();
+        }
+        lastState = currentState_;
 
         uiManager_->updateState(currentState_);
 
