@@ -321,7 +321,7 @@ void logSystemState(SystemState state) {
 }
 
 void outputTask(void *) {
-    bool firstTime = false;
+    bool firstTime = true;
     InputState lastZioState;
     SystemState lastState;
     std::chrono::steady_clock::time_point lastLoggedSystemState{};
@@ -345,6 +345,7 @@ void outputTask(void *) {
 
         if (currentState_ != lastState || (std::chrono::steady_clock::now() -
                                            lastLoggedSystemState) > SYSTEM_STATE_LOG_INTERVAL) {
+            zone_io_log_state(zioState);
             logSystemState(currentState_);
             lastLoggedSystemState = std::chrono::steady_clock::now();
         }
