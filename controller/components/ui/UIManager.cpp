@@ -490,9 +490,9 @@ void UIManager::initExtraWidgets() {
                                   LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_border_opa(restartButton_, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_border_width(restartButton_, 1, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_add_event_cb(restartButton_, ui_event_schedule_button2, LV_EVENT_CLICKED, this);
+    lv_obj_add_event_cb(restartButton_, restartCb, LV_EVENT_CLICKED, this);
 
-    lv_obj_t *restartLabel = lv_label_create(ui_schedule_button2);
+    lv_obj_t *restartLabel = lv_label_create(restartButton_);
     lv_obj_set_width(restartLabel, LV_SIZE_CONTENT);  /// 1
     lv_obj_set_height(restartLabel, LV_SIZE_CONTENT); /// 1
     lv_obj_set_align(restartLabel, LV_ALIGN_CENTER);
