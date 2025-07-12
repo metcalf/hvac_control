@@ -71,6 +71,8 @@ void coolRollerChangeCb(lv_event_t *e) {
                                                     lv_event_get_target(e));
 }
 
+void restartCb(lv_event_t *e) { ((UIManager *)lv_event_get_user_data(e))->eRestart(); }
+
 void UIManager::bootDone() {
     xSemaphoreTake(mutex_, portMAX_DELAY);
     booted_ = true;
@@ -434,6 +436,15 @@ void UIManager::eWifiTextarea(lv_event_t *e) {
     }
 }
 
+void UIManager::eRestart() {
+    Event evt{
+        EventType::Restart,
+        {},
+    };
+
+    eventCb_(evt);
+}
+
 void UIManager::updateTempLimits(uint8_t maxHeatDeg, uint8_t minCoolDeg) {
     maxHeatDeg_ = maxHeatDeg;
     minCoolDeg_ = minCoolDeg;
@@ -457,6 +468,7 @@ void UIManager::onCancelMsg(uint8_t msgID) {
 // I ran out of allowed widgets in the free version of Squareline so this is
 // where I add new stuff until I come up with a better answer.
 void UIManager::initExtraWidgets() {
+    // Firmware version label in the footer of the settings screen
     firmwareVersionLabel_ = lv_label_create(ui_Settings);
     lv_obj_remove_style_all(firmwareVersionLabel_);
     lv_obj_set_width(firmwareVersionLabel_, 300);
@@ -464,6 +476,28 @@ void UIManager::initExtraWidgets() {
     lv_obj_set_align(firmwareVersionLabel_, LV_ALIGN_CENTER);
     lv_label_set_text(firmwareVersionLabel_, "");
     lv_obj_set_style_text_font(firmwareVersionLabel_, &lv_font_montserrat_14,
+                               LV_PART_MAIN | LV_STATE_DEFAULT);
+
+    // restart button
+    restartButton_ = lv_btn_create(ui_Settings_buttons_right);
+    lv_obj_set_width(restartButton_, 120);
+    lv_obj_set_height(restartButton_, 40);
+    lv_obj_set_align(restartButton_, LV_ALIGN_TOP_MID);
+    lv_obj_set_style_bg_color(restartButton_, lv_color_hex(0x44474C),
+                              LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_bg_opa(restartButton_, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_border_color(restartButton_, lv_color_hex(0x808080),
+                                  LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_border_opa(restartButton_, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_border_width(restartButton_, 1, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_add_event_cb(restartButton_, ui_event_schedule_button2, LV_EVENT_CLICKED, this);
+
+    lv_obj_t *restartLabel = lv_label_create(ui_schedule_button2);
+    lv_obj_set_width(restartLabel, LV_SIZE_CONTENT);  /// 1
+    lv_obj_set_height(restartLabel, LV_SIZE_CONTENT); /// 1
+    lv_obj_set_align(restartLabel, LV_ALIGN_CENTER);
+    lv_label_set_text(restartLabel, "RESTART");
+    lv_obj_set_style_text_font(restartLabel, &lv_font_montserrat_18,
                                LV_PART_MAIN | LV_STATE_DEFAULT);
 }
 

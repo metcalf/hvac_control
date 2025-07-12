@@ -227,7 +227,7 @@ extern "C" void controller_main() {
     valveCtrl_.init();
 
     app_ = new ControllerApp(config, uiManager_, modbusController_, &sensors_, &valveCtrl_, &wifi_,
-                             &appConfigStore_, &homeCli_, ota_, uiEvtRcv);
+                             &appConfigStore_, &homeCli_, ota_, uiEvtRcv, esp_restart);
     xTaskCreate(uiTask, "uiTask", UI_TASK_STACK_SIZE, uiManager_, UI_TASK_PRIO, NULL);
 
     setenv("TZ", POSIX_TZ_STR, 1);

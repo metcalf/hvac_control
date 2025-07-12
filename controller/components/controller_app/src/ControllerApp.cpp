@@ -297,6 +297,13 @@ bool ControllerApp::pollUIEvent(bool wait) {
         ESP_LOGI(TAG, "MsgCancel: %s", msgIDToS((MsgID)uiEvent.payload.msgID));
         handleCancelMessage((MsgID)uiEvent.payload.msgID);
         break;
+    case EventType::Restart:
+        ESP_LOGI(TAG, "Restart requested");
+        restartCb_();
+        break;
+    default:
+        ESP_LOGE(TAG, "Unexpected UI event: %d", static_cast<int>(uiEvent.type));
+        break;
     }
 
     return true;

@@ -37,6 +37,7 @@ class AbstractUIManager {
         TempOverride,
         ACOverride,
         MsgCancel,
+        Restart,
     };
 
     union EventPayload {

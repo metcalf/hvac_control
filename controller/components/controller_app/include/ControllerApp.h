@@ -26,7 +26,7 @@
 
 class ControllerApp {
   public:
-    typedef void (*cfgUpdateCb_t)(ControllerDomain::Config &config);
+    typedef std::function<void()> restartCb_t;
     typedef std::function<bool(AbstractUIManager::Event *, uint16_t)> uiEvtRcv_t;
     //typedef bool (*uiEvtRcv_t)(AbstractUIManager::Event *evt, uint16_t waitMs);
 
@@ -34,10 +34,11 @@ class ControllerApp {
                   AbstractModbusController *modbusController, AbstractSensors *sensors,
                   AbstractValveCtrl *valveCtrl, AbstractWifi *wifi,
                   AbstractConfigStore<ControllerDomain::Config> *cfgStore,
-                  AbstractHomeClient *homeCli, AbstractOTAClient *ota, const uiEvtRcv_t &uiEvtRcv)
+                  AbstractHomeClient *homeCli, AbstractOTAClient *ota, const uiEvtRcv_t &uiEvtRcv,
+                  const restartCb_t restartCb)
         : config_(config), uiManager_(uiManager), modbusController_(modbusController),
           sensors_(sensors), valveCtrl_(valveCtrl), wifi_(wifi), cfgStore_(cfgStore),
-          homeCli_(homeCli), ota_(ota), uiEvtRcv_(uiEvtRcv),
+          homeCli_(homeCli), ota_(ota), uiEvtRcv_(uiEvtRcv), restartCb_(restartCb),
           fancoilCoolHandler_(fancoilCoolCutoffs_, std::size(fancoilCoolCutoffs_)),
           fancoilHeatHandler_(fancoilHeatCutoffs_, std::size(fancoilHeatCutoffs_)) {
         ventAlgo_ = new LinearVentAlgorithm();
@@ -220,6 +221,7 @@ class ControllerApp {
     AbstractOTAClient *ota_;
     uiEvtRcv_t uiEvtRcv_;
     AbstractDemandAlgorithm *ventAlgo_, *fanCoolAlgo_, *fanCoolLimitAlgo_, *heatAlgo_, *coolAlgo_;
+    restartCb_t restartCb_;
 
     AbstractUIManager::TempOverride tempOverride_;
     int tempOverrideUntilScheduleIdx_ = -1;

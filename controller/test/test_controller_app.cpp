@@ -59,12 +59,15 @@ class ControllerAppTest : public testing::Test {
         return true;
     }
 
+    void restartCb() { restartCalls_++; }
+
   protected:
     void SetUp() override {
         using namespace std::placeholders;
         app_ = new TestControllerApp(
             default_test_config(), &uiManager_, &modbusController_, &sensors_, &valveCtrl_, &wifi_,
-            &cfgStore_, &homeCli_, &otaCli_, std::bind(&ControllerAppTest::uiEvtRcv, this, _1, _2));
+            &cfgStore_, &homeCli_, &otaCli_, std::bind(&ControllerAppTest::uiEvtRcv, this, _1, _2),
+            std::bind(&ControllerAppTest::restartCb, this));
 
         setRealNow(std::tm{
             .tm_hour = 2,
@@ -130,6 +133,7 @@ class ControllerAppTest : public testing::Test {
 
     AbstractUIManager::Event *evt_;
     Config savedConfig_;
+    int restartCalls_ = 0;
 };
 
 TEST_F(ControllerAppTest, Boots) {

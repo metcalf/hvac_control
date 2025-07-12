@@ -70,6 +70,7 @@ class UIManager : public AbstractUIManager {
     void eSaveWifiSettings();
     void eTempOffsetChanged();
     void eWifiTextarea(lv_event_t *e);
+    void eRestart();
 
     void eHomeLoadStart();
     void eHomeUnloadStart();
@@ -101,7 +102,7 @@ class UIManager : public AbstractUIManager {
 
     inline static UIManager *eventsInst_;
 
-    lv_obj_t *firmwareVersionLabel_;
+    lv_obj_t *firmwareVersionLabel_, *restartButton_;
 
     SemaphoreHandle_t mutex_;
     MessageManager *msgMgr_;
