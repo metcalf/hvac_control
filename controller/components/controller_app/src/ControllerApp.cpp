@@ -199,7 +199,7 @@ bool ControllerApp::pollUIEvent(bool wait) {
             schedules[0].heatC, schedules[0].coolC, schedules[0].startHr, schedules[0].startMin,
             // Night
             schedules[1].heatC, schedules[1].coolC, schedules[1].startHr, schedules[1].startMin);
-        for (int i = 0; i < sizeof(schedules); i++) {
+        for (int i = 0; i < NUM_SCHEDULE_TIMES; i++) {
             config_.schedules[i] = schedules[i];
         }
         cfgStore_->store(config_);
