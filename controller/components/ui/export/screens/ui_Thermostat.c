@@ -251,7 +251,7 @@ ui_Label10 = lv_label_create(ui_on_button);
 lv_obj_set_width( ui_Label10, LV_SIZE_CONTENT);  /// 1
 lv_obj_set_height( ui_Label10, LV_SIZE_CONTENT);   /// 1
 lv_obj_set_align( ui_Label10, LV_ALIGN_CENTER );
-lv_label_set_text(ui_Label10,"ON");
+lv_label_set_text(ui_Label10,"SYSTEM ON");
 lv_obj_set_style_text_font(ui_Label10, &lv_font_montserrat_18, LV_PART_MAIN| LV_STATE_DEFAULT);
 
 lv_obj_add_event_cb(ui_comp_get_child(ui_Thermostat_setting_header, UI_COMP_SETTING_HEADER_SETTING_BACK_BUTTON), ui_event_Thermostat_setting_header_Setting_back_button, LV_EVENT_ALL, NULL);
