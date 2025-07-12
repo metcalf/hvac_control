@@ -11,8 +11,8 @@ template <typename T>
 class NVSConfigStore : public AbstractConfigStore<T> {
   public:
     NVSConfigStore(uint16_t version, const char *nvsNamespace)
-        : version_(version), nvsNamespace_(nvsNamespace){};
-    ~NVSConfigStore() override{};
+        : version_(version), nvsNamespace_(nvsNamespace) {};
+    ~NVSConfigStore() override {};
 
     void store(T &config) override;
     T load() override;
@@ -63,7 +63,7 @@ inline T NVSConfigStore<T>::load() {
     versionWritten_ = true; // Confirmed that the correct version was already written
 
     T config;
-    size_t size = sizeof(T);
+    size_t size;
     nvs_get_blob(handle, "config", &config, &size);
     if (size != sizeof(T)) {
         ESP_LOGE(TAG, "%s: Invalid config length read: %u != %u", nvsNamespace_, sizeof(T), size);
