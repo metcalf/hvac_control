@@ -338,6 +338,9 @@ void ControllerApp::handleCancelMessage(MsgID id) {
         //     });
         //     break;
         //}
+    case MsgID::HVACChangeLimit:
+        resetHVACChangeLimit();
+        break;
     default:
         ESP_LOGE(TAG, "Unexpected message cancellation for: %d", static_cast<int>(id));
     }
