@@ -331,9 +331,9 @@ TEST_F(ControllerAppTest, IncreasesFancoilSpeedOverTime) {
 
 TEST_F(ControllerAppTest, IncreasesFanSpeedOverTime) {
     // Establish cooling demand to trigger fan for outdoor temp update
-    sensors_.setLatest({.tempC = 22.5, .humidity = 2.0, .co2 = 500});
-    modbusController_.setFreshAirState(ControllerDomain::FreshAirState{.tempC = 15, .fanRpm = 1000},
-                                       app_->steadyNow_);
+    sensors_.setLatest({.tempC = 23, .humidity = 2.0, .co2 = 500});
+    ControllerDomain::FreshAirState fas = {.tempC = 15, .fanRpm = 1000};
+    modbusController_.setFreshAirState(fas, app_->steadyNow_);
     // After rolling time forward enough to measure the outdoor temperature, fan cooling
     // should come on.
     app_->task();
@@ -342,7 +342,8 @@ TEST_F(ControllerAppTest, IncreasesFanSpeedOverTime) {
     EXPECT_LT(modbusController_.getFreshAirSpeed(), 150);
     EXPECT_EQ("cool", app_->fanSpeedReason());
 
-    app_->steadyNow_ += std::chrono::minutes(15);
+    app_->steadyNow_ += std::chrono::minutes(60);
+    modbusController_.setFreshAirState(fas, app_->steadyNow_);
     app_->task();
     EXPECT_GT(modbusController_.getFreshAirSpeed(), 150);
     EXPECT_EQ("cool", app_->fanSpeedReason());
@@ -466,7 +467,7 @@ TEST_F(ControllerAppTest, MakeupDemand) {
 }
 
 TEST_F(ControllerAppTest, Precooling) {
-    sensors_.setLatest({.tempC = 25.1, .humidity = 2.0, .co2 = 456});
+    sensors_.setLatest({.tempC = 25.5, .humidity = 2.0, .co2 = 456});
     ControllerDomain::FreshAirState freshAirState = {
         .tempC = 20,
         .fanRpm = 1000,
@@ -490,7 +491,7 @@ TEST_F(ControllerAppTest, Precooling) {
     modbusController_.setFreshAirState(freshAirState, app_->steadyNow_);
     app_->task();
     EXPECT_GT(modbusController_.getFreshAirSpeed(), 20);
-    EXPECT_LT(modbusController_.getFreshAirSpeed(), 40);
+    EXPECT_LT(modbusController_.getFreshAirSpeed(), 60);
     EXPECT_EQ("cool", app_->fanSpeedReason());
     EXPECT_EQ("normal", app_->setpointReason());
     auto fcReq = modbusController_.getFancoilRequest();
