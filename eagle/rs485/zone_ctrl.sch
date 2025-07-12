@@ -9633,7 +9633,7 @@ Number of pins: &lt;b&gt;2&lt;/b&gt;&lt;b&gt;&lt;P&gt;
 <pinref part="J11" gate="G$1" pin="1"/>
 </segment>
 </net>
-<net name="RS485B" class="0">
+<net name="RS485A" class="0">
 <segment>
 <label x="63.5" y="10.16" size="1.778" layer="95"/>
 <pinref part="J9" gate="G$1" pin="2"/>
@@ -9648,7 +9648,7 @@ Number of pins: &lt;b&gt;2&lt;/b&gt;&lt;b&gt;&lt;P&gt;
 <wire x1="91.44" y1="0" x2="91.44" y2="15.24" width="0.1524" layer="91"/>
 </segment>
 </net>
-<net name="RS485A" class="0">
+<net name="RS485B" class="0">
 <segment>
 <pinref part="U9" gate="G$1" pin="B"/>
 <wire x1="63.5" y1="12.7" x2="86.36" y2="12.7" width="0.1524" layer="91"/>
