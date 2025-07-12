@@ -46,7 +46,7 @@ RegisterDef registers_[] = {
     {CID::MakeupDemandState, "MakeupDemandState", SlaveID::MakeupDemand, MB_PARAM_INPUT, 0x00, 1},
 };
 
-const uint16_t numLocalRegisters_ = (sizeof(registers_) / sizeof(registers_[0]));
+const uint16_t numLocalRegisters_ = std::size(registers_);
 const uint16_t numDeviceParams_ = numLocalRegisters_ + static_cast<uint16_t>(CxiRegister::_Count);
 mb_parameter_descriptor_t deviceParams_[numDeviceParams_];
 std::unordered_map<CID, const char *> registerNames_;

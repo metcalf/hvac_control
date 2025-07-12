@@ -29,7 +29,7 @@ lv_obj_t **wifiContainers[] = {
     &ui_log_name_container,
 };
 
-size_t nWifiTextareas = sizeof(wifiTextareas) / sizeof(wifiTextareas[0]);
+size_t nWifiTextareas = std::size(wifiTextareas);
 
 uint8_t getTempOffsetTenthDeg(lv_obj_t *roller) { return lv_roller_get_selected(roller) - 50; }
 
@@ -609,7 +609,7 @@ void UIManager::setSystemPower(bool on) {
 
     lv_opa_t opa = on ? LV_OPA_100 : LV_OPA_50;
 
-    for (int i = 0; i < (sizeof(objs) / sizeof(objs[0])); i++) {
+    for (int i = 0; i < std::size(objs); i++) {
         lv_obj_set_style_opa(objs[i], opa, 0);
     }
 
