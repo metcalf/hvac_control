@@ -6221,7 +6221,7 @@ make R8/9 4.7k</text>
 <label x="104.14" y="30.48" size="1.778" layer="95"/>
 </segment>
 </net>
-<net name="RS485B" class="0">
+<net name="RS485A" class="0">
 <segment>
 <label x="40.64" y="27.94" size="1.778" layer="95"/>
 <wire x1="40.64" y1="27.94" x2="60.96" y2="27.94" width="0.1524" layer="91"/>
@@ -6237,7 +6237,7 @@ make R8/9 4.7k</text>
 <junction x="66.04" y="5.08"/>
 </segment>
 </net>
-<net name="RS485A" class="0">
+<net name="RS485B" class="0">
 <segment>
 <wire x1="40.64" y1="30.48" x2="66.04" y2="30.48" width="0.1524" layer="91"/>
 <label x="40.64" y="30.48" size="1.778" layer="95"/>

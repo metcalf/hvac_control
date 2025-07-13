@@ -5585,7 +5585,7 @@ Source: &lt;a href="https://datasheet.datasheetarchive.com/originals/distributor
 <label x="279.4" y="68.58" size="1.778" layer="95"/>
 </segment>
 </net>
-<net name="RS485B" class="0">
+<net name="RS485A" class="0">
 <segment>
 <label x="83.82" y="5.08" size="1.778" layer="95"/>
 <wire x1="83.82" y1="5.08" x2="104.14" y2="5.08" width="0.1524" layer="91"/>
@@ -5601,7 +5601,7 @@ Source: &lt;a href="https://datasheet.datasheetarchive.com/originals/distributor
 <junction x="109.22" y="-17.78"/>
 </segment>
 </net>
-<net name="RS485A" class="0">
+<net name="RS485B" class="0">
 <segment>
 <wire x1="83.82" y1="7.62" x2="109.22" y2="7.62" width="0.1524" layer="91"/>
 <label x="83.82" y="7.62" size="1.778" layer="95"/>

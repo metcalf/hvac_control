@@ -7524,7 +7524,7 @@ Source: &lt;a href="https://support.epson.biz/td/api/doc_check.php?dl=app_RX8111
 <pinref part="C2" gate="G$1" pin="1"/>
 </segment>
 </net>
-<net name="RS485B" class="0">
+<net name="RS485A" class="0">
 <segment>
 <label x="93.98" y="0" size="1.778" layer="95"/>
 <wire x1="93.98" y1="0" x2="111.76" y2="0" width="0.1524" layer="91"/>
@@ -7540,7 +7540,7 @@ Source: &lt;a href="https://support.epson.biz/td/api/doc_check.php?dl=app_RX8111
 <junction x="116.84" y="-22.86"/>
 </segment>
 </net>
-<net name="RS485A" class="0">
+<net name="RS485B" class="0">
 <segment>
 <wire x1="93.98" y1="2.54" x2="116.84" y2="2.54" width="0.1524" layer="91"/>
 <label x="93.98" y="2.54" size="1.778" layer="95"/>
