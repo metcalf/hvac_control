@@ -41,7 +41,7 @@
 // If fan is above this speed, turn on exhaust fan for extra cooling
 #define FAN_SPEED_EXHAUST_THRESHOLD (FanSpeed)180
 // Fan speed for makeup air
-#define MAKEUP_FAN_SPEED (FanSpeed)120
+#define MAKEUP_FAN_SPEED (FanSpeed)160
 #define FAN_ON_THRESHOLD (FanSpeed)40
 #define MIN_FAN_SPEED_VALUE (FanSpeed)10
 #define MIN_FAN_RUNNING_RPM 900
