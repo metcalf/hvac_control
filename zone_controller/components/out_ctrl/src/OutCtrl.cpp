@@ -156,7 +156,7 @@ void OutCtrl::setCalls(ZCDomain::SystemState &state, const InputState &zioState)
     for (int i = 0; i < ZONE_IO_NUM_FC; i++) {
         FancoilState fc = zioState.fc[i];
         if (fc.v) {
-            state.fancoils[i] = fc.ob ? Call::Cool : Call::Heat;
+            state.fancoils[i] = fc.ob ? Call::Heat : Call::Cool;
         }
     }
 }
