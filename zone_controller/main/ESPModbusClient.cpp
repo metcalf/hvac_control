@@ -1,12 +1,13 @@
 #include "ESPModbusClient.h"
 
+#include "driver/gpio.h"
 #include "esp_log.h"
 
 #define MB_PORT_NUM UART_NUM_1 // Number of UART port used for Modbus connection
 #define MB_DEV_SPEED 9600      // The communication speed of the UART
-#define MB_UART_TXD 43         // TXD0
-#define MB_UART_RXD 1
-#define MB_UART_RTS 2
+#define MB_UART_TXD GPIO_NUM_41
+#define MB_UART_RXD GPIO_NUM_1
+#define MB_UART_RTS GPIO_NUM_2 // RXD0
 
 #define MB_NAME_CX_ONOFF "cx_onoff"
 #define MB_NAME_CX_MODE "cx_mode"
@@ -38,7 +39,8 @@ esp_err_t ESPModbusClient::init() {
     }
 
     // Initialize and start Modbus controller
-    mb_communication_info_t comm = {.mode = MB_MODE_RTU};
+    mb_communication_info_t comm;
+    comm.mode = MB_MODE_RTU;
     comm.port = MB_PORT_NUM;
     comm.baudrate = MB_DEV_SPEED;
     comm.parity = MB_PARITY_NONE;
