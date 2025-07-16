@@ -312,9 +312,9 @@ void logSystemState(SystemState state) {
 
     wrote =
         snprintf(buffer, sizeof(buffer) - pos,
-                 "zone_pump=%d fc_pump=%d hp_mode=%s cx_mode=%d hp_out_t=%0.1f hp_hz=%d",
+                 "zone_pump=%d fc_pump=%d hp_mode=%s cx_mode=%s hp_out_t=%0.1f hp_hz=%d",
                  state.zonePump, state.fcPump, ZCDomain::stringForHeatPumpMode(state.heatPumpMode),
-                 static_cast<int>(cxOpMode), hpOutT, hpHz);
+                 BaseModbusClient::cxOpModeToString(cxOpMode), hpOutT, hpHz);
     CHECK_STRING_ERROR_AND_ADVANCE(wrote, pos)
 
     ESP_LOGW(TAG, "%s", buffer);
