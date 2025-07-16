@@ -208,7 +208,7 @@ esp_err_t ModbusClient::getFancoilState(ControllerDomain::FancoilState *state) {
 
 esp_err_t ModbusClient::setFancoil(const ControllerDomain::FancoilRequest req) {
     if (req.speed == FancoilSpeed::Off) {
-        return cxi_client_set_param(CxiRegister::OnOff, 0);
+        return cxi_client_set_param(CxiRegister::OnOff, 0, 2);
     }
 
     esp_err_t err;
@@ -233,18 +233,18 @@ esp_err_t ModbusClient::setFancoil(const ControllerDomain::FancoilRequest req) {
     }
     err = cxi_client_set_temp_param(req.cool ? CxiRegister::CoolingSetTemperature
                                              : CxiRegister::HeatingSetTemperature,
-                                    setpointC, 1);
+                                    setpointC, 2);
     if (err != ESP_OK) {
         return err;
     }
 
     err = cxi_client_set_param(CxiRegister::Mode,
-                               static_cast<uint16_t>(req.cool ? CxiMode::Cool : CxiMode::Heat), 1);
+                               static_cast<uint16_t>(req.cool ? CxiMode::Cool : CxiMode::Heat), 2);
     if (err != ESP_OK) {
         return err;
     }
 
-    cxi_client_set_param(CxiRegister::OnOff, 1, 1);
+    cxi_client_set_param(CxiRegister::OnOff, 1, 2);
     if (err != ESP_OK) {
         return err;
     }
@@ -253,7 +253,7 @@ esp_err_t ModbusClient::setFancoil(const ControllerDomain::FancoilRequest req) {
     // controller. We can only set the OffTimer when turned on and changing the value
     // doesn't seem to reset the timer so we just set it for something long and accept
     // that we might power cycle very briefly after 11 hours.
-    cxi_client_set_param(CxiRegister::OffTimer, 11, 1);
+    cxi_client_set_param(CxiRegister::OffTimer, 11, 2);
     if (err != ESP_OK) {
         return err;
     }
