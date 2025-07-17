@@ -1,1 +1,5 @@
-{ "DisableFormat": false, "SortIncludes": "CaseSensitive", "IndentWidth": 4 }
+{
+  "DisableFormat": false,
+  "SortIncludes": "CaseSensitive",
+  "BasedOnStyle": "InheritParentConfig",
+}
