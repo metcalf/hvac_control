@@ -208,7 +208,7 @@ esp_err_t ModbusClient::getFancoilState(ControllerDomain::FancoilState *state) {
 
 esp_err_t ModbusClient::setFancoil(const ControllerDomain::FancoilRequest req) {
     if (req.speed == FancoilSpeed::Off) {
-        return cxi_client_set_param(CxiRegister::OnOff, 0, 2);
+        return cxi_client_set_param(CxiRegister::OnOff, 0);
     }
 
     esp_err_t err;
@@ -233,18 +233,18 @@ esp_err_t ModbusClient::setFancoil(const ControllerDomain::FancoilRequest req) {
     }
     err = cxi_client_set_temp_param(req.cool ? CxiRegister::CoolingSetTemperature
                                              : CxiRegister::HeatingSetTemperature,
-                                    setpointC, 2);
+                                    setpointC);
     if (err != ESP_OK) {
         return err;
     }
 
     err = cxi_client_set_param(CxiRegister::Mode,
-                               static_cast<uint16_t>(req.cool ? CxiMode::Cool : CxiMode::Heat), 2);
+                               static_cast<uint16_t>(req.cool ? CxiMode::Cool : CxiMode::Heat));
     if (err != ESP_OK) {
         return err;
     }
 
-    cxi_client_set_param(CxiRegister::OnOff, 1, 2);
+    cxi_client_set_param(CxiRegister::OnOff, 1);
     if (err != ESP_OK) {
         return err;
     }
@@ -253,7 +253,7 @@ esp_err_t ModbusClient::setFancoil(const ControllerDomain::FancoilRequest req) {
     // controller. We can only set the OffTimer when turned on and changing the value
     // doesn't seem to reset the timer so we just set it for something long and accept
     // that we might power cycle very briefly after 11 hours.
-    cxi_client_set_param(CxiRegister::OffTimer, 11, 2);
+    cxi_client_set_param(CxiRegister::OffTimer, 11);
     if (err != ESP_OK) {
         return err;
     }
@@ -266,17 +266,17 @@ esp_err_t ModbusClient::configureFancoil() {
 
     // For some reason the fancoil isn't turning the transformer on even with this set to
     // `1` so I'm using the Remote Out dry contact instead and providing my own 24VAC.
-    err = cxi_client_set_param(CxiRegister::UseValve, 0, 2);
+    err = cxi_client_set_param(CxiRegister::UseValve, 0);
     if (err != ESP_OK) {
         return err;
     }
 
-    err = cxi_client_set_param(CxiRegister::StartUltraLowWind, 1, 2);
+    err = cxi_client_set_param(CxiRegister::StartUltraLowWind, 1);
     if (err != ESP_OK) {
         return err;
     }
 
-    err = cxi_client_set_param(CxiRegister::StartAntiHotWind, 1, 2);
+    err = cxi_client_set_param(CxiRegister::StartAntiHotWind, 1);
     if (err != ESP_OK) {
         return err;
     }
@@ -286,17 +286,17 @@ esp_err_t ModbusClient::configureFancoil() {
         return err;
     }
 
-    err = cxi_client_set_temp_param(CxiRegister::AntiCoolingWindSettingTemperature, 25, 2);
+    err = cxi_client_set_temp_param(CxiRegister::AntiCoolingWindSettingTemperature, 25);
     if (err != ESP_OK) {
         return err;
     }
 
     // Configure the default min/max set temp since they work fine for our purposes
-    err = cxi_client_set_temp_param(CxiRegister::MaxSetTemperature, 30, 2);
+    err = cxi_client_set_temp_param(CxiRegister::MaxSetTemperature, 30);
     if (err != ESP_OK) {
         return err;
     }
-    err = cxi_client_set_temp_param(CxiRegister::MinSetTemperature, 8, 2);
+    err = cxi_client_set_temp_param(CxiRegister::MinSetTemperature, 8);
     if (err != ESP_OK) {
         return err;
     }

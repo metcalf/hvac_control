@@ -94,26 +94,37 @@ void cxi_client_init(mb_parameter_descriptor_t *deviceParameters, uint startIdx)
     }
 }
 
-esp_err_t cxi_client_get_param(CxiRegDef def, uint16_t *value) {
+esp_err_t cxi_client_get_param(CxiRegDef def, uint16_t *value, uint retries = 2) {
     uint8_t type = 0; // throwaway
+    esp_err_t err = ESP_OK;
 
-    esp_err_t err = mbc_master_get_parameter(def.idx, (char *)def.name, (uint8_t *)value, &type);
-    if (err != ESP_OK) {
+    for (int i = 0; i <= retries; i++) {
+        err = mbc_master_get_parameter(def.idx, (char *)def.name, (uint8_t *)value, &type);
+        if (err == ESP_OK) {
+
+            break;
+        }
+
+        vTaskDelay(pdMS_TO_TICKS((i + 1) * 10));
+    }
+
+    if (err == ESP_OK) {
+        ESP_LOGD(TAG, "Get OK %s(%d)=%u", def.name, def.idx, *value);
+    } else {
         ESP_LOGE(TAG, "Get failed %s(%d), err = 0x%x (%s)", def.name, def.idx, (int)err,
                  (char *)esp_err_to_name(err));
     }
-    ESP_LOGD(TAG, "Get OK %s(%d)=%u", def.name, def.idx, *value);
 
     return err;
 }
 
-esp_err_t cxi_client_get_param(CxiRegister reg, uint16_t *value) {
-    return cxi_client_get_param(cxi_registers_.at(reg), value);
+esp_err_t cxi_client_get_param(CxiRegister reg, uint16_t *value, uint retries) {
+    return cxi_client_get_param(cxi_registers_.at(reg), value, retries);
 }
 
-esp_err_t cxi_client_get_temp_param(CxiRegister reg, double *value) {
+esp_err_t cxi_client_get_temp_param(CxiRegister reg, double *value, uint retries) {
     uint16_t raw;
-    esp_err_t err = cxi_client_get_param(reg, &raw);
+    esp_err_t err = cxi_client_get_param(reg, &raw, retries);
     if (err == ESP_OK) {
         *value = parse_temp(raw);
     }
@@ -130,11 +141,15 @@ esp_err_t cxi_client_set_param(CxiRegDef def, uint16_t value, uint retries) {
         if (err == ESP_OK) {
             break;
         }
-        ESP_LOGE(TAG, "Set failed %s(%d)=%u, err = 0x%x (%s)", def.name, def.idx, value, (int)err,
-                 (char *)esp_err_to_name(err));
         vTaskDelay(pdMS_TO_TICKS((i + 1) * 10));
     }
-    ESP_LOGD(TAG, "Set OK %s(%d)=%u", def.name, def.idx, value);
+
+    if (err == ESP_OK) {
+        ESP_LOGD(TAG, "Set OK %s(%d)=%u", def.name, def.idx, value);
+    } else {
+        ESP_LOGE(TAG, "Set failed %s(%d)=%u, err = 0x%x (%s)", def.name, def.idx, value, (int)err,
+                 (char *)esp_err_to_name(err));
+    }
 
     return err;
 }
