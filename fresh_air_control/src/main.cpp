@@ -74,7 +74,7 @@ void setupTachTimer() {
     EVSYS.USERTCB0CAPT = EVSYS_USER_CHANNEL2_gc;   // to TCB0
     TCB0.CTRLB = TCB_CNTMODE_FRQ_gc;               // Frequency count mode
     TCB0.EVCTRL = TCB_CAPTEI_bm | TCB_EDGE_bm;     // Measure frequency between falling edge events
-    TCB0.INTCTRL = TCB_CAPT_bm;
+    TCB0.INTCTRL = TCB_OVF_bm | TCB_CAPT_bm;
     TCB0.CTRLA = (TCB_ENABLE_bm | TCB_CLKSEL_TCA0_gc);
 }
 
