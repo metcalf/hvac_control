@@ -6,11 +6,13 @@
 
 class FakeModbusController : public AbstractModbusController {
   public:
-    virtual void setHasMakeupDemand(bool has) override { hasMakeupDemand_ = has; };
-
     ControllerDomain::FreshAirModel getFreshAirModelId() override { return freshAirModel_; };
     esp_err_t getFancoilState(ControllerDomain::FancoilState *state,
                               std::chrono::steady_clock::time_point *time) override {
+        if (!hasFancoil_) {
+            return ESP_ERR_NOT_SUPPORTED;
+        }
+
         *state = fancoilState_;
         *time = lastFancoilState_;
         return ESP_OK;
@@ -37,7 +39,13 @@ class FakeModbusController : public AbstractModbusController {
         return ESP_OK;
     }
 
-    esp_err_t lastSetFancoilErr() override { return ESP_OK; }
+    esp_err_t lastSetFancoilErr() override {
+        if (!hasFancoil_) {
+            return ESP_ERR_NOT_SUPPORTED;
+        } else {
+            return ESP_OK;
+        }
+    }
 
     void setFreshAirSpeed(ControllerDomain::FanSpeed speed) override { fanSpeed_ = speed; }
     void setFancoil(ControllerDomain::FancoilRequest req) override { req_ = req; }
@@ -76,5 +84,5 @@ class FakeModbusController : public AbstractModbusController {
     ControllerDomain::FanSpeed fanSpeed_;
     ControllerDomain::FancoilRequest req_;
     ControllerDomain::FreshAirModel freshAirModel_ = ControllerDomain::FreshAirModel::SP;
-    bool makeupDemand_, hasMakeupDemand_ = false;
+    bool makeupDemand_;
 };

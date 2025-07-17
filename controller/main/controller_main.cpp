@@ -223,7 +223,7 @@ extern "C" void controller_main() {
     uiManager_ = new UIManager(config, ControllerApp::nMsgIds(), uiEvtCb);
     UIManager::setEventsInst(uiManager_);
     uiManager_->setFirmwareVersion(ota_->currentVersion());
-    modbusController_ = new ModbusController(config.equipment.hasMakeupDemand);
+    modbusController_ = new ModbusController();
     valveCtrl_.init();
 
     app_ = new ControllerApp(config, uiManager_, modbusController_, &sensors_, &valveCtrl_, &wifi_,

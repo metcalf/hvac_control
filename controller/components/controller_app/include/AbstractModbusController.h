@@ -10,7 +10,8 @@ class AbstractModbusController {
   public:
     virtual ~AbstractModbusController() {}
 
-    virtual void setHasMakeupDemand(bool has) = 0;
+    void setHasFancoil(bool has) { hasFancoil_ = has; }
+    void setHasMakeupDemand(bool has) { hasMakeupDemand_ = has; };
 
     virtual ControllerDomain::FreshAirModel getFreshAirModelId() = 0;
     virtual esp_err_t getFancoilState(ControllerDomain::FancoilState *state,
@@ -26,4 +27,8 @@ class AbstractModbusController {
 
     virtual void setFreshAirSpeed(ControllerDomain::FanSpeed speed) = 0;
     virtual void setFancoil(ControllerDomain::FancoilRequest req) = 0;
+
+  protected:
+    bool hasFancoil_ = false;
+    bool hasMakeupDemand_ = false;
 };

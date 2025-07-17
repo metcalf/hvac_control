@@ -61,6 +61,13 @@ void ModbusController::doGetFreshAir() {
 }
 
 void ModbusController::doSetFancoil() {
+    if (!hasFancoil_) {
+        xSemaphoreTake(mutex_, portMAX_DELAY);
+        setFancoilErr_ = ESP_ERR_NOT_SUPPORTED;
+        xSemaphoreGive(mutex_);
+        return;
+    }
+
     esp_err_t err;
 
     if (!fancoilConfigured_) {
@@ -117,7 +124,10 @@ void ModbusController::task() {
         }
 
         doGetFreshAir();
-        doGetFancoil();
+
+        if (hasFancoil_) {
+            doGetFancoil();
+        }
     }
 }
 
@@ -131,6 +141,11 @@ ControllerDomain::FreshAirModel ModbusController::getFreshAirModelId() {
 
 esp_err_t ModbusController::getFancoilState(ControllerDomain::FancoilState *state,
                                             std::chrono::steady_clock::time_point *time) {
+
+    if (!hasFancoil_) {
+        return ESP_ERR_NOT_SUPPORTED;
+    }
+
     xSemaphoreTake(mutex_, portMAX_DELAY);
     esp_err_t err = fancoilStateErr_;
     if (err == ESP_OK) {

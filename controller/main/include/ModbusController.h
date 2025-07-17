@@ -14,7 +14,7 @@
 
 class ModbusController : public AbstractModbusController {
   public:
-    ModbusController(bool hasMakeupDemand) : hasMakeupDemand_(hasMakeupDemand) {
+    ModbusController() {
         requests_ = xEventGroupCreate();
         mutex_ = xSemaphoreCreateMutex();
     }
@@ -26,8 +26,6 @@ class ModbusController : public AbstractModbusController {
 
     esp_err_t init() { return client_.init(); }
     void task();
-
-    void setHasMakeupDemand(bool has) override { hasMakeupDemand_ = has; };
 
     esp_err_t getFancoilState(ControllerDomain::FancoilState *state,
                               std::chrono::steady_clock::time_point *time) override;
@@ -54,8 +52,6 @@ class ModbusController : public AbstractModbusController {
     using FancoilRequest = ControllerDomain::FancoilRequest;
 
     enum class RequestType { SetFreshAirSpeed, SetFancoil };
-
-    bool hasMakeupDemand_;
 
     ModbusClient client_;
     EventGroupHandle_t requests_;

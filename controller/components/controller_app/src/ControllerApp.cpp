@@ -57,15 +57,17 @@ void ControllerApp::bootErr(const char *msg) {
 }
 
 void ControllerApp::updateEquipment(ControllerDomain::Config::Equipment equipment) {
-    if (equipment.heatType != config_.equipment.heatType) {
+    if (heatAlgo_ == NULL || equipment.heatType != config_.equipment.heatType) {
         delete heatAlgo_;
         heatAlgo_ = getAlgoForEquipment(equipment.heatType, true);
     }
-    if (equipment.coolType != config_.equipment.coolType) {
+    if (coolAlgo_ == NULL || equipment.coolType != config_.equipment.coolType) {
         delete coolAlgo_;
         coolAlgo_ = getAlgoForEquipment(equipment.coolType, false);
     }
     modbusController_->setHasMakeupDemand(config_.equipment.hasMakeupDemand);
+    modbusController_->setHasFancoil(config_.equipment.heatType == Config::HVACType::Fancoil ||
+                                     config_.equipment.coolType == Config::HVACType::Fancoil);
 }
 
 void ControllerApp::updateACMode(const double coolDemand, const double coolSetpointDeltaC) {

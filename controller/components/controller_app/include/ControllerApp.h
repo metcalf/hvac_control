@@ -44,9 +44,8 @@ class ControllerApp {
         ventAlgo_ = new LinearVentAlgorithm();
         fanCoolAlgo_ = new PIDAlgorithm(false, REL_F_TO_C(4.0));
         fanCoolLimitAlgo_ = new FanCoolLimitAlgorithm(fanCoolAlgo_);
-        heatAlgo_ = getAlgoForEquipment(config_.equipment.heatType, true);
-        coolAlgo_ = getAlgoForEquipment(config_.equipment.coolType, false);
 
+        updateEquipment(config_.equipment);
         setSystemPower(config_.systemOn);
     }
     ~ControllerApp() {
@@ -220,7 +219,8 @@ class ControllerApp {
     AbstractHomeClient *homeCli_;
     AbstractOTAClient *ota_;
     uiEvtRcv_t uiEvtRcv_;
-    AbstractDemandAlgorithm *ventAlgo_, *fanCoolAlgo_, *fanCoolLimitAlgo_, *heatAlgo_, *coolAlgo_;
+    AbstractDemandAlgorithm *ventAlgo_, *fanCoolAlgo_, *fanCoolLimitAlgo_, *heatAlgo_ = NULL,
+                                                                           *coolAlgo_ = NULL;
     restartCb_t restartCb_;
 
     AbstractUIManager::TempOverride tempOverride_;
