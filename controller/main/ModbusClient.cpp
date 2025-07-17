@@ -264,7 +264,9 @@ esp_err_t ModbusClient::setFancoil(const ControllerDomain::FancoilRequest req) {
 esp_err_t ModbusClient::configureFancoil() {
     esp_err_t err;
 
-    err = cxi_client_set_param(CxiRegister::UseValve, 1, 2);
+    // For some reason the fancoil isn't turning the transformer on even with this set to
+    // `1` so I'm using the Remote Out dry contact instead and providing my own 24VAC.
+    err = cxi_client_set_param(CxiRegister::UseValve, 0, 2);
     if (err != ESP_OK) {
         return err;
     }

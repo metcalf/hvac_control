@@ -10,7 +10,8 @@
 using HVACState = ControllerDomain::HVACState;
 using Config = ControllerDomain::Config;
 
-#define TEMP_LIMIT_ROLLER_START 64
+#define TEMP_LIMIT_ROLLER_START 60
+#define TEMP_LIMIT_ROLLER_END 80
 #define MIN_HEAT_DEG 50
 #define MAX_COOL_DEG 99
 #define MIN_HEAT_COOL_DELTA_DEG 2
@@ -529,6 +530,8 @@ UIManager::UIManager(ControllerDomain::Config config, size_t nMsgIds, eventCb_t 
     }
     updateTempLimits(std::round(ABS_C_TO_F(config.maxHeatC)),
                      std::round(ABS_C_TO_F(config.minCoolC)));
+    setupTempRoller(ui_heat_limit, TEMP_LIMIT_ROLLER_START, TEMP_LIMIT_ROLLER_END);
+    setupTempRoller(ui_cool_limit, TEMP_LIMIT_ROLLER_START, TEMP_LIMIT_ROLLER_END);
 
     lv_label_set_text_fmt(ui_co2_target_value, "%u", config.co2Target);
 
