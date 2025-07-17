@@ -569,6 +569,16 @@ void ControllerApp::logState(const ControllerDomain::FreshAirState &freshAirStat
         statusLevel = ESP_LOG_DEBUG;
     }
 
+    int coilTempC = -1;
+    FancoilState fcState;
+    std::chrono::steady_clock::time_point t;
+    esp_err_t err = modbusController_->getFancoilState(&fcState, &t);
+    if (err == ESP_OK) {
+        // Though we return it as a double, the fancoil only returns integral values
+        // round anyway just in case that changes.
+        coilTempC = int(round(fcState.coilTempC));
+    }
+
     ESP_LOG_LEVEL(statusLevel, TAG,
                   "FreshAir: raw_t=%.1f out_t=%.1f t_off=%0.1f h=%.1f p=%lu rpm=%"
                   "u target_speed=%u reason=%s",
@@ -584,7 +594,7 @@ void ControllerApp::logState(const ControllerDomain::FreshAirState &freshAirStat
                   // DemandRequest
                   " vent_d=%.2f fancool_d=%.2f heat_d=%.2f cool_d=%.2f"
                   // HVACState
-                  " hvac=%s speed=%s ac=%s",
+                  " hvac=%s speed=%s ac=%s coil_c=%d",
                   // Sensors
                   sensorData.tempC, rawInTempC, sensorData.humidity, sensorData.pressurePa,
                   sensorData.co2,
@@ -594,7 +604,7 @@ void ControllerApp::logState(const ControllerDomain::FreshAirState &freshAirStat
                   ventDemand, fanCoolDemand, heatDemand, coolDemand,
                   // HVACState
                   ControllerDomain::hvacStateToS(hvacState),
-                  ControllerDomain::fancoilSpeedToS(lastHvacSpeed_), acModeToS(acMode_));
+                  ControllerDomain::fancoilSpeedToS(lastHvacSpeed_), acModeToS(acMode_), coilTempC);
 }
 
 void ControllerApp::checkWifiState() {
