@@ -44,13 +44,12 @@ double PIDAlgorithm::getDemand(double deltaC, std::chrono::steady_clock::time_po
     double iDemand = i_ / tiSecs_;
     double demand = clamp(err + iDemand);
 
-    if (!isHeater_) {
-        ESP_LOGE("PID",
-                 "deltaC: %0.2f, demand: %0.2f err: %0.2f i_demand: %0.2f iBefore:%0.2f "
-                 "iAfterAdd:%0.2f "
-                 "iAfterClamp1:%0.2f iAfterClamp2:%0.2f",
-                 deltaC, demand, err, iDemand, iBefore, iAfterAdd, iAfterClamp1, iAfterClamp2);
-    }
+    ESP_LOGD("PID",
+             "%s deltaC: %0.2f, demand: %0.2f err: %0.2f i_demand: %0.2f iBefore:%0.2f "
+             "iAfterAdd:%0.2f "
+             "iAfterClamp1:%0.2f iAfterClamp2:%0.2f",
+             isHeater_ ? "HEAT" : "COOL", deltaC, demand, err, iDemand, iBefore, iAfterAdd,
+             iAfterClamp1, iAfterClamp2);
 
     return demand;
 }

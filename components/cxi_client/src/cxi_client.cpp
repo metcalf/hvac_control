@@ -102,6 +102,7 @@ esp_err_t cxi_client_get_param(CxiRegDef def, uint16_t *value) {
         ESP_LOGE(TAG, "Get failed %s(%d), err = 0x%x (%s)", def.name, def.idx, (int)err,
                  (char *)esp_err_to_name(err));
     }
+    ESP_LOGD(TAG, "Get OK %s(%d)", def.name, def.idx);
 
     return err;
 }
@@ -133,6 +134,7 @@ esp_err_t cxi_client_set_param(CxiRegDef def, uint16_t value, uint retries) {
                  (char *)esp_err_to_name(err));
         vTaskDelay(pdMS_TO_TICKS((i + 1) * 10));
     }
+    ESP_LOGD(TAG, "Set OK %s(%d)", def.name, def.idx);
 
     return err;
 }

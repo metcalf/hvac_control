@@ -11,7 +11,7 @@ void app_main() {
     //esp_log_level_set("ILI9341", ESP_LOG_DEBUG);
     //esp_log_level_set("LV", ESP_LOG_DEBUG);
     // esp_log_level_set("MAIN", ESP_LOG_DEBUG);
-    esp_log_level_set("UI", ESP_LOG_DEBUG);
+    esp_log_level_set("CXIC", ESP_LOG_DEBUG);
     // esp_log_level_set("CTRL", ESP_LOG_DEBUG);
     // esp_log_level_set("SNS", ESP_LOG_DEBUG);
     // esp_log_level_set("VLV", ESP_LOG_DEBUG);
