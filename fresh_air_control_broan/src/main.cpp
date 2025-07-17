@@ -95,17 +95,15 @@ int main(void) {
     TCA0.SPLIT.CTRLD = TCA_SPLIT_SPLITM_bm;  // Enable split mode
     TCA0.SPLIT.CTRLB = TCA_SPLIT_HCMP1EN_bm; // Enable WO4 (WO[n+3])
     TCA0.SPLIT.INTCTRL = TCA_SPLIT_LUNF_bm;  // Interrupt on low byte underflow for tick counter
-    TCA0.SPLIT.HCMP1 = 255;
 
-    // High-byte runs at a bit less than 1.2khz to support full 8 bit range
-    // 20e6 CPU / 64 prescaler / 4 timer scaler / 256
-    // Low byte runs at ~2khz to act as a tick counter
-    // 20e6 CPU / 64 prescaler / 4 timer scaler / 256
+    // High-byte runs at ~1.2khz to support full 8 bit range
+    // 20e6 CPU / 16 prescaler / 4 timer scaler / 256
+    TCA0.SPLIT.HCMP1 = 255;
+    // Low byte runs at ~1.2khz to act as a tick counter
+    // 20e6 CPU / 16 prescaler / 4 timer scaler / 256
     TCA0.SPLIT.LPER = 255;
 
-    TCA0.SPLIT.CTRLA =
-        TCA_SPLIT_ENABLE_bm |
-        TCA_SPLIT_CLKSEL_DIV4_gc; // Run at ~1.2khz (16e6 / 64 prescaler / 4 timer scaler / 256 range)
+    TCA0.SPLIT.CTRLA = TCA_SPLIT_ENABLE_bm | TCA_SPLIT_CLKSEL_DIV4_gc;
 
     bme280_init();
 
