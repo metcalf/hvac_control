@@ -464,8 +464,7 @@ void ControllerApp::handleHomeClient() {
     clearMessage(MsgID::HomeClientErr);
     setVacation(state.vacationOn);
 
-    if (modbusController_->getFreshAirModelId() == ControllerDomain::FreshAirModel::BROAN &&
-        state.weatherTempC != 0 &&
+    if (state.weatherTempC != 0 &&
         (std::chrono::system_clock::now() - state.weatherObsTime < OUTDOOR_TEMP_MAX_AGE)) {
         rawOutdoorTempC_ = state.weatherTempC;
         lastOutdoorTempUpdate_ = steadyNow() + (state.weatherObsTime - realNow());
@@ -824,13 +823,16 @@ ControllerDomain::FreshAirState ControllerApp::getFreshAirState() {
             if (fanLastStarted_ == std::chrono::steady_clock::time_point{}) {
                 fanLastStopped_ = {};
                 fanLastStarted_ = fasTime;
-            } else if ((modbusController_->getFreshAirModelId() ==
-                        ControllerDomain::FreshAirModel::SP) &&
-                       now - fanLastStarted_ > OUTDOOR_TEMP_MIN_FAN_TIME) {
-                rawOutdoorTempC_ = freshAirState.tempC;
-                uiManager_->setOutTempC(outdoorTempC());
-                lastOutdoorTempUpdate_ = fasTime;
             }
+            // Not measuring outdoor temp using the internal sensor for now since it doesn't
+            // seem accurate.
+            // else if ((modbusController_->getFreshAirModelId() ==
+            //             ControllerDomain::FreshAirModel::SP) &&
+            //            now - fanLastStarted_ > OUTDOOR_TEMP_MIN_FAN_TIME) {
+            //     rawOutdoorTempC_ = freshAirState.tempC;
+            //     uiManager_->setOutTempC(outdoorTempC());
+            //     lastOutdoorTempUpdate_ = fasTime;
+            // }
         } else if (freshAirState.fanRpm == 0) {
             if (fanLastStopped_ == std::chrono::steady_clock::time_point{}) {
                 fanLastStopped_ = fanLastStarted_ = fasTime;
@@ -949,9 +951,11 @@ void ControllerApp::task(bool firstTime) {
 
     double coolSetpointDeltaC = sensorData.tempC - setpoints.coolTempC;
 
-    bool wantOutdoorTemp = (coolSetpointDeltaC > 0 && (std::isnan(rawOutdoorTempC_) ||
-                                                       (steadyNow() - lastOutdoorTempUpdate_) >
-                                                           OUTDOOR_TEMP_UPDATE_INTERVAL));
+    // Not using temp sensor in the fresh air unit for now since it doesn't seem accurate.
+    bool wantOutdoorTemp = false;
+    // bool wantOutdoorTemp = (coolSetpointDeltaC > 0 && (std::isnan(rawOutdoorTempC_) ||
+    //                                                    (steadyNow() - lastOutdoorTempUpdate_) >
+    //                                                        OUTDOOR_TEMP_UPDATE_INTERVAL));
 
     FanSpeed speed = computeFanSpeed(ventDemand, fanCoolDemand, wantOutdoorTemp);
     setFanSpeed(speed);
