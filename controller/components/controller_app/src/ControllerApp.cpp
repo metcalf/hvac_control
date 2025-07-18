@@ -467,6 +467,7 @@ void ControllerApp::handleHomeClient() {
     if (state.weatherTempC != 0 &&
         (std::chrono::system_clock::now() - state.weatherObsTime < OUTDOOR_TEMP_MAX_AGE)) {
         rawOutdoorTempC_ = state.weatherTempC;
+        uiManager_->setOutTempC(outdoorTempC());
         lastOutdoorTempUpdate_ = steadyNow() + (state.weatherObsTime - realNow());
     }
 }
