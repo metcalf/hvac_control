@@ -37,6 +37,7 @@
 // Turn the A/C on if temp exceeds setpoint by this amount
 #define AC_ON_THRESHOLD_C REL_F_TO_C(4.0)
 #define ON_DEMAND_THRESHOLD 0.01
+#define AC_DEMAND_THRESHOLD 0.1
 
 // If fan is above this speed, turn on exhaust fan for extra cooling
 #define FAN_SPEED_EXHAUST_THRESHOLD (FanSpeed)180
@@ -81,12 +82,13 @@ void ControllerApp::updateACMode(const double coolDemand, const double coolSetpo
         break;
     case ACMode::Standby:
         // If we're too far off the cool setpoint or the coil is cold anyway, turn the A/C on
-        if (coolSetpointDeltaC > AC_ON_THRESHOLD_C || (coolDemand > 0 && isCoilCold())) {
+        if (coolSetpointDeltaC > AC_ON_THRESHOLD_C ||
+            (coolDemand > AC_DEMAND_THRESHOLD && isCoilCold())) {
             acMode_ = ACMode::On;
         }
         break;
     case ACMode::On:
-        if (coolDemand < ON_DEMAND_THRESHOLD) {
+        if (coolDemand < AC_DEMAND_THRESHOLD) {
             clearMessage(MsgID::ACMode);
             acMode_ = ACMode::Standby;
         }
