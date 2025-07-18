@@ -24,7 +24,7 @@
 // waiting for the temp to drop to allow fan cooling
 #define OUTDOOR_TEMP_UPDATE_INTERVAL std::chrono::minutes(15)
 // Minimum time fan needs to run before we trust the outdoor temp reading
-#define OUTDOOR_TEMP_MIN_FAN_TIME std::chrono::seconds(60)
+#define OUTDOOR_TEMP_MIN_FAN_TIME std::chrono::seconds(120)
 // Minimum time fan needs to run at maximum before we read static pressure.
 // We set this pretty high because the Broan fan takes awhile start up and stabilize.
 #define STATIC_PRESSURE_MIN_FAN_TIME std::chrono::seconds(60)
@@ -36,8 +36,13 @@
 #define COIL_COLD_TEMP_C ABS_F_TO_C(60.0)
 // Turn the A/C on if temp exceeds setpoint by this amount
 #define AC_ON_THRESHOLD_C REL_F_TO_C(4.0)
-#define ON_DEMAND_THRESHOLD 0.01
+// Turn on the A/C if cooling demand exceeds this and the coil is cold. Turn off A/C when demand
+// drops below this.
 #define AC_DEMAND_THRESHOLD 0.1
+#define ON_DEMAND_THRESHOLD 0.01
+// All of the devices read high, I think due to heating from the board so correct for that
+// in addition to any per-device offset.
+#define IN_TEMP_BASE_OFFSET_C -3.1
 
 // If fan is above this speed, turn on exhaust fan for extra cooling
 #define FAN_SPEED_EXHAUST_THRESHOLD (FanSpeed)180
@@ -921,7 +926,7 @@ void ControllerApp::task(bool firstTime) {
 
     SensorData sensorData = sensors_->getLatest();
     double rawInTempC = sensorData.tempC;
-    sensorData.tempC += config_.inTempOffsetC;
+    sensorData.tempC += config_.inTempOffsetC + IN_TEMP_BASE_OFFSET_C;
 
     double ventDemand = 0, fanCoolDemand = 0, heatDemand = 0, coolDemand = 0;
 
