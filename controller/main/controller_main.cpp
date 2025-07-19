@@ -51,6 +51,10 @@
 
 #define POSIX_TZ_STR "PST8PDT,M3.2.0/2:00:00,M11.1.0/2:00:00"
 
+// All of the devices read high, I think due to heating from the board so correct for that
+// in addition to any per-device offset.
+#define IN_TEMP_BASE_OFFSET_C -3.1
+
 static const char *TAG = "MAIN";
 
 using Config = ControllerDomain::Config;
@@ -227,7 +231,8 @@ extern "C" void controller_main() {
     valveCtrl_.init();
 
     app_ = new ControllerApp(config, uiManager_, modbusController_, &sensors_, &valveCtrl_, &wifi_,
-                             &appConfigStore_, &homeCli_, ota_, uiEvtRcv, esp_restart);
+                             &appConfigStore_, &homeCli_, ota_, uiEvtRcv, esp_restart,
+                             IN_TEMP_BASE_OFFSET_C);
     xTaskCreate(uiTask, "uiTask", UI_TASK_STACK_SIZE, uiManager_, UI_TASK_PRIO, NULL);
 
     setenv("TZ", POSIX_TZ_STR, 1);

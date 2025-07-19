@@ -35,10 +35,11 @@ class ControllerApp {
                   AbstractValveCtrl *valveCtrl, AbstractWifi *wifi,
                   AbstractConfigStore<ControllerDomain::Config> *cfgStore,
                   AbstractHomeClient *homeCli, AbstractOTAClient *ota, const uiEvtRcv_t &uiEvtRcv,
-                  const restartCb_t restartCb)
+                  const restartCb_t restartCb, double inTempBaseOffsetC = 0)
         : config_(config), uiManager_(uiManager), modbusController_(modbusController),
           sensors_(sensors), valveCtrl_(valveCtrl), wifi_(wifi), cfgStore_(cfgStore),
           homeCli_(homeCli), ota_(ota), uiEvtRcv_(uiEvtRcv), restartCb_(restartCb),
+          inTempBaseOffsetC_(inTempBaseOffsetC),
           fancoilCoolHandler_(fancoilCoolCutoffs_, std::size(fancoilCoolCutoffs_)),
           fancoilHeatHandler_(fancoilHeatCutoffs_, std::size(fancoilHeatCutoffs_)) {
         ventAlgo_ = new LinearVentAlgorithm();
@@ -222,6 +223,7 @@ class ControllerApp {
     AbstractDemandAlgorithm *ventAlgo_, *fanCoolAlgo_, *fanCoolLimitAlgo_, *heatAlgo_ = NULL,
                                                                            *coolAlgo_ = NULL;
     restartCb_t restartCb_;
+    double inTempBaseOffsetC_;
 
     AbstractUIManager::TempOverride tempOverride_;
     int tempOverrideUntilScheduleIdx_ = -1;

@@ -40,9 +40,6 @@
 // drops below this.
 #define AC_DEMAND_THRESHOLD 0.1
 #define ON_DEMAND_THRESHOLD 0.01
-// All of the devices read high, I think due to heating from the board so correct for that
-// in addition to any per-device offset.
-#define IN_TEMP_BASE_OFFSET_C -3.1
 
 // If fan is above this speed, turn on exhaust fan for extra cooling
 #define FAN_SPEED_EXHAUST_THRESHOLD (FanSpeed)180
@@ -587,15 +584,14 @@ void ControllerApp::logState(const ControllerDomain::FreshAirState &freshAirStat
     }
 
     ESP_LOG_LEVEL(statusLevel, TAG,
-                  "FreshAir: raw_t=%.1f out_t=%.1f t_off=%0.1f h=%.1f p=%lu rpm=%"
+                  "FreshAir: t=%.1f t_off=%0.1f h=%.1f p=%lu rpm=%"
                   "u target_speed=%u reason=%s",
-                  freshAirState.tempC, outdoorTempC(), config_.outTempOffsetC,
-                  freshAirState.humidity, freshAirState.pressurePa, freshAirState.fanRpm, fanSpeed,
-                  fanSpeedReason_);
+                  freshAirState.tempC, config_.outTempOffsetC, freshAirState.humidity,
+                  freshAirState.pressurePa, freshAirState.fanRpm, fanSpeed, fanSpeedReason_);
     ESP_LOG_LEVEL(statusLevel, TAG,
                   "ctrl:"
                   // Sensors
-                  " t=%0.2f raw_t=%0.2f h=%0.1f p=%lu co2=%u"
+                  " in_t=%0.2f raw_in_t=%0.2f out_t=%0.2f h=%0.1f p=%lu co2=%u"
                   // Setpoints
                   " set_h=%.2f set_c=%.2f set_co2=%u set_r=%s"
                   // DemandRequest
@@ -603,8 +599,8 @@ void ControllerApp::logState(const ControllerDomain::FreshAirState &freshAirStat
                   // HVACState
                   " hvac=%s speed=%s ac=%s coil_c=%d",
                   // Sensors
-                  sensorData.tempC, rawInTempC, sensorData.humidity, sensorData.pressurePa,
-                  sensorData.co2,
+                  sensorData.tempC, rawInTempC, outdoorTempC(), sensorData.humidity,
+                  sensorData.pressurePa, sensorData.co2,
                   // Setpoints
                   setpoints.heatTempC, setpoints.coolTempC, setpoints.co2, setpointReason_,
                   // Demands
@@ -929,7 +925,7 @@ void ControllerApp::task(bool firstTime) {
 
     SensorData sensorData = sensors_->getLatest();
     double rawInTempC = sensorData.tempC;
-    sensorData.tempC += config_.inTempOffsetC + IN_TEMP_BASE_OFFSET_C;
+    sensorData.tempC += config_.inTempOffsetC + inTempBaseOffsetC_;
 
     double ventDemand = 0, fanCoolDemand = 0, heatDemand = 0, coolDemand = 0;
 
