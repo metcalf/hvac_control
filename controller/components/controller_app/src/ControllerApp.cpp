@@ -18,7 +18,7 @@
 #define COOL_VLV_GPIO GPIO_NUM_9
 
 #define PRECOOL_MINS 60 * 5
-#define PRECOOL_DEG_PER_MIN REL_F_TO_C(1.0) / 60.0
+#define PRECOOL_DEG_PER_MIN REL_F_TO_C(0.5) / 60.0
 
 // Interval between running the fan to get an updated outdoor temp when we're
 // waiting for the temp to drop to allow fan cooling
@@ -774,7 +774,7 @@ Setpoints ControllerApp::getCurrentSetpoints() {
                 setpointReason_ = "precooling";
                 setpoints.coolTempC = precoolC;
                 setMessageF(MsgID::Precooling, false, "Cooling to %d by %02d:%02d%s",
-                            static_cast<int>(ABS_C_TO_F(setpoints.coolTempC) + 0.5),
+                            static_cast<int>(ABS_C_TO_F(nextSchedule.coolC) + 0.5),
                             SCHEDULE_TIME_STR_ARGS(nextSchedule));
 
                 return setpoints;

@@ -465,8 +465,8 @@ TEST_F(ControllerAppTest, Precooling) {
     app_->realNow_ += std::chrono::hours(4);
     setOutdoorTempC(20);
     app_->task();
-    EXPECT_GT(modbusController_.getFreshAirSpeed(), 60);
-    EXPECT_LT(modbusController_.getFreshAirSpeed(), 100);
+    EXPECT_GT(modbusController_.getFreshAirSpeed(), 100);
+    EXPECT_LT(modbusController_.getFreshAirSpeed(), 250);
     EXPECT_EQ("cool", app_->fanSpeedReason());
     EXPECT_EQ("precooling", app_->setpointReason());
     fcReq = modbusController_.getFancoilRequest();
