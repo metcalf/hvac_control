@@ -520,3 +520,4 @@ TEST_F(ControllerAppTest, InvalidTimeSetpoints) {
 // Indoor and outdoor temp offsets?
 // Separate tests for PID algorithm?
 // allowHVACChange (and consequences)
+// static pressure measurement

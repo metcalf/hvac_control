@@ -28,6 +28,7 @@
 // Minimum time fan needs to run at maximum before we read static pressure.
 // We set this pretty high because the Broan fan takes awhile start up and stabilize.
 #define STATIC_PRESSURE_MIN_FAN_TIME std::chrono::seconds(60)
+#define STATIC_PRESSURE_OFF_TIME_MAX_AGE std::chrono::minutes(10)
 // Ignore makeup demand requests older than this
 #define MAKEUP_MAX_AGE std::chrono::minutes(5)
 // Ignore fancoil states older than this
@@ -851,7 +852,10 @@ ControllerDomain::FreshAirState ControllerApp::getFreshAirState() {
                 fanMaxSpeedStarted_ = speedT;
             } else if (speedT - fanMaxSpeedStarted_ > STATIC_PRESSURE_MIN_FAN_TIME &&
                        stoppedPressurePa_ > 0) {
-                if (stoppedPressurePa_ > freshAirState.pressurePa) {
+
+                if (speedT - fanLastStarted_ > STATIC_PRESSURE_OFF_TIME_MAX_AGE) {
+                    ESP_LOGI(TAG, "Off pressure is stale, can't compute static pressure");
+                } else if (stoppedPressurePa_ > freshAirState.pressurePa) {
                     ESP_LOGW(TAG, "est fresh air static pressure (pa): %lu",
                              (stoppedPressurePa_ - freshAirState.pressurePa));
                 } else {

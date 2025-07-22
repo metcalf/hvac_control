@@ -28,7 +28,6 @@ class ControllerApp {
   public:
     typedef std::function<void()> restartCb_t;
     typedef std::function<bool(AbstractUIManager::Event *, uint16_t)> uiEvtRcv_t;
-    //typedef bool (*uiEvtRcv_t)(AbstractUIManager::Event *evt, uint16_t waitMs);
 
     ControllerApp(ControllerDomain::Config config, AbstractUIManager *uiManager,
                   AbstractModbusController *modbusController, AbstractSensors *sensors,
