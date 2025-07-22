@@ -569,9 +569,19 @@ void ControllerApp::logState(const ControllerDomain::FreshAirState &freshAirStat
     if (now - lastStatusLog_ > STATUS_LOG_INTERVAL) {
         statusLevel = ESP_LOG_WARN;
         lastStatusLog_ = now;
+    } else if (lastLoggedFanSpeedReason_ != fanSpeedReason_ || lastLoggedHvacState_ != hvacState ||
+               lastLoggedFancoilSpeed_ != lastHvacSpeed_) {
+        // For significant state changes, log at a higher level so it gets
+        // picked up in the remote logs. We don't update `lastStatusLog_` here
+        // to keep those intervals consistent.
+        statusLevel = ESP_LOG_WARN;
     } else {
         statusLevel = ESP_LOG_DEBUG;
     }
+
+    lastLoggedFancoilSpeed_ = lastHvacSpeed_;
+    lastLoggedFanSpeedReason_ = fanSpeedReason_;
+    lastLoggedHvacState_ = hvacState;
 
     int coilTempC = -1;
     FancoilState fcState;

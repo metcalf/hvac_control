@@ -276,6 +276,9 @@ class ControllerApp {
         fanMaxSpeedStarted_{};
 
     std::chrono::steady_clock::time_point lastStatusLog_{};
+    FanSpeedReason lastLoggedFanSpeedReason_ = FanSpeedReason::Unknown;
+    HVACState lastLoggedHvacState_ = HVACState::Off;
+    FancoilSpeed lastLoggedFancoilSpeed_ = FancoilSpeed::Off;
 
     std::chrono::steady_clock::time_point hvacLastTurnedOn_{};
     bool hvacLastCool_;
