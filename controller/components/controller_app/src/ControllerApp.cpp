@@ -102,8 +102,7 @@ void ControllerApp::updateACMode(const double coolDemand, const double coolSetpo
 FanSpeed ControllerApp::computeFanSpeed(double ventDemand, double coolDemand,
                                         bool wantOutdoorTemp) {
     FanSpeed fanSpeed = 0;
-    fanSpeedReason_ = "off";
-
+    fanSpeedReason_ = FanSpeedReason::Off;
     if (!config_.systemOn) {
         clearMessage(MsgID::FanOverride);
         return 0;
@@ -116,17 +115,17 @@ FanSpeed ControllerApp::computeFanSpeed(double ventDemand, double coolDemand,
         if (fanSpeed > 0 && fanSpeed < MIN_FAN_SPEED_VALUE) {
             fanSpeed = MIN_FAN_SPEED_VALUE;
         }
-        fanSpeedReason_ = "override";
+        fanSpeedReason_ = FanSpeedReason::Override;
     } else {
         double demand = 0;
         if (coolDemand > ventDemand) {
             if (coolDemand > 0) {
-                fanSpeedReason_ = "cool";
+                fanSpeedReason_ = FanSpeedReason::Cool;
                 demand = coolDemand;
             }
         } else {
             if (ventDemand > 0) {
-                fanSpeedReason_ = "vent";
+                fanSpeedReason_ = FanSpeedReason::Vent;
                 demand = ventDemand;
             }
         }
@@ -150,7 +149,7 @@ FanSpeed ControllerApp::computeFanSpeed(double ventDemand, double coolDemand,
             // we haven't updated the outdoor temperature recently, run the fan until
             // we get an update.
             fanSpeed = MIN_FAN_SPEED_VALUE;
-            fanSpeedReason_ = "poll_temp";
+            fanSpeedReason_ = FanSpeedReason::PollOutdoorTemp;
         }
 
         if (fanOverrideUntil_ > std::chrono::steady_clock::time_point{}) {
@@ -166,7 +165,7 @@ FanSpeed ControllerApp::computeFanSpeed(double ventDemand, double coolDemand,
         clearMessage(MsgID::GetMakeupDemandErr);
 
         if (makeupDemand && now - mdTime < MAKEUP_MAX_AGE && fanSpeed < MAKEUP_FAN_SPEED) {
-            fanSpeedReason_ = "makeup_air";
+            fanSpeedReason_ = FanSpeedReason::MakeupAir;
             fanSpeed = MAKEUP_FAN_SPEED;
         }
     } else {
@@ -588,7 +587,8 @@ void ControllerApp::logState(const ControllerDomain::FreshAirState &freshAirStat
                   "FreshAir: t=%.1f t_off=%0.1f h=%.1f p=%lu rpm=%"
                   "u target_speed=%u reason=%s",
                   freshAirState.tempC, config_.outTempOffsetC, freshAirState.humidity,
-                  freshAirState.pressurePa, freshAirState.fanRpm, fanSpeed, fanSpeedReason_);
+                  freshAirState.pressurePa, freshAirState.fanRpm, fanSpeed,
+                  fanSpeedReasonToS(fanSpeedReason_));
     ESP_LOG_LEVEL(statusLevel, TAG,
                   "ctrl:"
                   // Sensors
@@ -603,7 +603,8 @@ void ControllerApp::logState(const ControllerDomain::FreshAirState &freshAirStat
                   sensorData.tempC, rawInTempC, outdoorTempC(), sensorData.humidity,
                   sensorData.pressurePa, sensorData.co2,
                   // Setpoints
-                  setpoints.heatTempC, setpoints.coolTempC, setpoints.co2, setpointReason_,
+                  setpoints.heatTempC, setpoints.coolTempC, setpoints.co2,
+                  setpointReasonToS(setpointReason_),
                   // Demands
                   ventDemand, fanCoolDemand, heatDemand, coolDemand,
                   // HVACState
@@ -719,7 +720,7 @@ Setpoints ControllerApp::getCurrentSetpoints() {
         tempOverrideUntilScheduleIdx_ = -1;
         clearMessage(MsgID::TempOverride);
     } else if (tempOverrideUntilScheduleIdx_ != -1) {
-        setpointReason_ = "override";
+        setpointReason_ = SetpointReason::Override;
         clearMessage(MsgID::Precooling);
         return Setpoints{
             .heatTempC = tempOverride_.heatC,
@@ -735,7 +736,7 @@ Setpoints ControllerApp::getCurrentSetpoints() {
             .coolTempC = ABS_F_TO_C(90),
             .co2 = config_.co2Target,
         };
-        setpointReason_ = "vacation";
+        setpointReason_ = SetpointReason::Vacation;
         clearMessage(MsgID::Precooling);
         return setpoints;
     }
@@ -751,7 +752,7 @@ Setpoints ControllerApp::getCurrentSetpoints() {
             setpoints.heatTempC = std::min(setpoints.heatTempC, config_.schedules[i].heatC);
             setpoints.coolTempC = std::max(setpoints.coolTempC, config_.schedules[i].coolC);
         }
-        setpointReason_ = "no_time";
+        setpointReason_ = SetpointReason::NoTime;
         clearMessage(MsgID::Precooling);
         return setpoints;
     }
@@ -772,7 +773,7 @@ Setpoints ControllerApp::getCurrentSetpoints() {
         if (minsUntilNext <= PRECOOL_MINS) {
             double precoolC = nextSchedule.coolC + minsUntilNext * PRECOOL_DEG_PER_MIN;
             if (precoolC < setpoints.coolTempC) {
-                setpointReason_ = "precooling";
+                setpointReason_ = SetpointReason::Precooling;
                 setpoints.coolTempC = precoolC;
                 setMessageF(MsgID::Precooling, false, "Cooling to %d by %02d:%02d%s",
                             static_cast<int>(ABS_C_TO_F(nextSchedule.coolC) + 0.5),
@@ -785,7 +786,7 @@ Setpoints ControllerApp::getCurrentSetpoints() {
 
     clearMessage(MsgID::Precooling);
 
-    setpointReason_ = "normal";
+    setpointReason_ = SetpointReason::Normal;
 
     return setpoints;
 }

@@ -84,6 +84,15 @@ class ControllerApp {
         HVACChangeLimit,
         _Last,
     };
+    enum class FanSpeedReason { Unknown, Off, Override, Cool, Vent, PollOutdoorTemp, MakeupAir };
+    enum class SetpointReason {
+        Unknown,
+        Normal,
+        Precooling,
+        Override,
+        Vacation,
+        NoTime,
+    };
 
   protected:
     virtual std::chrono::steady_clock::time_point steadyNow() {
@@ -93,8 +102,8 @@ class ControllerApp {
         return std::chrono::system_clock::now();
     }
 
-    const char *setpointReason_ = "";
-    const char *fanSpeedReason_ = "";
+    SetpointReason setpointReason_ = SetpointReason::Unknown;
+    FanSpeedReason fanSpeedReason_ = FanSpeedReason::Unknown;
 
   private:
     using FancoilRequest = ControllerDomain::FancoilRequest;
@@ -126,37 +135,26 @@ class ControllerApp {
         switch (id) {
         case MsgID::SystemOff:
             return "SystemOff";
-            break;
         case MsgID::FanOverride:
             return "FanOverride";
-            break;
         case MsgID::TempOverride:
             return "TempOverride";
-            break;
         case MsgID::ACMode:
             return "ACMode";
-            break;
         case MsgID::Precooling:
             return "Precooling";
-            break;
         case MsgID::Wifi:
             return "Wifi";
-            break;
         case MsgID::SensorErr:
             return "SensorErr";
-            break;
         case MsgID::GetFreshAirStateErr:
             return "GetFreshAirStateErr";
-            break;
         case MsgID::SetFreshAirSpeedErr:
             return "SetFreshAirSpeedErr";
-            break;
         case MsgID::GetMakeupDemandErr:
             return "GetMakeupDemandErr";
-            break;
         case MsgID::SetFancoilErr:
             return "SetFancoilErr";
-            break;
         case MsgID::HomeClientErr:
             return "HomeClientErr";
         case MsgID::OTA:
@@ -167,7 +165,46 @@ class ControllerApp {
             return "HVACChangeLimit";
         case MsgID::_Last:
             return "";
-            break;
+        }
+
+        __builtin_unreachable();
+    }
+
+    const char *fanSpeedReasonToS(FanSpeedReason reason) {
+        switch (reason) {
+        case FanSpeedReason::Unknown:
+            return "unknown";
+        case FanSpeedReason::Off:
+            return "off";
+        case FanSpeedReason::Override:
+            return "override";
+        case FanSpeedReason::Cool:
+            return "cool";
+        case FanSpeedReason::Vent:
+            return "vent";
+        case FanSpeedReason::PollOutdoorTemp:
+            return "poll_temp";
+        case FanSpeedReason::MakeupAir:
+            return "makeup_air";
+        }
+
+        __builtin_unreachable();
+    }
+
+    const char *setpointReasonToS(SetpointReason reason) {
+        switch (reason) {
+        case SetpointReason::Unknown:
+            return "unknown";
+        case SetpointReason::Normal:
+            return "normal";
+        case SetpointReason::Precooling:
+            return "precooling";
+        case SetpointReason::Override:
+            return "override";
+        case SetpointReason::Vacation:
+            return "vacation";
+        case SetpointReason::NoTime:
+            return "no_time";
         }
 
         __builtin_unreachable();

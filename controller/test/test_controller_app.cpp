@@ -23,6 +23,8 @@ using ::testing::IsNan;
 using ::testing::Le;
 using Config = ControllerDomain::Config;
 using FancoilSpeed = ControllerDomain::FancoilSpeed;
+using SetpointReason = ControllerApp::SetpointReason;
+using FanSpeedReason = ControllerApp::FanSpeedReason;
 
 void configUpdateCb(Config &config) {}
 
@@ -38,8 +40,8 @@ class TestControllerApp : public ControllerApp {
     std::chrono::system_clock::time_point realNow_ =
         std::chrono::system_clock::time_point(std::chrono::hours(1));
 
-    const char *setpointReason() { return setpointReason_; }
-    const char *fanSpeedReason() { return fanSpeedReason_; }
+    SetpointReason setpointReason() { return setpointReason_; }
+    FanSpeedReason fanSpeedReason() { return fanSpeedReason_; }
 
   protected:
     std::chrono::steady_clock::time_point steadyNow() override { return steadyNow_; }
@@ -170,7 +172,7 @@ TEST_F(ControllerAppTest, CallsForVenting) {
     // Start venting
     app_->task();
     EXPECT_EQ(76, modbusController_.getFreshAirSpeed());
-    EXPECT_EQ("vent", app_->fanSpeedReason());
+    EXPECT_EQ(FanSpeedReason::Vent, app_->fanSpeedReason());
 
     // Limit vent speed when we detect the cold outdoor temp
     setOutdoorTempC(5);
@@ -196,14 +198,14 @@ TEST_F(ControllerAppTest, UsesFanCoolingWhenOutdoorTempAllows) {
     EXPECT_CALL(uiManager_, setOutTempC(23));
     app_->task();
     EXPECT_EQ(255, modbusController_.getFreshAirSpeed());
-    EXPECT_EQ("cool", app_->fanSpeedReason());
+    EXPECT_EQ(FanSpeedReason::Cool, app_->fanSpeedReason());
 
     // If the outdoor temp gets too high, the fan should turn off
     setOutdoorTempC(30);
     EXPECT_CALL(uiManager_, setOutTempC(30));
     app_->task();
     EXPECT_EQ(0, modbusController_.getFreshAirSpeed());
-    EXPECT_EQ("off", app_->fanSpeedReason());
+    EXPECT_EQ(FanSpeedReason::Off, app_->fanSpeedReason());
 }
 
 TEST_F(ControllerAppTest, CallsForValveHVAC) {
@@ -315,12 +317,12 @@ TEST_F(ControllerAppTest, IncreasesFanSpeedOverTime) {
 
     app_->task();
     EXPECT_LT(modbusController_.getFreshAirSpeed(), 150);
-    EXPECT_EQ("cool", app_->fanSpeedReason());
+    EXPECT_EQ(FanSpeedReason::Cool, app_->fanSpeedReason());
 
     app_->steadyNow_ += std::chrono::minutes(60);
     app_->task();
     EXPECT_GT(modbusController_.getFreshAirSpeed(), 150);
-    EXPECT_EQ("cool", app_->fanSpeedReason());
+    EXPECT_EQ(FanSpeedReason::Cool, app_->fanSpeedReason());
 }
 
 TEST_F(ControllerAppTest, CallsForACWithColdCoil) {
@@ -352,13 +354,13 @@ TEST_F(ControllerAppTest, FanSpeedOverride) {
     app_->task();
     app_->task();
     EXPECT_EQ(100, modbusController_.getFreshAirSpeed());
-    EXPECT_EQ("override", app_->fanSpeedReason());
+    EXPECT_EQ(FanSpeedReason::Override, app_->fanSpeedReason());
 
     // Override expires
     app_->steadyNow_ += std::chrono::minutes(20);
     app_->task();
     EXPECT_EQ(0, modbusController_.getFreshAirSpeed());
-    EXPECT_EQ("off", app_->fanSpeedReason());
+    EXPECT_EQ(FanSpeedReason::Off, app_->fanSpeedReason());
 }
 
 TEST_F(ControllerAppTest, TempOverride) {
@@ -375,21 +377,21 @@ TEST_F(ControllerAppTest, TempOverride) {
     app_->task();
     app_->task();
     EXPECT_GT(modbusController_.getFreshAirSpeed(), 10);
-    EXPECT_EQ("cool", app_->fanSpeedReason());
+    EXPECT_EQ(FanSpeedReason::Cool, app_->fanSpeedReason());
     auto fcReq = modbusController_.getFancoilRequest();
     EXPECT_TRUE(fcReq.cool);
     EXPECT_EQ(FancoilSpeed::High, fcReq.speed);
-    EXPECT_EQ("override", app_->setpointReason());
+    EXPECT_EQ(SetpointReason::Override, app_->setpointReason());
 
     // Override expires
     app_->realNow_ += std::chrono::hours(12);
     app_->task();
     EXPECT_EQ(0, modbusController_.getFreshAirSpeed());
-    EXPECT_EQ("off", app_->fanSpeedReason());
+    EXPECT_EQ(FanSpeedReason::Off, app_->fanSpeedReason());
     fcReq = modbusController_.getFancoilRequest();
     EXPECT_FALSE(fcReq.cool);
     EXPECT_EQ(FancoilSpeed::Low, fcReq.speed);
-    EXPECT_EQ("normal", app_->setpointReason());
+    EXPECT_EQ(SetpointReason::Normal, app_->setpointReason());
 }
 
 TEST_F(ControllerAppTest, ACOverride) {
@@ -438,7 +440,7 @@ TEST_F(ControllerAppTest, MakeupDemand) {
     app_->task();
 
     EXPECT_GT(modbusController_.getFreshAirSpeed(), 100);
-    EXPECT_EQ("makeup_air", app_->fanSpeedReason());
+    EXPECT_EQ(FanSpeedReason::MakeupAir, app_->fanSpeedReason());
 }
 
 TEST_F(ControllerAppTest, Precooling) {
@@ -456,8 +458,8 @@ TEST_F(ControllerAppTest, Precooling) {
     app_->task();
     EXPECT_GT(modbusController_.getFreshAirSpeed(), 20);
     EXPECT_LT(modbusController_.getFreshAirSpeed(), 60);
-    EXPECT_EQ("cool", app_->fanSpeedReason());
-    EXPECT_EQ("normal", app_->setpointReason());
+    EXPECT_EQ(FanSpeedReason::Cool, app_->fanSpeedReason());
+    EXPECT_EQ(SetpointReason::Normal, app_->setpointReason());
     auto fcReq = modbusController_.getFancoilRequest();
     EXPECT_EQ(FancoilSpeed::Off, fcReq.speed);
 
@@ -467,8 +469,8 @@ TEST_F(ControllerAppTest, Precooling) {
     app_->task();
     EXPECT_GT(modbusController_.getFreshAirSpeed(), 100);
     EXPECT_LT(modbusController_.getFreshAirSpeed(), 250);
-    EXPECT_EQ("cool", app_->fanSpeedReason());
-    EXPECT_EQ("precooling", app_->setpointReason());
+    EXPECT_EQ(FanSpeedReason::Cool, app_->fanSpeedReason());
+    EXPECT_EQ(SetpointReason::Precooling, app_->setpointReason());
     fcReq = modbusController_.getFancoilRequest();
     EXPECT_EQ(FancoilSpeed::Off, fcReq.speed);
 
@@ -477,8 +479,8 @@ TEST_F(ControllerAppTest, Precooling) {
     setOutdoorTempC(20);
     app_->task();
     EXPECT_EQ(255, modbusController_.getFreshAirSpeed());
-    EXPECT_EQ("cool", app_->fanSpeedReason());
-    EXPECT_EQ("precooling", app_->setpointReason());
+    EXPECT_EQ(FanSpeedReason::Cool, app_->fanSpeedReason());
+    EXPECT_EQ(SetpointReason::Precooling, app_->setpointReason());
     fcReq = modbusController_.getFancoilRequest();
     EXPECT_TRUE(fcReq.cool);
     EXPECT_EQ(FancoilSpeed::High, fcReq.speed);
@@ -488,8 +490,8 @@ TEST_F(ControllerAppTest, Precooling) {
     setOutdoorTempC(20);
     app_->task();
     EXPECT_EQ(255, modbusController_.getFreshAirSpeed());
-    EXPECT_EQ("cool", app_->fanSpeedReason());
-    EXPECT_EQ("normal", app_->setpointReason());
+    EXPECT_EQ(FanSpeedReason::Cool, app_->fanSpeedReason());
+    EXPECT_EQ(SetpointReason::Normal, app_->setpointReason());
     fcReq = modbusController_.getFancoilRequest();
     EXPECT_TRUE(fcReq.cool);
     EXPECT_EQ(FancoilSpeed::High, fcReq.speed);
