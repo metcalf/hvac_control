@@ -384,7 +384,7 @@ TEST_F(ControllerAppTest, TempOverride) {
     EXPECT_EQ(SetpointReason::Override, app_->setpointReason());
 
     // Override expires
-    app_->realNow_ += std::chrono::hours(12);
+    app_->realNow_ += std::chrono::hours(10);
     app_->task();
     EXPECT_EQ(0, modbusController_.getFreshAirSpeed());
     EXPECT_EQ(FanSpeedReason::Off, app_->fanSpeedReason());

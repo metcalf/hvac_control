@@ -17,7 +17,7 @@
 #define HEAT_VLV_GPIO GPIO_NUM_3
 #define COOL_VLV_GPIO GPIO_NUM_9
 
-#define PRECOOL_MINS 60 * 5
+#define PRECOOL_MINS 60 * 8
 #define PRECOOL_DEG_PER_MIN REL_F_TO_C(0.5) / 60.0
 
 // Interval between running the fan to get an updated outdoor temp when we're
