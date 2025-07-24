@@ -126,7 +126,9 @@ void OutCtrl::setPumps(SystemState &state, const InputState &zioState) {
     }
 
     for (int i = 0; i < ZONE_IO_NUM_TS; i++) {
-        if (ZCDomain::callForMode(state.thermostats[i], state.heatPumpMode)) {
+        if (ZCDomain::callForMode(state.thermostats[i], state.heatPumpMode) &&
+            (zioState.valve_sw[0] != ValveSWState::None ||
+             zioState.valve_sw[1] != ValveSWState::None)) {
             state.zonePump = true;
             break;
         }

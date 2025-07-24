@@ -2,7 +2,7 @@
 
 #define ZONE_IO_NUM_FC 4
 #define ZONE_IO_NUM_TS 4
-#define ZONE_IO_NUM_SW 4
+#define ZONE_IO_NUM_SW 2
 
 struct FancoilState {
     unsigned v : 1, ob : 1;

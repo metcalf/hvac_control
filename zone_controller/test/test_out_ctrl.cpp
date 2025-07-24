@@ -69,9 +69,29 @@ TEST_F(OutCtrlTest, TurnsCoolingOnForFancoil) {
     EXPECT_TRUE(state.fcPump);
 }
 
+TEST_F(OutCtrlTest, NoZonePumpWithoutValve) {
+    InputState input_state{};
+    input_state.ts[0].w = true;
+
+    SystemState state = outCtrl_.update(true, input_state);
+
+    EXPECT_EQ(state.heatPumpMode, HeatPumpMode::Heat);
+    EXPECT_FALSE(state.zonePump);
+
+    // Any open valve, even unrelated to the call, allows
+    // the pump to turn on.
+    input_state.valve_sw[1] = ValveSWState::One;
+
+    state = outCtrl_.update(true, input_state);
+
+    EXPECT_EQ(state.heatPumpMode, HeatPumpMode::Heat);
+    EXPECT_TRUE(state.zonePump);
+}
+
 TEST_F(OutCtrlTest, TurnsHeatingOnForTS) {
     InputState input_state{};
     input_state.ts[0].w = true;
+    input_state.valve_sw[0] = ValveSWState::One;
 
     SystemState state = outCtrl_.update(true, input_state);
 
@@ -82,6 +102,7 @@ TEST_F(OutCtrlTest, TurnsHeatingOnForTS) {
 TEST_F(OutCtrlTest, TurnsCoolingOnForTS) {
     InputState input_state{};
     input_state.ts[0].y = true;
+    input_state.valve_sw[0] = ValveSWState::One;
 
     SystemState state = outCtrl_.update(true, input_state);
 
@@ -120,6 +141,7 @@ TEST_F(OutCtrlTest, ConflictingDemands) {
 
     // Initial heat demand
     input_state.ts[0].w = true;
+    input_state.valve_sw[0] = ValveSWState::One;
     SystemState state = outCtrl_.update(true, input_state);
     EXPECT_EQ(state.heatPumpMode, HeatPumpMode::Heat);
     EXPECT_TRUE(state.zonePump);
@@ -188,6 +210,7 @@ TEST_F(OutCtrlTest, DelayedStandby) {
 
     // Initial cool demand
     input_state.ts[0].y = true;
+    input_state.valve_sw[0] = ValveSWState::One;
     SystemState state = outCtrl_.update(true, input_state);
     EXPECT_EQ(state.heatPumpMode, HeatPumpMode::Cool);
     EXPECT_TRUE(state.zonePump);
