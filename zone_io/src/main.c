@@ -12,6 +12,9 @@
 #define SEND_INTERVAL_MS 450
 
 volatile uint16_t vlv12_sw_period_, vlv34_sw_period_;
+volatile uint8_t port_read_flag_;
+volatile uint8_t port_in_values_[3];
+volatile uint8_t *ports_[] = {&VPORTA.IN, &VPORTB.IN, &VPORTC.IN};
 
 volatile uint8_t tx_pos_;
 char tx_buffer_[3];
@@ -42,27 +45,6 @@ const uint8_t tx_map_[3][6] = {
     },
 };
 
-uint8_t getVlvState(uint16_t *g_period) {
-    uint16_t period;
-    ATOMIC_BLOCK(ATOMIC_FORCEON) { period = *g_period; }
-
-    if (period == 0) {
-        return 0;
-    }
-
-    // Integer rounding division to convert period to frequency
-    uint32_t vlv_sw_freq = (VLV_SW_CLK + period / 2) / period;
-
-    // NB: Rectified AC is double mains frequency (120hz)
-    if (vlv_sw_freq < 30) {
-        return 0; // Assume off
-    } else if (vlv_sw_freq < 90) {
-        return 1; // Assume one channel on (~60hz)
-    } else {
-        return 2; // Assume both channels on (~120hz)
-    }
-}
-
 void setupUSART() {
     VPORTA.DIR |= PIN1_bm; // TxD on PA1
     // Configure async 8N1 (this is the default anyway, being explicit for clarity)
@@ -72,7 +54,7 @@ void setupUSART() {
     USART1.CTRLB = USART_TXEN_bm; // TX only
 }
 
-void startTx(uint8_t *port_states) {
+void startTx(uint8_t *port_states, uint8_t vlv12_state, uint8_t vlv34_state) {
     if (USART1.CTRLA & USART_DREIE_bm) {
         return; // We're still writing, skip this Tx
     }
@@ -87,7 +69,7 @@ void startTx(uint8_t *port_states) {
         }
     }
 
-    tx_buffer_[2] |= (getVlvState(&vlv12_sw_period_) << 2) | (getVlvState(&vlv34_sw_period_) << 4);
+    tx_buffer_[2] |= (vlv12_state << 2) | (vlv34_state << 4);
 
     USART1.CTRLA |= USART_DREIE_bm;
 }
@@ -109,56 +91,84 @@ void setupInputPins() {
     }
 }
 
-void setupTCBn(TCB_t *tcb) {
-    tcb->CTRLB = TCB_CNTMODE_FRQ_gc;           // Frequency count mode
-    tcb->EVCTRL = TCB_CAPTEI_bm | TCB_EDGE_bm; // Measure frequency between falling edge events
-    tcb->INTCTRL = TCB_CAPT_bm | TCB_OVF_bm;
-    tcb->CTRLA =
-        TCB_ENABLE_bm | TCB_CLKSEL_DIV2_gc; // Configure tach frequency measurement @ ~156khz
-}
-
-void setupVlvTimer() {
-    // Configure TCB0 on PC2 for frequency measurement for VLV1/2_SW_IO
-    PORTC.PIN2CTRL = PORT_PULLUPEN_bm;
-    EVSYS.CHANNEL2 = EVSYS_CHANNEL2_PORTC_PIN2_gc; // Route pin PC2
-    EVSYS.USERTCB0CAPT = EVSYS_USER_CHANNEL2_gc;   // to TCB0
-    setupTCBn(&TCB0);
-
-    // Configure TCB1 on PC3 for frequency measurement for VLV3/4_SW_IO
-    PORTC.PIN3CTRL = PORT_PULLUPEN_bm;
-    EVSYS.CHANNEL3 = EVSYS_CHANNEL2_PORTC_PIN3_gc; // Route pin PC3
-    EVSYS.USERTCB1CAPT = EVSYS_USER_CHANNEL3_gc;   // to TCB1
-    setupTCBn(&TCB1);
+void setupPinCheckTimer() {
+    // Sample at 1200hz (10x rectified mains frequency)
+    // 20e6 CPU / 8 / 1200 system clock prescaler
+    TCA0.SINGLE.PER = 2083;
+    TCA0.SINGLE.INTCTRL = TCA_SINGLE_OVF_bm;
+    TCA0.SINGLE.CTRLA = TCA_SINGLE_CLKSEL_DIV1_gc;
 }
 
 int main(void) {
     wdt_enable(0x8); // 1 second (note the constants in avr/wdt are wrong for this chip)
 
     CPU_CCP = CCP_IOREG_gc; /* Enable writing to protected register MCLKCTRLB */
-    CLKCTRL.MCLKCTRLB = CLKCTRL_PEN_bm | CLKCTRL_PDIV_64X_gc; // Divide main clock by 64 = 312500hz
+    CLKCTRL.MCLKCTRLB = CLKCTRL_PEN_bm | CLKCTRL_PDIV_8X_gc; // Divide main clock by 8 = 2.5mhz
 
     setupInputPins();
     setupUSART();
-    setupVlvTimer();
+    setupPinCheckTimer();
 
     sei(); // Enable interrupts
 
     while (1) {
         wdt_reset();
 
-        uint8_t port_states[3] = {0, 0, 0};
+        uint8_t port_counts[3][8] = {};
 
-        // Poll pin states every 833us for 50ms. This gives us a sample rate
-        // of 1200hz on a 120hz signal for 6 cycles
-        for (int i = 0; i < 60; i++) {
-            port_states[0] |= VPORTA.IN;
-            port_states[1] |= VPORTB.IN;
-            port_states[2] |= VPORTC.IN;
+        // Poll 100 times at 1200hz. Gives us 10 full cycles of data and takes ~83ms
+        // Our read strategy here is designed to filter out external noise at the optoisolator inputs.
+        // The Taco valves in particular throw off a lot of noise and cause pins to flicker.
+        port_read_flag_ = 0;
+        TCA0.SINGLE.INTFLAGS |= TCA_SINGLE_OVF_bm; // Clear interrupt flag
+        TCA0.SINGLE.CNT = 0;                       // Start at zero
+        TCA0.SINGLE.CTRLA |= TCA_SINGLE_ENABLE_bm; // Start the timer
 
-            _delay_us(833);
+        for (int i = 0; i < 100; i++) {
+            while (!port_read_flag_)
+                ;
+
+            for (uint8_t port_idx = 0; port_idx < 3; port_idx++) {
+                for (uint8_t pin = 0; pin < 8; pin++) {
+                    if (port_in_values_[port_idx] & (1 << pin)) {
+                        port_counts[port_idx][pin]++;
+                    }
+                }
+            }
+            ATOMIC_BLOCK(ATOMIC_FORCEON) { port_read_flag_ = 0; }
         }
 
-        startTx(port_states);
+        TCA0.SINGLE.CTRLA &= ~TCA_SINGLE_ENABLE_bm; // Stop the timer
+
+        uint8_t port_states[3] = {0};
+
+        for (uint8_t port_idx = 0; port_idx < 3; port_idx++) {
+            for (uint8_t pin = 0; pin < 8; pin++) {
+                // The optoisolators are pretty sensitive so it should read high
+                // most of the time if the pin is high. The internal pull-ups is very weak (~35kohm)
+                // so a tiny amount of current (<0.1mA) should pull the pin high. This corresponds to
+                // something like 0.2mA at the opto input which requires 5-6V.
+                if (port_counts[port_idx][pin] > 60) {
+                    port_states[port_idx] |= tx_map_[port_idx][pin];
+                }
+            }
+        }
+
+        uint8_t vlv_states[2] = {0};
+        for (int i = 0; i < 2; i++) {
+            // PC2 and PC3 are used for VLV1/2 and VLV3/4 respectively
+            uint8_t count = port_counts[2][i + 2];
+
+            if (count > 60) {
+                vlv_states[i] = 2; // Both channels on
+            } else if (count > 30) {
+                vlv_states[i] = 1; // One channel on
+            } else {
+                vlv_states[i] = 0; // Off
+            }
+        }
+
+        startTx(port_states, vlv_states[0], vlv_states[1]);
 
         // Delay while sending since we don't need the data very frequently
         wdt_reset();
@@ -166,19 +176,16 @@ int main(void) {
     }
 }
 
-uint16_t handleVlvInt(TCB_t *tcb) {
-    if (tcb->INTFLAGS & TCB_OVF_bm) {
-        // If we overflowed, clear both flags and set an invalid period
-        tcb->INTFLAGS |= TCB_OVF_bm;
-        tcb->INTFLAGS |= TCB_CAPT_bm;
-        return 0;
-    } else {
-        return tcb->CCMP; // reading CCMP clears interrupt flag
+ISR(TCA0_OVF_vect) {
+    if (port_read_flag_ == 0) {
+        for (int i = 0; i < 3; i++) {
+            port_in_values_[i] = *ports_[i];
+        }
+        port_read_flag_ = 1;
     }
-}
 
-ISR(TCB0_INT_vect) { vlv12_sw_period_ = handleVlvInt(&TCB0); }
-ISR(TCB1_INT_vect) { vlv34_sw_period_ = handleVlvInt(&TCB1); }
+    TCA0.SINGLE.INTFLAGS |= TCA_SINGLE_OVF_bm; // Clear interrupt flag
+}
 
 ISR(USART1_DRE_vect) {
     USART1_TXDATAL = tx_buffer_[tx_pos_];

@@ -159,7 +159,8 @@
       "init_display.h": "c",
       "scd4x_sensirion_common.h": "c",
       "__availability": "cpp",
-      "regex": "cpp"
+      "regex": "cpp",
+      "delay.h": "c"
     },
     "search.exclude": {
       "**/build": true
