@@ -50,7 +50,7 @@ void setupUSART() {
     // Configure async 8N1 (this is the default anyway, being explicit for clarity)
     USART1.CTRLC = USART_CMODE_ASYNCHRONOUS_gc | USART_PMODE_DISABLED_gc | USART_SBMODE_1BIT_gc |
                    USART_CHSIZE_8BIT_gc;
-    USART1.BAUD = (uint16_t)((float)(F_CLK_PER * 64 / (16 * (float)UART_BAUD)) + 0.5);
+    USART1.BAUD = (uint16_t)((double)(F_CLK_PER * 64 / (16 * (double)UART_BAUD)) + 0.5);
     USART1.CTRLB = USART_TXEN_bm; // TX only
 }
 
@@ -93,8 +93,7 @@ void setupInputPins() {
 
 void setupPinCheckTimer() {
     // Sample at 1200hz (10x rectified mains frequency)
-    // 20e6 CPU / 8 / 1200 system clock prescaler
-    TCA0.SINGLE.PER = 2083;
+    TCA0.SINGLE.PER = (F_CLK_PER + 600) / 1200;
     TCA0.SINGLE.INTCTRL = TCA_SINGLE_OVF_bm;
     TCA0.SINGLE.CTRLA = TCA_SINGLE_CLKSEL_DIV1_gc;
 }
@@ -103,7 +102,7 @@ int main(void) {
     wdt_enable(0x8); // 1 second (note the constants in avr/wdt are wrong for this chip)
 
     CPU_CCP = CCP_IOREG_gc; /* Enable writing to protected register MCLKCTRLB */
-    CLKCTRL.MCLKCTRLB = CLKCTRL_PEN_bm | CLKCTRL_PDIV_8X_gc; // Divide main clock by 8 = 2.5mhz
+    CLKCTRL.MCLKCTRLB = CLKCTRL_PEN_bm | CLKCTRL_PDIV_16X_gc; // Divide main clock by 16 = 1.25mhz
 
     setupInputPins();
     setupUSART();
@@ -125,8 +124,13 @@ int main(void) {
         TCA0.SINGLE.CTRLA |= TCA_SINGLE_ENABLE_bm; // Start the timer
 
         for (int i = 0; i < 100; i++) {
-            while (!port_read_flag_)
-                ;
+            while (1) {
+                uint8_t read;
+                ATOMIC_BLOCK(ATOMIC_FORCEON) { read = port_read_flag_; }
+                if (read) {
+                    break;
+                }
+            }
 
             for (uint8_t port_idx = 0; port_idx < 3; port_idx++) {
                 for (uint8_t pin = 0; pin < 8; pin++) {

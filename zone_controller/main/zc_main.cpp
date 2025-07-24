@@ -80,6 +80,7 @@ uint64_t otaFn() {
 
 void inputEvtCb() {
     ZCUIManager::Event evt{ZCUIManager::EventType::InputUpdate, 0};
+    ESP_LOGI(TAG, "IO received");
     xQueueSend(uiEvtQueue_, &evt, portMAX_DELAY);
 }
 
@@ -231,7 +232,7 @@ void pollCxStatus() {
     }
 }
 
-bool checkValveSWConsistency(ValveState *valves, ValveSWState sw) {
+bool isValveSWConsistent(ValveState *valves, ValveSWState sw) {
     int expectOpen = 0;
     for (int i = 0; i < 2; i++) {
         if (valves[i].action != ValveAction::Set) {
@@ -245,7 +246,17 @@ bool checkValveSWConsistency(ValveState *valves, ValveSWState sw) {
     return expectOpen == static_cast<int>(sw);
 }
 
-void checkValveErrors(ValveSWState sws[2]) {
+void checkValveSWConsistency(ValveSWState sws[2]) {
+    if (!(isValveSWConsistent(currentState_.valves, sws[0]) &&
+          isValveSWConsistent(&currentState_.valves[2], sws[1]))) {
+        uiManager_->setMessage(MsgID::ValveSWError, false, VALVE_SW_MSG);
+        ESP_LOGE(TAG, VALVE_SW_MSG);
+    } else {
+        uiManager_->clearMessage(MsgID::ValveSWError);
+    }
+}
+
+void checkStuckValves(ValveSWState sws[2]) {
     std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now();
 
     bool anyStuck = false;
@@ -262,14 +273,6 @@ void checkValveErrors(ValveSWState sws[2]) {
         ESP_LOGE(TAG, VALVE_STUCK_MSG);
     } else {
         uiManager_->clearMessage(MsgID::ValveStuckError);
-    }
-
-    if (!(checkValveSWConsistency(currentState_.valves, sws[0]) &&
-          checkValveSWConsistency(&currentState_.valves[2], sws[1]))) {
-        uiManager_->setMessage(MsgID::ValveSWError, false, VALVE_SW_MSG);
-        ESP_LOGE(TAG, VALVE_SW_MSG);
-    } else {
-        uiManager_->clearMessage(MsgID::ValveSWError);
     }
 }
 
@@ -347,13 +350,14 @@ void outputTask(void *) {
                                            lastLoggedSystemState) > SYSTEM_STATE_LOG_INTERVAL) {
             zone_io_log_state(zioState);
             logSystemState(currentState_);
+            checkValveSWConsistency(zioState.valve_sw);
             lastLoggedSystemState = std::chrono::steady_clock::now();
         }
         lastState = currentState_;
 
         uiManager_->updateState(currentState_);
 
-        checkValveErrors(zioState.valve_sw);
+        checkStuckValves(zioState.valve_sw);
         setCxOpMode(currentState_.heatPumpMode);
         pollCxStatus();
         setIOStates(currentState_);
