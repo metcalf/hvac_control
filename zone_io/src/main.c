@@ -80,9 +80,13 @@ void setupInputPins() {
     VPORTC.DIR = 0;
 
     register8_t *pins[] = {
-        &PORTA.PIN2CTRL, &PORTA.PIN3CTRL, &PORTA.PIN4CTRL, &PORTA.PIN5CTRL, &PORTA.PIN6CTRL,
-        &PORTA.PIN7CTRL, &PORTB.PIN1CTRL, &PORTB.PIN2CTRL, &PORTB.PIN3CTRL, &PORTB.PIN5CTRL,
-        &PORTB.PIN4CTRL, &PORTB.PIN0CTRL, &PORTC.PIN0CTRL, &PORTC.PIN1CTRL, &PORTC.PIN2CTRL,
+        &PORTA.PIN2CTRL, &PORTA.PIN3CTRL, &PORTA.PIN4CTRL, &PORTA.PIN5CTRL,
+        &PORTA.PIN6CTRL, &PORTA.PIN7CTRL,
+
+        &PORTB.PIN0CTRL, &PORTB.PIN1CTRL, &PORTB.PIN2CTRL, &PORTB.PIN3CTRL,
+        &PORTB.PIN4CTRL, &PORTB.PIN5CTRL,
+
+        &PORTC.PIN0CTRL, &PORTC.PIN1CTRL, &PORTC.PIN2CTRL, &PORTC.PIN3CTRL,
     };
 
     for (int i = 0; i < (sizeof(pins) / sizeof(pins[0])); i++) {
@@ -153,7 +157,7 @@ int main(void) {
                 // so a tiny amount of current (<0.1mA) should pull the pin high. This corresponds to
                 // something like 0.2mA at the opto input which requires 5-6V.
                 if (port_counts[port_idx][pin] > 60) {
-                    port_states[port_idx] |= tx_map_[port_idx][pin];
+                    port_states[port_idx] |= (1 << pin);
                 }
             }
         }

@@ -51,6 +51,7 @@ class OutCtrlTest : public testing::Test {
 TEST_F(OutCtrlTest, TurnsHeatingOnForFancoil) {
     InputState input_state{};
     input_state.fc[0].v = true;
+    input_state.fc[0].ob = true;
 
     SystemState state = outCtrl_.update(true, input_state);
 
@@ -61,7 +62,6 @@ TEST_F(OutCtrlTest, TurnsHeatingOnForFancoil) {
 TEST_F(OutCtrlTest, TurnsCoolingOnForFancoil) {
     InputState input_state{};
     input_state.fc[0].v = true;
-    input_state.fc[0].ob = true;
 
     SystemState state = outCtrl_.update(true, input_state);
 
@@ -92,13 +92,13 @@ TEST_F(OutCtrlTest, TurnsCoolingOnForTS) {
 TEST_F(OutCtrlTest, NoLockoutToReturnToMostRecent) {
     InputState input_state{};
 
-    // Initial heat demand
+    // Initial cool demand
     input_state.fc[0].v = true;
     SystemState state = outCtrl_.update(true, input_state);
-    EXPECT_EQ(state.heatPumpMode, HeatPumpMode::Heat);
+    EXPECT_EQ(state.heatPumpMode, HeatPumpMode::Cool);
     EXPECT_TRUE(state.fcPump);
 
-    // Switch to cool (enters lockout)
+    // Switch to heat (enters lockout)
     incrTime();
     input_state.fc[0].ob = true;
     state = outCtrl_.update(true, input_state);
@@ -106,11 +106,11 @@ TEST_F(OutCtrlTest, NoLockoutToReturnToMostRecent) {
     EXPECT_FALSE(state.fcPump);
     EXPECT_TRUE(messageUI_.isSet(MsgID::HVACLockout));
 
-    // Switch back to heat (no lockout)
+    // Switch back to cool (no lockout)
     incrTime();
     input_state.fc[0].ob = false;
     state = outCtrl_.update(true, input_state);
-    EXPECT_EQ(state.heatPumpMode, HeatPumpMode::Heat);
+    EXPECT_EQ(state.heatPumpMode, HeatPumpMode::Cool);
     EXPECT_TRUE(state.fcPump);
     EXPECT_FALSE(messageUI_.isSet(MsgID::HVACLockout));
 }
@@ -146,30 +146,15 @@ TEST_F(OutCtrlTest, ConflictingDemands) {
 TEST_F(OutCtrlTest, Lockouts) {
     InputState input_state{};
 
-    // Initial heat demand
+    // Initial cool demand
     input_state.fc[0].v = true;
     SystemState state = outCtrl_.update(true, input_state);
-    EXPECT_EQ(state.heatPumpMode, HeatPumpMode::Heat);
-    EXPECT_TRUE(state.fcPump);
-
-    // Switch to cool (enters lockout)
-    incrTime();
-    input_state.fc[0].ob = true;
-    state = outCtrl_.update(true, input_state);
-    EXPECT_EQ(state.heatPumpMode, HeatPumpMode::Standby);
-    EXPECT_FALSE(state.fcPump);
-    EXPECT_TRUE(messageUI_.isSet(MsgID::HVACLockout));
-
-    // Waiting for the lockout to expire cools
-    incrTime(HEAT_TO_COOL_LOCKOUT);
-    state = outCtrl_.update(true, input_state);
     EXPECT_EQ(state.heatPumpMode, HeatPumpMode::Cool);
     EXPECT_TRUE(state.fcPump);
-    EXPECT_FALSE(messageUI_.isSet(MsgID::HVACLockout));
 
     // Switch to heat (enters lockout)
     incrTime();
-    input_state.fc[0].ob = false;
+    input_state.fc[0].ob = true;
     state = outCtrl_.update(true, input_state);
     EXPECT_EQ(state.heatPumpMode, HeatPumpMode::Standby);
     EXPECT_FALSE(state.fcPump);
@@ -179,6 +164,21 @@ TEST_F(OutCtrlTest, Lockouts) {
     incrTime(COOL_TO_HEAT_LOCKOUT);
     state = outCtrl_.update(true, input_state);
     EXPECT_EQ(state.heatPumpMode, HeatPumpMode::Heat);
+    EXPECT_TRUE(state.fcPump);
+    EXPECT_FALSE(messageUI_.isSet(MsgID::HVACLockout));
+
+    // Switch to cool (enters lockout)
+    incrTime();
+    input_state.fc[0].ob = false;
+    state = outCtrl_.update(true, input_state);
+    EXPECT_EQ(state.heatPumpMode, HeatPumpMode::Standby);
+    EXPECT_FALSE(state.fcPump);
+    EXPECT_TRUE(messageUI_.isSet(MsgID::HVACLockout));
+
+    // Waiting for the lockout to expire cools
+    incrTime(HEAT_TO_COOL_LOCKOUT);
+    state = outCtrl_.update(true, input_state);
+    EXPECT_EQ(state.heatPumpMode, HeatPumpMode::Cool);
     EXPECT_TRUE(state.fcPump);
     EXPECT_FALSE(messageUI_.isSet(MsgID::HVACLockout));
 }
