@@ -37,6 +37,10 @@
 #define COIL_COLD_TEMP_C ABS_F_TO_C(60.0)
 // Turn the A/C on if temp exceeds setpoint by this amount
 #define AC_ON_THRESHOLD_C REL_F_TO_C(4.0)
+// Do not turn A/C on if outdoor temp is below this
+#define AC_ON_MIN_OUT_TEMP_C ABS_F_TO_C(70.0)
+// Turn A/C off if outdoor temp falls below this
+#define AC_OFF_OUT_TEMP_C ABS_F_TO_C(63.0)
 // Turn on the A/C if cooling demand exceeds this and the coil is cold. Turn off A/C when demand
 // drops below this.
 #define AC_DEMAND_THRESHOLD 0.1
@@ -74,7 +78,8 @@ void ControllerApp::updateEquipment(ControllerDomain::Config::Equipment equipmen
                                      config_.equipment.coolType == Config::HVACType::Fancoil);
 }
 
-void ControllerApp::updateACMode(const double coolDemand, const double coolSetpointDeltaC) {
+void ControllerApp::updateACMode(const double coolDemand, const double coolSetpointDeltaC,
+                                 const double outTempC) {
     if (!config_.systemOn) {
         acMode_ = ACMode::Standby;
         clearMessage(MsgID::ACMode);
@@ -85,13 +90,15 @@ void ControllerApp::updateACMode(const double coolDemand, const double coolSetpo
         break;
     case ACMode::Standby:
         // If we're too far off the cool setpoint or the coil is cold anyway, turn the A/C on
-        if (coolSetpointDeltaC > AC_ON_THRESHOLD_C ||
-            (coolDemand > AC_DEMAND_THRESHOLD && isCoilCold())) {
+        // as long as the outdoor temp is above threshold
+        if (outTempC > AC_ON_MIN_OUT_TEMP_C &&
+            (coolSetpointDeltaC > AC_ON_THRESHOLD_C ||
+             (coolDemand > AC_DEMAND_THRESHOLD && isCoilCold()))) {
             acMode_ = ACMode::On;
         }
         break;
     case ACMode::On:
-        if (coolDemand < AC_DEMAND_THRESHOLD) {
+        if (outTempC < AC_OFF_OUT_TEMP_C || coolDemand < AC_DEMAND_THRESHOLD) {
             clearMessage(MsgID::ACMode);
             acMode_ = ACMode::Standby;
         }
@@ -972,7 +979,7 @@ void ControllerApp::task(bool firstTime) {
     FanSpeed speed = computeFanSpeed(ventDemand, fanCoolDemand, wantOutdoorTemp);
     setFanSpeed(speed);
 
-    updateACMode(coolDemand, coolSetpointDeltaC);
+    updateACMode(coolDemand, coolSetpointDeltaC, outdoorTempC());
     HVACState hvacState = setHVAC(heatDemand, coolDemand, speed);
 
     checkModbusErrors();
