@@ -38,12 +38,13 @@
 // Turn the A/C on if temp exceeds setpoint by this amount
 #define AC_ON_THRESHOLD_C REL_F_TO_C(4.0)
 // Do not turn A/C on if outdoor temp is below this
-#define AC_ON_MIN_OUT_TEMP_C ABS_F_TO_C(70.0)
+#define AC_ON_MIN_OUT_TEMP_C ABS_F_TO_C(72.0)
 // Turn A/C off if outdoor temp falls below this
-#define AC_OFF_OUT_TEMP_C ABS_F_TO_C(63.0)
-// Turn on the A/C if cooling demand exceeds this and the coil is cold. Turn off A/C when demand
-// drops below this.
-#define AC_DEMAND_THRESHOLD 0.1
+#define AC_OFF_OUT_TEMP_C ABS_F_TO_C(60.0)
+// Turn on the A/C if cooling demand exceeds this and the coil is cold.
+#define AC_COLD_COIL_THRESHOLD 0.3
+// Turn off A/C when demand drops below this.
+#define AC_DEMAND_THRESHOLD 0.2
 #define ON_DEMAND_THRESHOLD 0.01
 
 // If fan is above this speed, turn on exhaust fan for extra cooling
@@ -93,7 +94,7 @@ void ControllerApp::updateACMode(const double coolDemand, const double coolSetpo
         // as long as the outdoor temp is above threshold
         if (outTempC > AC_ON_MIN_OUT_TEMP_C &&
             (coolSetpointDeltaC > AC_ON_THRESHOLD_C ||
-             (coolDemand > AC_DEMAND_THRESHOLD && isCoilCold()))) {
+             (coolDemand > AC_COLD_COIL_THRESHOLD && isCoilCold()))) {
             acMode_ = ACMode::On;
         }
         break;
