@@ -46,6 +46,7 @@ if ! strings "${FIRMWARE_PATH}" | grep "${version}"; then
 fi
 
 # Note this doesn't clear out old files but they're only 1.5M
-ssh "${REMOTE_SPEC}" "mkdir -p ${REMOTE_PATH} && chown -R www-data:adm ${REMOTE_ROOT}"
-scp "${FIRMWARE_PATH}" "$REMOTE_SPEC:${REMOTE_PATH}/${version}.bin"
-ssh "${REMOTE_SPEC}" "echo -n ${version} > ${REMOTE_PATH}/latest_version"
+ssh "${REMOTE_SPEC}" "sudo mkdir -p ${REMOTE_PATH} && sudo chown -R www-data:adm ${REMOTE_ROOT}"
+scp "${FIRMWARE_PATH}" "${REMOTE_SPEC}:/tmp/${version}.bin"
+ssh "${REMOTE_SPEC}" "sudo mv /tmp/${version}.bin ${REMOTE_PATH}/${version}.bin"
+ssh "${REMOTE_SPEC}" "echo -n ${version} | sudo tee ${REMOTE_PATH}/latest_version"
