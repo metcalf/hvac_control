@@ -963,10 +963,9 @@ void ControllerApp::task(bool firstTime) {
         setMessage(MsgID::SensorErr, false, sensorData.errMsg);
     }
 
-    double coolSetpointDeltaC = sensorData.tempC - setpoints.coolTempC;
-
     // Not using temp sensor in the fresh air unit for now since it doesn't seem accurate.
     bool wantOutdoorTemp = false;
+    // double coolSetpointDeltaC = sensorData.tempC - setpoints.coolTempC;
     // bool wantOutdoorTemp = (coolSetpointDeltaC > 0 && (std::isnan(rawOutdoorTempC_) ||
     //                                                    (steadyNow() - lastOutdoorTempUpdate_) >
     //                                                        OUTDOOR_TEMP_UPDATE_INTERVAL));
