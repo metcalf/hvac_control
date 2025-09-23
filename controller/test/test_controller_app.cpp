@@ -345,6 +345,22 @@ TEST_F(ControllerAppTest, CallsForACWithColdCoil) {
     EXPECT_EQ(actual.speed, FancoilSpeed::Low); // Turns onn with a cold coil
 }
 
+TEST_F(ControllerAppTest, CallsForACWithHighOutdoorTemp) {
+    sensors_.setLatest({.tempC = 22.5, .humidity = 2.0, .co2 = 500});
+    setOutdoorTempC(23);
+
+    app_->task();
+
+    auto actual = modbusController_.getFancoilRequest();
+    EXPECT_EQ(actual.speed, FancoilSpeed::Off); // Off at lower outdoor temp
+
+    setOutdoorTempC(30);
+    app_->task();
+
+    actual = modbusController_.getFancoilRequest();
+    EXPECT_EQ(actual.speed, FancoilSpeed::Low); // Turns on with higher outdoor temp
+}
+
 TEST_F(ControllerAppTest, FanSpeedOverride) {
     sensors_.setLatest({.tempC = 20.0, .humidity = 2.0, .co2 = 456});
     auto evt = AbstractUIManager::Event{

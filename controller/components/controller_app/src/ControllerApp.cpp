@@ -37,14 +37,18 @@
 #define COIL_COLD_TEMP_C ABS_F_TO_C(60.0)
 // Turn the A/C on if temp exceeds setpoint by this amount
 #define AC_ON_THRESHOLD_C REL_F_TO_C(4.0)
+// Turn the A/C on if the outdoor temp is above the setpoint by this amount
+// since we want to get ahead of the heat
+#define AC_ON_OUT_TEMP_THRESHOLD_C REL_F_TO_C(8.0)
 // Do not turn A/C on if outdoor temp is below this
 #define AC_ON_MIN_OUT_TEMP_C ABS_F_TO_C(72.0)
 // Turn A/C off if outdoor temp falls below this
 #define AC_OFF_OUT_TEMP_C ABS_F_TO_C(60.0)
-// Turn on the A/C if cooling demand exceeds this and the coil is cold.
-#define AC_COLD_COIL_THRESHOLD 0.3
+// Turn on the A/C if cooling demand exceeds this and another condition is met
+// (coil is cold or outdoor temp is high enough)
+#define AC_ON_DEMAND_THRESHOLD 0.3
 // Turn off A/C when demand drops below this.
-#define AC_DEMAND_THRESHOLD 0.2
+#define AC_OFF_DEMAND_THRESHOLD 0.2
 #define ON_DEMAND_THRESHOLD 0.01
 
 // If fan is above this speed, turn on exhaust fan for extra cooling
@@ -79,8 +83,8 @@ void ControllerApp::updateEquipment(ControllerDomain::Config::Equipment equipmen
                                      config_.equipment.coolType == Config::HVACType::Fancoil);
 }
 
-void ControllerApp::updateACMode(const double coolDemand, const double coolSetpointDeltaC,
-                                 const double outTempC) {
+void ControllerApp::updateACMode(const double coolDemand, const double coolSetpointC,
+                                 const double inTempC, const double outTempC) {
     if (!config_.systemOn) {
         acMode_ = ACMode::Standby;
         clearMessage(MsgID::ACMode);
@@ -92,14 +96,18 @@ void ControllerApp::updateACMode(const double coolDemand, const double coolSetpo
     case ACMode::Standby:
         // If we're too far off the cool setpoint or the coil is cold anyway, turn the A/C on
         // as long as the outdoor temp is above threshold
-        if (outTempC > AC_ON_MIN_OUT_TEMP_C &&
-            (coolSetpointDeltaC > AC_ON_THRESHOLD_C ||
-             (coolDemand > AC_COLD_COIL_THRESHOLD && isCoilCold()))) {
+        if (
+            // Outdoor temp and demand must be high enough to turn on at all
+            outTempC > AC_ON_MIN_OUT_TEMP_C && coolDemand > AC_ON_DEMAND_THRESHOLD &&
+            ((inTempC - coolSetpointC) > AC_ON_THRESHOLD_C ||           // Indoor temp is high
+             (outTempC - coolSetpointC) > AC_ON_OUT_TEMP_THRESHOLD_C || // Outdoor temp is high
+             isCoilCold()                                               // Coil is cold anyway
+             )) {
             acMode_ = ACMode::On;
         }
         break;
     case ACMode::On:
-        if (outTempC < AC_OFF_OUT_TEMP_C || coolDemand < AC_DEMAND_THRESHOLD) {
+        if (outTempC < AC_OFF_OUT_TEMP_C || coolDemand < AC_OFF_DEMAND_THRESHOLD) {
             clearMessage(MsgID::ACMode);
             acMode_ = ACMode::Standby;
         }
@@ -610,7 +618,7 @@ void ControllerApp::logState(const ControllerDomain::FreshAirState &freshAirStat
     ESP_LOG_LEVEL(statusLevel, TAG,
                   "ctrl:"
                   // Sensors
-                  " in_t=%0.2f raw_in_t=%0.2f out_t=%0.2f h=%0.1f p=%lu co2=%u"
+                  " in_t=%0.2f raw_in_t=%0.2f out_t=%0.2f h=%0.1f p=%u co2=%u"
                   // Setpoints
                   " set_h=%.2f set_c=%.2f set_co2=%u set_r=%s"
                   // DemandRequest
@@ -875,7 +883,7 @@ ControllerDomain::FreshAirState ControllerApp::getFreshAirState() {
                 if (speedT - fanLastStarted_ > STATIC_PRESSURE_OFF_TIME_MAX_AGE) {
                     ESP_LOGI(TAG, "Off pressure is stale, can't compute static pressure");
                 } else if (stoppedPressurePa_ > freshAirState.pressurePa) {
-                    ESP_LOGW(TAG, "est fresh air static pressure (pa): %lu",
+                    ESP_LOGW(TAG, "est fresh air static pressure (pa): %u",
                              (stoppedPressurePa_ - freshAirState.pressurePa));
                 } else {
                     ESP_LOGE(TAG, "Unexpected negative static pressure estimate");
@@ -980,7 +988,7 @@ void ControllerApp::task(bool firstTime) {
     FanSpeed speed = computeFanSpeed(ventDemand, fanCoolDemand, wantOutdoorTemp);
     setFanSpeed(speed);
 
-    updateACMode(coolDemand, coolSetpointDeltaC, outdoorTempC());
+    updateACMode(coolDemand, setpoints.coolTempC, sensorData.tempC, outdoorTempC());
     HVACState hvacState = setHVAC(heatDemand, coolDemand, speed);
 
     checkModbusErrors();

@@ -211,7 +211,7 @@ class ControllerApp {
     }
 
     void updateEquipment(ControllerDomain::Config::Equipment equipment);
-    void updateACMode(const double coolDemand, const double coolSetpointDelt,
+    void updateACMode(const double coolDemand, const double coolSetpointC, const double inTempC,
                       const double outTempC);
     FanSpeed computeFanSpeed(double ventDemand, double coolDemand, bool wantOutdoorTemp);
     void setFanSpeed(FanSpeed);
