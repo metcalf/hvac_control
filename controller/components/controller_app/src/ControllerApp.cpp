@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cstring>
+#include <inttypes.h>
 
 #include "LinearFancoilAlgorithm.h"
 #include "ValveAlgorithm.h"
@@ -595,15 +596,15 @@ void ControllerApp::logState(const ControllerDomain::FreshAirState &freshAirStat
     }
 
     ESP_LOG_LEVEL(statusLevel, TAG,
-                  "FreshAir: t=%.1f t_off=%0.1f h=%.1f p=%lu rpm=%"
-                  "u target_speed=%u reason=%s",
+                  "FreshAir: t=%.1f t_off=%0.1f h=%.1f p=%" PRIu32 " rpm=%u"
+                  " target_speed=%u reason=%s",
                   freshAirState.tempC, config_.outTempOffsetC, freshAirState.humidity,
                   freshAirState.pressurePa, freshAirState.fanRpm, fanSpeed,
                   fanSpeedReasonToS(fanSpeedReason_));
     ESP_LOG_LEVEL(statusLevel, TAG,
                   "ctrl:"
                   // Sensors
-                  " in_t=%0.2f raw_in_t=%0.2f out_t=%0.2f h=%0.1f p=%u co2=%u"
+                  " in_t=%0.2f raw_in_t=%0.2f out_t=%0.2f h=%0.1f p=%" PRIu32 " co2=%u"
                   // Setpoints
                   " set_h=%.2f set_c=%.2f set_co2=%u set_r=%s"
                   // DemandRequest
@@ -868,7 +869,7 @@ ControllerDomain::FreshAirState ControllerApp::getFreshAirState() {
                 if (speedT - fanLastStarted_ > STATIC_PRESSURE_OFF_TIME_MAX_AGE) {
                     ESP_LOGI(TAG, "Off pressure is stale, can't compute static pressure");
                 } else if (stoppedPressurePa_ > freshAirState.pressurePa) {
-                    ESP_LOGW(TAG, "est fresh air static pressure (pa): %u",
+                    ESP_LOGW(TAG, "est fresh air static pressure (pa): %" PRIu32,
                              (stoppedPressurePa_ - freshAirState.pressurePa));
                 } else {
                     ESP_LOGE(TAG, "Unexpected negative static pressure estimate");
