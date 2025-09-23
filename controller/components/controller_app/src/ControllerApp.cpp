@@ -33,22 +33,7 @@
 #define MAKEUP_MAX_AGE std::chrono::minutes(5)
 // Ignore fancoil states older than this
 #define FANCOIL_STATE_MAX_AGE std::chrono::minutes(5)
-// Turn A/C on if we have cooling demand and the coil temp is below this
-#define COIL_COLD_TEMP_C ABS_F_TO_C(60.0)
-// Turn the A/C on if temp exceeds setpoint by this amount
-#define AC_ON_THRESHOLD_C REL_F_TO_C(4.0)
-// Turn the A/C on if the outdoor temp is above the setpoint by this amount
-// since we want to get ahead of the heat
-#define AC_ON_OUT_TEMP_THRESHOLD_C REL_F_TO_C(8.0)
-// Do not turn A/C on if outdoor temp is below this
-#define AC_ON_MIN_OUT_TEMP_C ABS_F_TO_C(72.0)
-// Turn A/C off if outdoor temp falls below this
-#define AC_OFF_OUT_TEMP_C ABS_F_TO_C(60.0)
-// Turn on the A/C if cooling demand exceeds this and another condition is met
-// (coil is cold or outdoor temp is high enough)
-#define AC_ON_DEMAND_THRESHOLD 0.3
-// Turn off A/C when demand drops below this.
-#define AC_OFF_DEMAND_THRESHOLD 0.2
+// Treat demands higher than this as "on"
 #define ON_DEMAND_THRESHOLD 0.01
 
 // If fan is above this speed, turn on exhaust fan for extra cooling
@@ -98,7 +83,7 @@ void ControllerApp::updateACMode(const double coolDemand, const double coolSetpo
         // as long as the outdoor temp is above threshold
         if (
             // Outdoor temp and demand must be high enough to turn on at all
-            outTempC > AC_ON_MIN_OUT_TEMP_C && coolDemand > AC_ON_DEMAND_THRESHOLD &&
+            outTempC >= AC_ON_MIN_OUT_TEMP_C && coolDemand > AC_ON_DEMAND_THRESHOLD &&
             ((inTempC - coolSetpointC) > AC_ON_THRESHOLD_C ||           // Indoor temp is high
              (outTempC - coolSetpointC) > AC_ON_OUT_TEMP_THRESHOLD_C || // Outdoor temp is high
              isCoilCold()                                               // Coil is cold anyway
@@ -717,7 +702,7 @@ bool ControllerApp::isCoilCold() {
         return false;
     }
 
-    return (fcState.coilTempC < COIL_COLD_TEMP_C);
+    return (fcState.coilTempC <= COIL_COLD_TEMP_C);
 }
 
 int ControllerApp::getScheduleIdx(int offset) {

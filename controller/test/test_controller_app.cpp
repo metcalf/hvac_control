@@ -248,7 +248,7 @@ TEST_F(ControllerAppTest, CallsForValveHVAC) {
 
     // Cools
     sensors_.setLatest({.tempC = 25.0, .humidity = 2.0, .co2 = 500});
-    setOutdoorTempC(23); // Above minimum threshold for cooling, TODO
+    setOutdoorTempC(AC_ON_MIN_OUT_TEMP_C);
     app_->task();
     EXPECT_TRUE(valveCtrl_.set_);
     valveCtrl_.set_ = false;
@@ -283,7 +283,7 @@ TEST_F(ControllerAppTest, CallsForFancoilHVAC) {
     using FancoilSpeed = ControllerDomain::FancoilSpeed;
     using FancoilRequest = ControllerDomain::FancoilRequest;
 
-    setOutdoorTempC(23); // Above minimum threshold for cooling, TODO
+    setOutdoorTempC(AC_ON_MIN_OUT_TEMP_C);
 
     for (int i = 0; i < nHvacCalls; i++) {
         sensors_.setLatest({.tempC = fcCallTempSeq[i], .humidity = 2.0, .co2 = 500});
@@ -300,7 +300,7 @@ TEST_F(ControllerAppTest, CallsForFancoilHVAC) {
 TEST_F(ControllerAppTest, IncreasesFancoilSpeedOverTime) {
     sensors_.setLatest({.tempC = 18.3, .humidity = 2.0, .co2 = 500});
 
-    modbusController_.setFancoilState({.coilTempC = 20}, app_->steadyNow_);
+    modbusController_.setFancoilState({.coilTempC = COIL_COLD_TEMP_C + 1}, app_->steadyNow_);
     app_->task();
 
     auto actual = modbusController_.getFancoilRequest();
@@ -330,15 +330,15 @@ TEST_F(ControllerAppTest, IncreasesFanSpeedOverTime) {
 
 TEST_F(ControllerAppTest, CallsForACWithColdCoil) {
     sensors_.setLatest({.tempC = 22.5, .humidity = 2.0, .co2 = 500});
-    setOutdoorTempC(23); // Above minimum threshold for cooling, TODO
+    setOutdoorTempC(AC_ON_MIN_OUT_TEMP_C);
 
-    modbusController_.setFancoilState({.coilTempC = 20}, app_->steadyNow_);
+    modbusController_.setFancoilState({.coilTempC = COIL_COLD_TEMP_C + 1}, app_->steadyNow_);
     app_->task();
 
     auto actual = modbusController_.getFancoilRequest();
     EXPECT_EQ(actual.speed, FancoilSpeed::Off); // Stays off without coil temp
 
-    modbusController_.setFancoilState({.coilTempC = 10}, app_->steadyNow_);
+    modbusController_.setFancoilState({.coilTempC = COIL_COLD_TEMP_C}, app_->steadyNow_);
     app_->task();
 
     actual = modbusController_.getFancoilRequest();
@@ -385,7 +385,7 @@ TEST_F(ControllerAppTest, FanSpeedOverride) {
 
 TEST_F(ControllerAppTest, TempOverride) {
     sensors_.setLatest({.tempC = 23, .humidity = 2.0, .co2 = 456});
-    setOutdoorTempC(22.5);
+    setOutdoorTempC(AC_ON_MIN_OUT_TEMP_C);
     auto evt = AbstractUIManager::Event{
         AbstractUIManager::EventType::TempOverride,
         {.tempOverride = AbstractUIManager::TempOverride{.heatC = 10, .coolC = 15}},
@@ -415,8 +415,8 @@ TEST_F(ControllerAppTest, TempOverride) {
 }
 
 TEST_F(ControllerAppTest, ACOverride) {
-    sensors_.setLatest({.tempC = 22.8, .humidity = 2.0, .co2 = 456});
-    setOutdoorTempC(23); // Above minimum threshold for cooling, TODO
+    sensors_.setLatest({.tempC = 23, .humidity = 2.0, .co2 = 456});
+    setOutdoorTempC(AC_ON_MIN_OUT_TEMP_C);
 
     // No A/C
     app_->task();
@@ -497,7 +497,7 @@ TEST_F(ControllerAppTest, Precooling) {
 
     // Use A/C if fan can't keep up
     app_->realNow_ += std::chrono::hours(4);
-    setOutdoorTempC(23); // Above minimum threshold for cooling, TODO
+    setOutdoorTempC(AC_ON_MIN_OUT_TEMP_C);
     app_->task();
     EXPECT_EQ(255, modbusController_.getFreshAirSpeed());
     EXPECT_EQ(FanSpeedReason::Cool, app_->fanSpeedReason());
