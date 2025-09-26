@@ -19,15 +19,13 @@ static esp_err_t _http_event_handler(esp_http_client_event_t *evt) {
 
 ESPOTAClient::ESPOTAClient(const char *name, msgCb_t msgCb, size_t maxMsgLen)
     : msgCb_(msgCb), maxMsgLen_(maxMsgLen) {
-    int written =
-        snprintf(url_, std::size(url_), default_ota_url_prefix_tmpl, name);
+    int written = snprintf(url_, std::size(url_), default_ota_url_prefix_tmpl, name);
     assert(written < std::size(url_));
 
     pathPart_ = url_ + written;
     pathLen_ = std::size(url_) - written;
 
-    strncpy(runningVersion_, esp_app_get_description()->version,
-            std::size(runningVersion_));
+    strncpy(runningVersion_, esp_app_get_description()->version, std::size(runningVersion_));
 }
 
 AbstractOTAClient::Error ESPOTAClient::update() {
@@ -68,8 +66,8 @@ AbstractOTAClient::Error ESPOTAClient::update() {
         return Error::NoUpdateAvailable;
     } else {
         setErrMessageF("Downloading update %s", outputBuffer_);
-        ESP_LOGI(TAG, "new version `%s` found, upgrading from `%s`",
-                 outputBuffer_, runningVersion_);
+        ESP_LOGI(TAG, "new version `%s` found, upgrading from `%s`", outputBuffer_,
+                 runningVersion_);
     }
 
     // Update URL to point to the versioned firmware
@@ -95,9 +93,7 @@ AbstractOTAClient::Error ESPOTAClient::update() {
 
 void ESPOTAClient::markValid() { esp_ota_mark_app_valid_cancel_rollback(); }
 
-const char *ESPOTAClient::currentVersion() {
-    return esp_app_get_description()->version;
-}
+const char *ESPOTAClient::currentVersion() { return esp_app_get_description()->version; }
 
 esp_err_t ESPOTAClient::_handleHTTPEvent(esp_http_client_event_t *evt) {
     // Adapted from
@@ -113,8 +109,7 @@ esp_err_t ESPOTAClient::_handleHTTPEvent(esp_http_client_event_t *evt) {
         ESP_LOGD(TAG, "HTTP_EVENT_HEADER_SENT");
         break;
     case HTTP_EVENT_ON_HEADER:
-        ESP_LOGD(TAG, "HTTP_EVENT_ON_HEADER, key=%s, value=%s", evt->header_key,
-                 evt->header_value);
+        ESP_LOGD(TAG, "HTTP_EVENT_ON_HEADER, key=%s, value=%s", evt->header_key, evt->header_value);
         break;
     case HTTP_EVENT_ON_DATA:
         ESP_LOGD(TAG, "HTTP_EVENT_ON_DATA, len=%d", evt->data_len);
@@ -153,8 +148,7 @@ esp_err_t ESPOTAClient::_handleHTTPEvent(esp_http_client_event_t *evt) {
     return ESP_OK; // Note: This is ignored
 }
 
-void __attribute__((format(printf, 2, 3)))
-ESPOTAClient::setErrMessageF(const char *fmt, ...) {
+void __attribute__((format(printf, 2, 3))) ESPOTAClient::setErrMessageF(const char *fmt, ...) {
     char msg[maxMsgLen_];
 
     va_list args;
