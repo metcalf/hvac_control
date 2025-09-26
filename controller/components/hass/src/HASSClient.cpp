@@ -10,11 +10,13 @@
 #include "ControllerDomain.h"
 
 static const char *TAG = "HASS";
+extern const uint8_t server_root_pem[] asm("_binary_isrgrootx1_pem_start");
 
 #define TASK_STACK_SIZE 4096
 #define EXPECTED_VERSION 1
 #define EXPECTED_LENGTH 22
-#define URL "http://hass-local.itsshedtime.com/custom-api/states/sensor.custom_thermostat_api_data"
+#define URL                                                                                        \
+    "https://homeassistant.itsshedtime.com/custom-api/states/sensor.custom_thermostat_api_data"
 
 static esp_err_t _http_event_handler(esp_http_client_event_t *evt) {
     return ((HASSClient *)evt->user_data)->_handleHTTPEvent(evt);
@@ -23,6 +25,7 @@ static esp_err_t _http_event_handler(esp_http_client_event_t *evt) {
 void HASSClient::fetch() {
     esp_http_client_config_t config = {
         .url = URL,
+        .cert_pem = (const char *)server_root_pem,
         .timeout_ms = 5000,
         .event_handler = _http_event_handler,
         .user_data = this,
