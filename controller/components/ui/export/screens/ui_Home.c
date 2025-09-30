@@ -49,35 +49,35 @@ ui_clock_value = lv_label_create(ui_Clock_container);
 lv_obj_set_width( ui_clock_value, LV_SIZE_CONTENT);  /// 1
 lv_obj_set_height( ui_clock_value, LV_SIZE_CONTENT);   /// 1
 lv_obj_set_align( ui_clock_value, LV_ALIGN_CENTER );
-lv_label_set_text(ui_clock_value,"11:88 ");
+lv_label_set_text(ui_clock_value,"11:88P");
 lv_obj_set_style_text_font(ui_clock_value, &lv_font_montserrat_18, LV_PART_MAIN| LV_STATE_DEFAULT);
 
-ui_Humidity = lv_obj_create(ui_Header);
-lv_obj_remove_style_all(ui_Humidity);
-lv_obj_set_width( ui_Humidity, 67);
-lv_obj_set_height( ui_Humidity, 35);
-lv_obj_set_x( ui_Humidity, 0 );
-lv_obj_set_y( ui_Humidity, -6 );
-lv_obj_set_align( ui_Humidity, LV_ALIGN_CENTER );
-lv_obj_clear_flag( ui_Humidity, LV_OBJ_FLAG_SCROLLABLE );    /// Flags
-lv_obj_set_style_pad_left(ui_Humidity, 5, LV_PART_MAIN| LV_STATE_DEFAULT);
-lv_obj_set_style_pad_right(ui_Humidity, 5, LV_PART_MAIN| LV_STATE_DEFAULT);
-lv_obj_set_style_pad_top(ui_Humidity, 0, LV_PART_MAIN| LV_STATE_DEFAULT);
-lv_obj_set_style_pad_bottom(ui_Humidity, 0, LV_PART_MAIN| LV_STATE_DEFAULT);
+ui_AQI = lv_obj_create(ui_Header);
+lv_obj_remove_style_all(ui_AQI);
+lv_obj_set_width( ui_AQI, 65);
+lv_obj_set_height( ui_AQI, 35);
+lv_obj_set_x( ui_AQI, 0 );
+lv_obj_set_y( ui_AQI, -6 );
+lv_obj_set_align( ui_AQI, LV_ALIGN_CENTER );
+lv_obj_clear_flag( ui_AQI, LV_OBJ_FLAG_SCROLLABLE );    /// Flags
+lv_obj_set_style_pad_left(ui_AQI, 5, LV_PART_MAIN| LV_STATE_DEFAULT);
+lv_obj_set_style_pad_right(ui_AQI, 5, LV_PART_MAIN| LV_STATE_DEFAULT);
+lv_obj_set_style_pad_top(ui_AQI, 0, LV_PART_MAIN| LV_STATE_DEFAULT);
+lv_obj_set_style_pad_bottom(ui_AQI, 0, LV_PART_MAIN| LV_STATE_DEFAULT);
 
-ui_Humidity_symbol = lv_label_create(ui_Humidity);
-lv_obj_set_width( ui_Humidity_symbol, LV_SIZE_CONTENT);  /// 1
-lv_obj_set_height( ui_Humidity_symbol, LV_SIZE_CONTENT);   /// 1
-lv_obj_set_align( ui_Humidity_symbol, LV_ALIGN_LEFT_MID );
-lv_label_set_text(ui_Humidity_symbol,"");
-lv_obj_set_style_text_font(ui_Humidity_symbol, &ui_font_MaterialSymbols18, LV_PART_MAIN| LV_STATE_DEFAULT);
+ui_AQI_symbol = lv_label_create(ui_AQI);
+lv_obj_set_width( ui_AQI_symbol, LV_SIZE_CONTENT);  /// 1
+lv_obj_set_height( ui_AQI_symbol, LV_SIZE_CONTENT);   /// 1
+lv_obj_set_align( ui_AQI_symbol, LV_ALIGN_LEFT_MID );
+lv_label_set_text(ui_AQI_symbol,"");
+lv_obj_set_style_text_font(ui_AQI_symbol, &ui_font_MaterialSymbols18, LV_PART_MAIN| LV_STATE_DEFAULT);
 
-ui_Humidity_value = lv_label_create(ui_Humidity);
-lv_obj_set_width( ui_Humidity_value, LV_SIZE_CONTENT);  /// 1
-lv_obj_set_height( ui_Humidity_value, LV_SIZE_CONTENT);   /// 1
-lv_obj_set_align( ui_Humidity_value, LV_ALIGN_RIGHT_MID );
-lv_label_set_text(ui_Humidity_value,"66%");
-lv_obj_set_style_text_font(ui_Humidity_value, &lv_font_montserrat_18, LV_PART_MAIN| LV_STATE_DEFAULT);
+ui_AQI_value = lv_label_create(ui_AQI);
+lv_obj_set_width( ui_AQI_value, 34);
+lv_obj_set_height( ui_AQI_value, LV_SIZE_CONTENT);   /// 1
+lv_obj_set_align( ui_AQI_value, LV_ALIGN_RIGHT_MID );
+lv_label_set_text(ui_AQI_value,"666");
+lv_obj_set_style_text_font(ui_AQI_value, &lv_font_montserrat_18, LV_PART_MAIN| LV_STATE_DEFAULT);
 
 ui_Fan = lv_obj_create(ui_Header);
 lv_obj_remove_style_all(ui_Fan);

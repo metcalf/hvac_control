@@ -14,6 +14,7 @@ class AbstractHomeClient {
         bool vacationOn;
         std::chrono::system_clock::time_point weatherObsTime;
         double weatherTempC;
+        int16_t aqi;
         Error err;
     };
 

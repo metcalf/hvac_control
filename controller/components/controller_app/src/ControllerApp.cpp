@@ -462,6 +462,7 @@ void ControllerApp::handleHomeClient() {
 
     clearMessage(MsgID::HomeClientErr);
     setVacation(state.vacationOn);
+    uiManager_->setAQI(state.aqi);
 
     if (state.weatherTempC != 0 &&
         (std::chrono::system_clock::now() - state.weatherObsTime < OUTDOOR_TEMP_MAX_AGE)) {
@@ -955,7 +956,6 @@ void ControllerApp::task(bool firstTime) {
 
         clearMessage(MsgID::SensorErr);
 
-        uiManager_->setHumidity(sensorData.humidity);
         uiManager_->setInTempC(sensorData.tempC);
         uiManager_->setInCO2(sensorData.co2);
     } else {

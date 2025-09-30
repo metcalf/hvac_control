@@ -154,7 +154,6 @@ TEST_F(ControllerAppTest, Boots) {
     // Should not be called since we don't have a valid measurement
     //EXPECT_CALL(uiManager_, setOutTempC(_)).Times(0);
 
-    uiInits += EXPECT_CALL(uiManager_, setHumidity(2.0));
     uiInits += EXPECT_CALL(uiManager_, setCurrentFanSpeed(0));
     uiInits += EXPECT_CALL(uiManager_, setInTempC(20.0));
     uiInits += EXPECT_CALL(uiManager_, setInCO2(456));

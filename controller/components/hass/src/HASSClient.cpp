@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <chrono>
+#include <inttypes.h>
 #include <iterator>
 
 #include "esp_err.h"
@@ -13,7 +14,7 @@ static const char *TAG = "HASS";
 extern const uint8_t server_root_pem[] asm("_binary_isrgrootx1_pem_start");
 
 #define TASK_STACK_SIZE 4096
-#define EXPECTED_VERSION 1
+#define EXPECTED_VERSION 2
 #define EXPECTED_LENGTH 22
 #define URL                                                                                        \
     "https://homeassistant.itsshedtime.com/custom-api/states/sensor.custom_thermostat_api_data"
@@ -143,8 +144,8 @@ AbstractHomeClient::HomeState HASSClient::parseResponse() {
     long epoch_time;
 
     // Parse the rest of the string
-    if (sscanf(outputBuffer_ + 4, "%1d %5lf %10ld", (int *)&result.vacationOn, &result.weatherTempC,
-               &epoch_time) != 3) {
+    if (sscanf(outputBuffer_ + 4, "%1d %5lf %10ld %3" PRId16, (int *)&result.vacationOn,
+               &result.weatherTempC, &epoch_time, &result.aqi) != 4) {
         ESP_LOGE(TAG, "Failed to parse data");
         result.err = Error::ParseError;
         return result;

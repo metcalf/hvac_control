@@ -517,6 +517,7 @@ UIManager::UIManager(ControllerDomain::Config config, size_t nMsgIds, eventCb_t 
 
     sleepMgr_ = new SleepManager(ui_Home, GPIO_NUM_48);
 
+    setAQI(-1);
     setInTempC(std::nan(""));
     setOutTempC(std::nan(""));
     setSystemPower(config.systemOn);
@@ -557,12 +558,12 @@ uint32_t UIManager::handleTasks() {
     return rv;
 }
 
-void UIManager::setHumidity(double h) {
+void UIManager::setAQI(int16_t aqi) {
     xSemaphoreTake(mutex_, portMAX_DELAY);
-    if (std::isnan(h)) {
-        lv_label_set_text(ui_Humidity_value, "--%");
+    if (aqi > 999 || aqi < 0) {
+        lv_label_set_text(ui_AQI_value, "---");
     } else {
-        lv_label_set_text_fmt(ui_Humidity_value, "%u%%", std::min(99U, (uint)std::round(h)));
+        lv_label_set_text_fmt(ui_AQI_value, "%d", aqi);
     }
 
     xSemaphoreGive(mutex_);

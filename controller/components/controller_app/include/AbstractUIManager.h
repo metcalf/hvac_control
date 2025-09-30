@@ -63,7 +63,7 @@ class AbstractUIManager {
 
     typedef void (*eventCb_t)(Event &);
 
-    virtual void setHumidity(double h) = 0;
+    virtual void setAQI(int16_t aqi) = 0;
     virtual void setCurrentFanSpeed(uint8_t speed) = 0;
     virtual void setOutTempC(double tc) = 0;
     virtual void setInTempC(double tc) = 0;

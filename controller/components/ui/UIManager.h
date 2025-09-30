@@ -24,7 +24,7 @@ class UIManager : public AbstractUIManager {
 
     uint32_t handleTasks();
 
-    void setHumidity(double h) override;
+    void setAQI(int16_t aqi) override;
     void setCurrentFanSpeed(uint8_t speed) override;
     void setOutTempC(double tc) override;
     void setInTempC(double tc) override;
