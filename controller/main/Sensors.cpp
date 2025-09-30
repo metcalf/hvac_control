@@ -78,6 +78,21 @@ bool Sensors::pollInternal(SensorData &prevData) {
             co2offset = co2Calibration_->update(co2ppm);
         }
 
+        if (correctedTempC_ != std::nan("")) {
+            double currentOffsetC;
+            err = co2_get_temp_offset(&currentOffsetC);
+            if (err != 0) {
+                ESP_LOGE(TAG, "Error getting CO2 temp offset %d", err);
+            } else {
+                err = co2_set_temp_offset(co2TempC - correctedTempC_ + currentOffsetC);
+                if (err != 0) {
+                    ESP_LOGE(TAG, "Error setting CO2 temp offset %d", err);
+                } else {
+                    correctedTempC_ = std::nan("");
+                }
+            }
+        }
+
         co2ppm += co2offset;
         prevData.co2 = co2ppm;
         prevData.humidity = co2Humidity;

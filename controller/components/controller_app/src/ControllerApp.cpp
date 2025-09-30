@@ -943,6 +943,7 @@ void ControllerApp::task(bool firstTime) {
     SensorData sensorData = sensors_->getLatest();
     double rawInTempC = sensorData.tempC;
     sensorData.tempC += config_.inTempOffsetC + inTempBaseOffsetC_;
+    sensors_->reportCorrectedTempC(sensorData.tempC);
 
     double ventDemand = 0, fanCoolDemand = 0, heatDemand = 0, coolDemand = 0;
 
