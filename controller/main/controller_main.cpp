@@ -53,7 +53,7 @@
 
 // All of the devices read high, I think due to heating from the board so correct for that
 // in addition to any per-device offset.
-#define IN_TEMP_BASE_OFFSET_C -3.3
+#define IN_TEMP_BASE_OFFSET_C -3.5
 
 static const char *TAG = "MAIN";
 
