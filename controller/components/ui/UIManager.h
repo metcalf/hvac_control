@@ -99,6 +99,8 @@ class UIManager : public AbstractUIManager {
     void updateUIForEquipment();
     void onCancelMsg(uint8_t msgID);
     void initExtraWidgets();
+    void sendEvent(Event &evt);
+    void setSystemPowerInternal(bool on);
 
     inline static UIManager *eventsInst_;
 

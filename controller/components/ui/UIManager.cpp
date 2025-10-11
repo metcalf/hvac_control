@@ -94,12 +94,12 @@ void UIManager::bootErr(const char *msg) {
 
 void UIManager::sendACOverrideEvent(ACOverride override) {
     Event evt{EventType::ACOverride, EventPayload{.acOverride = override}};
-    eventCb_(evt);
+    sendEvent(evt);
 }
 
 void UIManager::sendPowerEvent(bool on) {
     Event evt{EventType::SetSystemPower, EventPayload{.systemPower = on}};
-    eventCb_(evt);
+    sendEvent(evt);
 }
 
 int UIManager::getHeatRollerValueDeg(lv_obj_t *roller) {
@@ -170,7 +170,7 @@ void UIManager::eFanOverride() {
                          .timeMins = (uint16_t)(lv_roller_get_selected(ui_Fan_override_hrs) * 60 +
                                                 lv_roller_get_selected(ui_Fan_override_mins)),
                      }}};
-    eventCb_(evt);
+    sendEvent(evt);
 }
 
 void UIManager::eThermotatOverride() {
@@ -179,7 +179,7 @@ void UIManager::eThermotatOverride() {
                                .heatC = getHeatRollerValueC(ui_Heat_override_setpoint),
                                .coolC = getCoolRollerValueC(ui_Cool_override_setpoint),
                            }}};
-    eventCb_(evt);
+    sendEvent(evt);
 }
 
 // This isn't currently implemented since it requires more complicated
@@ -210,18 +210,18 @@ void UIManager::eAllowAC() {
 
 void UIManager::eSystemOff() {
     sendPowerEvent(false);
-    setSystemPower(false);
+    setSystemPowerInternal(false);
 }
 
 void UIManager::eSystemOn() {
     sendPowerEvent(true);
-    setSystemPower(true);
+    setSystemPowerInternal(true);
 }
 
 void UIManager::eTargetCO2() {
     co2Target_ = 800 + lv_roller_get_selected(ui_co2_target) * 50;
     Event evt{EventType::SetCO2Target, EventPayload{.co2Target = co2Target_}};
-    eventCb_(evt);
+    sendEvent(evt);
 
     lv_label_set_text_fmt(ui_co2_target_value, "%u", co2Target_);
 }
@@ -244,7 +244,7 @@ void UIManager::eSchedule() {
                                                        currSchedules_[0],
                                                        currSchedules_[1],
                                                    }}};
-    eventCb_(evt);
+    sendEvent(evt);
 }
 
 void UIManager::eHomeLoadStart() {
@@ -301,7 +301,7 @@ void UIManager::eSaveEquipmentSettings() {
         EventPayload{.equipment = equipment_},
     };
 
-    eventCb_(evt);
+    sendEvent(evt);
 
     _ui_screen_change(&ui_Settings, LV_SCR_LOAD_ANIM_NONE, 0, 0, &ui_Settings_screen_init);
 }
@@ -315,7 +315,7 @@ void UIManager::eSaveTempLimits() {
                                                          .maxHeatC = maxHeatC,
                                                          .minCoolC = minCoolC,
                                                      }}};
-    eventCb_(evt);
+    sendEvent(evt);
 
     // Update schedules to confirm to the new limits
     bool scheduleChanged = false;
@@ -341,7 +341,7 @@ void UIManager::eSaveTempLimits() {
                                                                    currSchedules_[0],
                                                                    currSchedules_[1],
                                                                }}};
-        eventCb_(scheduleEvt);
+        sendEvent(scheduleEvt);
     }
 }
 
@@ -357,7 +357,7 @@ void UIManager::eSaveTempOffsets() {
                              .outTempOffsetC = outTempOffsetC_,
                          }},
     };
-    eventCb_(evt);
+    sendEvent(evt);
 }
 
 void UIManager::eSaveWifiSettings() {
@@ -375,7 +375,7 @@ void UIManager::eSaveWifiSettings() {
         EventPayload{.wifi = wifi_},
     };
 
-    eventCb_(evt);
+    sendEvent(evt);
 }
 
 void UIManager::eEquipmentSettingsLoadStart() {
@@ -443,7 +443,7 @@ void UIManager::eRestart() {
         {},
     };
 
-    eventCb_(evt);
+    sendEvent(evt);
 }
 
 void UIManager::updateTempLimits(uint8_t maxHeatDeg, uint8_t minCoolDeg) {
@@ -463,7 +463,7 @@ void UIManager::updateUIForEquipment() {
 
 void UIManager::onCancelMsg(uint8_t msgID) {
     Event evt{EventType::MsgCancel, EventPayload{.msgID = msgID}};
-    eventCb_(evt);
+    sendEvent(evt);
 }
 
 // I ran out of allowed widgets in the free version of Squareline so this is
@@ -502,6 +502,19 @@ void UIManager::initExtraWidgets() {
                                LV_PART_MAIN | LV_STATE_DEFAULT);
 }
 
+void UIManager::sendEvent(Event &evt) {
+    // Release the mutex while calling the event callback to avoid deadlock.
+    // Usually this thread will be holding the mutex via handleTasks
+    // and the callback may want to call something like SetMessage/ClearMessage
+    // I'm not 100% sure it's safe to do this but seems plausible as long
+    // as this thread is blocked.
+    bool had = xSemaphoreGive(mutex_);
+    eventCb_(evt);
+    if (had) {
+        xSemaphoreTake(mutex_, portMAX_DELAY);
+    }
+}
+
 UIManager::UIManager(ControllerDomain::Config config, size_t nMsgIds, eventCb_t eventCb)
     : eventCb_(eventCb) {
     mutex_ = xSemaphoreCreateMutex();
@@ -520,7 +533,7 @@ UIManager::UIManager(ControllerDomain::Config config, size_t nMsgIds, eventCb_t 
     setAQI(-1);
     setInTempC(std::nan(""));
     setOutTempC(std::nan(""));
-    setSystemPower(config.systemOn);
+    setSystemPowerInternal(config.systemOn);
 
     for (int i = 0; i < nWifiTextareas; i++) {
         lv_obj_add_event_cb(*wifiTextareas[i], wifiTextareaEventCb, LV_EVENT_ALL, this);
@@ -638,8 +651,10 @@ void UIManager::setCurrentSetpoints(double heatC, double coolC) {
     xSemaphoreGive(mutex_);
 }
 
-void UIManager::setSystemPower(bool on) {
-    xSemaphoreTake(mutex_, portMAX_DELAY);
+// NB: Only call while holding mutex_ (or during single-threaded setup)
+// This should always be true within event handlers since handleTasks
+// takes the mutex before calling them.
+void UIManager::setSystemPowerInternal(bool on) {
     lv_obj_t *objs[] = {
         ui_Temp_setpoint_container,
         ui_co2_setpoint_container,
@@ -653,5 +668,10 @@ void UIManager::setSystemPower(bool on) {
 
     objSetVisibility(!on, ui_on_button);
     objSetVisibility(on, ui_off_button);
+}
+
+void UIManager::setSystemPower(bool on) {
+    xSemaphoreTake(mutex_, portMAX_DELAY);
+    setSystemPowerInternal(on);
     xSemaphoreGive(mutex_);
 }
