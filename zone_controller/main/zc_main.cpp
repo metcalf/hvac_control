@@ -358,8 +358,10 @@ void outputTask(void *) {
         uiManager_->updateState(currentState_);
 
         checkStuckValves(zioState.valve_sw);
-        setCxOpMode(currentState_.heatPumpMode);
-        pollCxStatus();
+        if (!testMode_) {
+            setCxOpMode(currentState_.heatPumpMode);
+            pollCxStatus();
+        }
         setIOStates(currentState_);
 
         if (pollUIEvent(true)) {
