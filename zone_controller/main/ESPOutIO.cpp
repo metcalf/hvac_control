@@ -31,8 +31,3 @@ void ESPOutIO::setValve(int idx, bool on) {
     assert(idx < NUM_VALVES);
     ESP_ERROR_CHECK(gpio_set_level(valve_gpios_[idx], on));
 }
-
-bool ESPOutIO::getValve(int idx) {
-    assert(idx < NUM_VALVES);
-    return gpio_get_level(valve_gpios_[idx]);
-}
