@@ -71,31 +71,31 @@ void OutCtrl::selectMode(SystemState &state, bool systemOn, const InputState &zi
         }
         ESP_LOGI(TAG, "Conflicting cool and heat demands, leaving system in %s",
                  stringForHeatPumpMode(mode));
-        messageUI_.setMessage(MsgID::SystemConflictingCallsError, false,
+        uiManager_.setMessage(MsgID::SystemConflictingCallsError, false,
                               "Both cool and heat calls");
     } else {
-        messageUI_.clearMessage(MsgID::SystemConflictingCallsError);
+        uiManager_.clearMessage(MsgID::SystemConflictingCallsError);
 
         if (heat_demand) {
             if (checkModeLockout(lastHeat_, lastCool_, COOL_TO_HEAT_LOCKOUT)) {
-                messageUI_.setMessage(MsgID::HVACLockout, false, HEAT_LOCKOUT_MSG);
+                uiManager_.setMessage(MsgID::HVACLockout, false, HEAT_LOCKOUT_MSG);
                 ESP_LOGI(TAG, HEAT_LOCKOUT_MSG);
                 mode = HeatPumpMode::Standby;
             } else {
-                messageUI_.clearMessage(MsgID::HVACLockout);
+                uiManager_.clearMessage(MsgID::HVACLockout);
                 mode = HeatPumpMode::Heat;
             }
         } else if (cool_demand) {
             if (checkModeLockout(lastCool_, lastHeat_, HEAT_TO_COOL_LOCKOUT)) {
-                messageUI_.setMessage(MsgID::HVACLockout, false, COOL_LOCKOUT_MSG);
+                uiManager_.setMessage(MsgID::HVACLockout, false, COOL_LOCKOUT_MSG);
                 ESP_LOGI(TAG, COOL_LOCKOUT_MSG);
                 mode = HeatPumpMode::Standby;
             } else {
-                messageUI_.clearMessage(MsgID::HVACLockout);
+                uiManager_.clearMessage(MsgID::HVACLockout);
                 mode = HeatPumpMode::Cool;
             }
         } else {
-            messageUI_.clearMessage(MsgID::HVACLockout);
+            uiManager_.clearMessage(MsgID::HVACLockout);
             mode = HeatPumpMode::Standby;
         }
     }
@@ -170,7 +170,7 @@ ZCDomain::SystemState OutCtrl::update(bool systemOn, const InputState &zioState)
         ThermostatState ts = zioState.ts[i];
         if (ts.w && ts.y) {
             // Note: logging is in static setCalls
-            messageUI_.setMessage(MsgID::TSConflictingCallsError, false, "W+Y on thermostat");
+            uiManager_.setMessage(MsgID::TSConflictingCallsError, false, "W+Y on thermostat");
         }
     }
 

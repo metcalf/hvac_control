@@ -3,7 +3,7 @@
 #include <chrono>
 #include <functional>
 
-#include "AbstractMessageUI.h"
+#include "AbstractZCUIManager.h"
 #include "BaseModbusClient.h"
 #include "BaseOutIO.h"
 #include "InputState.h"
@@ -19,8 +19,8 @@
 
 class OutCtrl {
   public:
-    OutCtrl(ValveStateManager &valveStateManager, AbstractMessageUI &messageUI)
-        : valveStateManager_(valveStateManager), messageUI_(messageUI) {};
+    OutCtrl(ValveStateManager &valveStateManager, AbstractZCUIManager &uiManager)
+        : valveStateManager_(valveStateManager), uiManager_(uiManager) {};
 
     ZCDomain::SystemState update(bool systemOn, const InputState &zioState);
     void resetLockout() {
@@ -43,7 +43,7 @@ class OutCtrl {
     using MsgID = ZCDomain::MsgID;
 
     ValveStateManager &valveStateManager_;
-    AbstractMessageUI &messageUI_;
+    AbstractZCUIManager &uiManager_;
 
     HeatPumpMode lastHeatPumpMode_ = HeatPumpMode::Off;
     std::chrono::steady_clock::time_point lastHeat_{}, lastCool_{};

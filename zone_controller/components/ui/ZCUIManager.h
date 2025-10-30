@@ -5,7 +5,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
 
-#include "AbstractMessageUI.h"
+#include "AbstractZCUIManager.h"
 #include "MessageManager.h"
 #include "SleepManager.h"
 #include "ZCDomain.h"
@@ -14,33 +14,8 @@
 
 #define UI_MAX_MSG_LEN 18 * 2
 
-class ZCUIManager : public AbstractMessageUI {
+class ZCUIManager : public AbstractZCUIManager {
   public:
-    enum class EventType {
-        InputUpdate, // Used by zc_main
-        SetSystemPower,
-        ResetHVACLockout,
-        SetTestMode,
-        TestToggleZone,
-        TestTogglePump,
-        MsgCancel,
-    };
-
-    enum class Pump { Zone, Fancoil };
-
-    union EventPayload {
-        bool systemPower;
-        bool testMode;
-        uint8_t zone;
-        Pump pump;
-        uint8_t msgID;
-    };
-    struct Event {
-        EventType type;
-        EventPayload payload;
-    };
-    typedef void (*eventCb_t)(Event &);
-
     ZCUIManager(ZCDomain::SystemState state, size_t nMsgIds, eventCb_t eventCb);
     ~ZCUIManager() override {
         delete msgMgr_;
@@ -60,7 +35,7 @@ class ZCUIManager : public AbstractMessageUI {
         msgMgr_->clearMessage(static_cast<uint8_t>(msgID));
         xSemaphoreGive(mutex_);
     }
-    void updateState(ZCDomain::SystemState state);
+    void updateState(ZCDomain::SystemState state) override;
 
   private:
     using Call = ZCDomain::Call;

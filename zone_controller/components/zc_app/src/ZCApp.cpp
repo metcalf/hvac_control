@@ -132,9 +132,9 @@ void ZCApp::handleCancelMessage(MsgID id) {
 }
 
 bool ZCApp::pollUIEvent(bool wait) {
-    using EventType = ZCUIManager::EventType;
+    using EventType = AbstractZCUIManager::EventType;
 
-    ZCUIManager::Event evt;
+    AbstractZCUIManager::Event evt;
     uint16_t waitMs = wait ? OUTPUT_UPDATE_PERIOD_MS : 0;
 
     if (!uiEvtRcv_(&evt, waitMs)) {
@@ -159,10 +159,10 @@ bool ZCApp::pollUIEvent(bool wait) {
         break;
     case EventType::TestTogglePump:
         switch (evt.payload.pump) {
-        case ZCUIManager::Pump::Zone:
+        case AbstractZCUIManager::Pump::Zone:
             currentState_.zonePump = !currentState_.zonePump;
             break;
-        case ZCUIManager::Pump::Fancoil:
+        case AbstractZCUIManager::Pump::Fancoil:
             currentState_.fcPump = !currentState_.fcPump;
             break;
         }
