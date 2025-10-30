@@ -5,6 +5,15 @@
 #include "BaseOutIO.h"
 #include "OutCtrl.h"
 
+#define OUTPUT_UPDATE_PERIOD_MS 500
+// Check the CX status every minute to see if it differs from what we expect
+#define CHECK_CX_STATUS_INTERVAL std::chrono::seconds(60)
+// Disable the zone pump if we don't have up to date CX mod info
+// to avoid circulating condensing water in floors.
+#define ZONE_PUMP_MAX_CX_MODE_AGE std::chrono::minutes(15)
+#define MAX_VALVE_TRANSITION_INTERVAL std::chrono::minutes(2)
+#define SYSTEM_STATE_LOG_INTERVAL std::chrono::minutes(1)
+
 class ZCApp {
   public:
     typedef std::function<InputState()> getZioState_t;
@@ -18,6 +27,11 @@ class ZCApp {
     virtual ~ZCApp() = default;
 
     void task();
+
+  protected:
+    virtual std::chrono::steady_clock::time_point steadyNow() const {
+        return std::chrono::steady_clock::now();
+    }
 
   private:
     using SystemState = ZCDomain::SystemState;

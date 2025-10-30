@@ -2,15 +2,6 @@
 
 #include "esp_log.h"
 
-#define OUTPUT_UPDATE_PERIOD_MS 500
-// Check the CX status every minute to see if it differs from what we expect
-#define CHECK_CX_STATUS_INTERVAL std::chrono::seconds(60)
-// Disable the zone pump if we don't have up to date CX mod info
-// to avoid circulating condensing water in floors.
-#define ZONE_PUMP_MAX_CX_MODE_AGE std::chrono::minutes(15)
-#define MAX_VALVE_TRANSITION_INTERVAL std::chrono::minutes(2)
-#define SYSTEM_STATE_LOG_INTERVAL std::chrono::minutes(1)
-
 #define VALVE_STUCK_MSG "valves may be stuck"
 #define VALVE_SW_MSG "valves not consistent with switches"
 
@@ -35,8 +26,8 @@ void ZCApp::task() {
         setCxOpMode(currentState_.heatPumpMode);
         pollCxStatus();
 
-        if (currentState_.zonePump &&
-            std::chrono::steady_clock::now() - lastGoodCxOpMode_ > ZONE_PUMP_MAX_CX_MODE_AGE) {
+        if (!testMode_ && currentState_.zonePump &&
+            steadyNow() - lastGoodCxOpMode_ > ZONE_PUMP_MAX_CX_MODE_AGE) {
             // Disable the zone pump if we don't have up to date CX mode info
             currentState_.zonePump = false;
             // Only log the first time we disable to avoid massive log chunder
@@ -51,12 +42,12 @@ void ZCApp::task() {
     setIOStates(currentState_);
 
     if (currentState_ != lastState_ ||
-        (std::chrono::steady_clock::now() - lastLoggedSystemState_) > SYSTEM_STATE_LOG_INTERVAL) {
+        (steadyNow() - lastLoggedSystemState_) > SYSTEM_STATE_LOG_INTERVAL) {
         // TODO: fix double logging when zio state changes
         logInputState(zioState);
         logSystemState(currentState_);
         checkValveSWConsistency(zioState.valve_sw);
-        lastLoggedSystemState_ = std::chrono::steady_clock::now();
+        lastLoggedSystemState_ = steadyNow();
     }
     lastState_ = currentState_;
 
@@ -124,7 +115,7 @@ void ZCApp::handleCancelMessage(MsgID id) {
         break;
     case MsgID::StaleCXMode:
         // Reset the clock on CX staleness
-        lastGoodCxOpMode_ = std::chrono::steady_clock::now();
+        lastGoodCxOpMode_ = steadyNow();
         break;
     default:
         ESP_LOGE(TAG, "Unexpected message cancellation for: %d", static_cast<int>(id));
@@ -185,7 +176,7 @@ void ZCApp::setIOStates(SystemState &state) {
     // running condensing cold water (except in test mode).
     // TODO: This may be causing rapid switching of the pump freezing it up
     // TODO: Also implement preventing rapid changing of any IOs
-    outIO_->setZonePump(state.zonePump && (testMode_ || lastCxOpMode_ != CxOpMode::Error));
+    outIO_->setZonePump(state.zonePump);
     outIO_->setFancoilPump(state.fcPump);
 }
 
@@ -197,7 +188,7 @@ esp_err_t ZCApp::setCxOpMode(CxOpMode cxMode) {
     esp_err_t err = mbClient_->setCxOpMode(cxMode);
     if (err == ESP_OK) {
         lastCxOpMode_ = cxMode;
-        lastCheckedCxOpMode_ = lastGoodCxOpMode_ = std::chrono::steady_clock::now();
+        lastCheckedCxOpMode_ = lastGoodCxOpMode_ = steadyNow();
         uiManager_->clearMessage(MsgID::CXError);
     } else {
         lastCxOpMode_ = CxOpMode::Error;
@@ -231,7 +222,7 @@ esp_err_t ZCApp::setCxOpMode(HeatPumpMode output_mode) {
 }
 
 void ZCApp::pollCxStatus() {
-    std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now();
+    std::chrono::steady_clock::time_point now = steadyNow();
     if (now - lastCheckedCxOpMode_ < CHECK_CX_STATUS_INTERVAL) {
         return; // Already have recent status
     }
@@ -283,7 +274,7 @@ void ZCApp::checkValveSWConsistency(ValveSWState sws[2]) {
 }
 
 void ZCApp::checkStuckValves(ValveSWState sws[2]) {
-    std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now();
+    std::chrono::steady_clock::time_point now = steadyNow();
 
     bool anyStuck = false;
     for (int i = 0; i < 4; i++) {

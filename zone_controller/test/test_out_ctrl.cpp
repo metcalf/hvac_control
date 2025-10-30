@@ -9,7 +9,7 @@ using SystemState = ZCDomain::SystemState;
 using HeatPumpMode = ZCDomain::HeatPumpMode;
 using MsgID = ZCDomain::MsgID;
 
-class FakeMessageUI : public AbstractZCUIManager {
+class FakeUIManager : public AbstractZCUIManager {
   public:
     void setMessage(MsgID msgID, bool allowCancel, const char *msg) override {
         msgs_[static_cast<int>(msgID)] = true;
@@ -45,7 +45,7 @@ class OutCtrlTest : public testing::Test {
     void incrTime(std::chrono::steady_clock::duration t) { outCtrl_.steadyNow_ += t; }
     void incrTime() { incrTime(std::chrono::seconds(1)); }
 
-    FakeMessageUI messageUI_;
+    FakeUIManager messageUI_;
     ValveStateManager valveStateManager_;
     TestOutCtrl outCtrl_{valveStateManager_, messageUI_};
 };
