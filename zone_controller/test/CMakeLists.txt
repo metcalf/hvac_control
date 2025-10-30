@@ -2,6 +2,7 @@
 file(GLOB TEST_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/test_*.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/helpers/src/*.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/../components/zc_app/src/*.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/../components/out_ctrl/src/*.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/../components/modbus_client/src/*.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/../../components/esp_local_test_helpers/src/*.cpp
@@ -48,6 +49,7 @@ target_link_libraries(
 target_include_directories(
     unit_tests
     PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/helpers/include
+    PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../components/zc_app/include
     PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../components/out_ctrl/include
     PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../components/modbus_client/include
     PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../../components/zone_io_client/include

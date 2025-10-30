@@ -1,6 +1,6 @@
 #include <gtest/gtest.h>
 
-#include "AbstractMessageUI.h"
+#include "AbstractZCUIManager.h"
 #include "InputState.h"
 #include "OutCtrl.h"
 #include "ZCDomain.h"
@@ -9,7 +9,7 @@ using SystemState = ZCDomain::SystemState;
 using HeatPumpMode = ZCDomain::HeatPumpMode;
 using MsgID = ZCDomain::MsgID;
 
-class FakeMessageUI : public AbstractMessageUI {
+class FakeMessageUI : public AbstractZCUIManager {
   public:
     void setMessage(MsgID msgID, bool allowCancel, const char *msg) override {
         msgs_[static_cast<int>(msgID)] = true;
@@ -17,6 +17,8 @@ class FakeMessageUI : public AbstractMessageUI {
     void clearMessage(MsgID msgID) override { msgs_[static_cast<int>(msgID)] = false; }
 
     bool isSet(MsgID msgID) { return msgs_[static_cast<int>(msgID)]; }
+
+    void updateState(ZCDomain::SystemState state) override {}
 
   private:
     bool msgs_[static_cast<int>(MsgID::_Last)] = {};
