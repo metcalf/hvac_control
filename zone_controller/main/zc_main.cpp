@@ -314,7 +314,7 @@ void logSystemState(SystemState state) {
     mbClient_.getCxCompressorFrequency(&hpHz);
 
     wrote =
-        snprintf(buffer, sizeof(buffer) - pos,
+        snprintf(buffer + pos, sizeof(buffer) - pos,
                  "zone_pump=%d fc_pump=%d hp_mode=%s cx_mode=%s hp_out_t=%0.1f hp_hz=%d",
                  state.zonePump, state.fcPump, ZCDomain::stringForHeatPumpMode(state.heatPumpMode),
                  BaseModbusClient::cxOpModeToString(cxOpMode), hpOutT, hpHz);
