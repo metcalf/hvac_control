@@ -73,3 +73,34 @@ int ZCDomain::writeValveStates(const ValveState valves[4], char *buffer, size_t 
     }
     return wrote;
 }
+
+const char *ZCDomain::msgIDToS(MsgID id) {
+    switch (id) {
+    case MsgID::TSConflictingCallsError:
+        return "TSConflictingCallsError";
+    case MsgID::SystemConflictingCallsError:
+        return "SystemConflictingCallsError";
+    case MsgID::CXError:
+        return "CXError";
+    case MsgID::CXModeMismatch:
+        return "CXModeMismatch";
+    case MsgID::ValveStuckError:
+        return "ValveStuckError";
+    case MsgID::ValveSWError:
+        return "ValveSWError";
+    case MsgID::HVACLockout:
+        return "HVACLockout";
+    case MsgID::Vacation:
+        return "Vacation";
+    case MsgID::PowerOut:
+        return "PowerOut";
+    case MsgID::OTA:
+        return "OTA";
+    case MsgID::StaleCXMode:
+        return "StaleCXMode";
+    case MsgID::_Last:
+        return "";
+    }
+
+    __builtin_unreachable();
+}

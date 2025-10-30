@@ -23,6 +23,7 @@ class ZCUIManager : public AbstractMessageUI {
         SetTestMode,
         TestToggleZone,
         TestTogglePump,
+        MsgCancel,
     };
 
     enum class Pump { Zone, Fancoil };
@@ -32,6 +33,7 @@ class ZCUIManager : public AbstractMessageUI {
         bool testMode;
         uint8_t zone;
         Pump pump;
+        uint8_t msgID;
     };
     struct Event {
         EventType type;
@@ -83,4 +85,5 @@ class ZCUIManager : public AbstractMessageUI {
     void onEndLockout();
     void onZoneToggle(uint8_t i);
     void onPumpToggle(Pump pump);
+    void onCancelMsg(uint8_t msgID);
 };

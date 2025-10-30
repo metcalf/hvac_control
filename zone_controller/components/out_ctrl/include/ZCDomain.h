@@ -42,6 +42,7 @@ enum class MsgID {
     Vacation,
     PowerOut,
     OTA,
+    StaleCXMode,
     _Last,
 };
 
@@ -49,5 +50,6 @@ bool callForMode(Call call, HeatPumpMode hpMode);
 const char *stringForHeatPumpMode(ZCDomain::HeatPumpMode mode);
 int writeCallStates(const Call calls[4], char *buffer, size_t bufferSize);
 int writeValveStates(const ValveState valves[4], char *buffer, size_t bufferSize);
+const char *msgIDToS(MsgID id);
 
 } // namespace ZCDomain

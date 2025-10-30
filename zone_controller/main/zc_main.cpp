@@ -34,6 +34,9 @@
 #define INIT_ERR_RESTART_DELAY_TICKS pdMS_TO_TICKS(10 * 1000)
 // Check the CX status every minute to see if it differs from what we expect
 #define CHECK_CX_STATUS_INTERVAL std::chrono::seconds(60)
+// Disable the zone pump if we don't have up to date CX mod info
+// to avoid circulating condensing water in floors.
+#define ZONE_PUMP_MAX_CX_MODE_AGE std::chrono::minutes(15)
 #define MAX_VALVE_TRANSITION_INTERVAL std::chrono::minutes(2)
 #define OTA_INTERVAL_MS (15 * 60 * 1000)
 #define OTA_FETCH_ERR_INTERVAL_MS (60 * 1000)
@@ -66,7 +69,8 @@ static SystemState currentState_;
 
 static bool systemOn_ = true, testMode_ = false;
 static CxOpMode lastCxOpMode_ = CxOpMode::Unknown;
-static std::chrono::steady_clock::time_point lastCheckedCxOpMode_;
+static std::chrono::steady_clock::time_point lastCheckedCxOpMode_{};
+static std::chrono::steady_clock::time_point lastGoodCxOpMode_{};
 
 static std::chrono::steady_clock::time_point valveLastSet_[4];
 
@@ -117,6 +121,20 @@ void __attribute__((format(printf, 1, 2))) bootErr(const char *fmt, ...) {
     esp_restart();
 }
 
+void handleCancelMessage(MsgID id) {
+    switch (id) {
+    case MsgID::CXModeMismatch:
+        // Ignore, just clearing in the UI
+        break;
+    case MsgID::StaleCXMode:
+        // Reset the clock on CX staleness
+        lastGoodCxOpMode_ = std::chrono::steady_clock::now();
+        break;
+    default:
+        ESP_LOGE(TAG, "Unexpected message cancellation for: %d", static_cast<int>(id));
+    }
+}
+
 bool pollUIEvent(bool wait) {
     using EventType = ZCUIManager::EventType;
 
@@ -151,6 +169,10 @@ bool pollUIEvent(bool wait) {
             break;
         }
         break;
+    case EventType::MsgCancel:
+        ESP_LOGI(TAG, "MsgCancel: %s", msgIDToS((MsgID)evt.payload.msgID));
+        handleCancelMessage((MsgID)evt.payload.msgID);
+        break;
     }
 
     return true;
@@ -163,26 +185,31 @@ void setIOStates(SystemState &state) {
 
     // Do not enable the zone pump if we don't know the state of the heat pump to avoid
     // running condensing cold water (except in test mode).
+    // TODO: This may be causing rapid switching of the pump freezing it up
+    // TODO: Also implement preventing rapid changing of any IOs
     outIO_.setZonePump(state.zonePump && (testMode_ || lastCxOpMode_ != CxOpMode::Error));
     outIO_.setFancoilPump(state.fcPump);
 }
 
-void setCxOpMode(CxOpMode cxMode) {
+esp_err_t setCxOpMode(CxOpMode cxMode) {
     if (cxMode == lastCxOpMode_) {
-        return;
+        return ESP_OK;
     }
 
-    if (mbClient_.setCxOpMode(cxMode) == ESP_OK) {
+    esp_err_t err = mbClient_.setCxOpMode(cxMode);
+    if (err == ESP_OK) {
         lastCxOpMode_ = cxMode;
-        lastCheckedCxOpMode_ = std::chrono::steady_clock::now();
+        lastCheckedCxOpMode_ = lastGoodCxOpMode_ = std::chrono::steady_clock::now();
         uiManager_->clearMessage(MsgID::CXError);
     } else {
         lastCxOpMode_ = CxOpMode::Error;
         uiManager_->setMessage(MsgID::CXError, false, "CX communication error");
     }
+
+    return err;
 }
 
-void setCxOpMode(HeatPumpMode output_mode) {
+esp_err_t setCxOpMode(HeatPumpMode output_mode) {
     CxOpMode cxMode;
 
     switch (output_mode) {
@@ -202,7 +229,7 @@ void setCxOpMode(HeatPumpMode output_mode) {
         assert(false);
     }
 
-    setCxOpMode(cxMode);
+    return setCxOpMode(cxMode);
 }
 
 void pollCxStatus() {
@@ -219,12 +246,13 @@ void pollCxStatus() {
             ESP_LOGE(TAG, "CX mode %d != %d", static_cast<int>(currMode),
                      static_cast<int>(lastCxOpMode_));
             uiManager_->setMessage(MsgID::CXModeMismatch, true, "CX mode mismatch occurred");
-            CxOpMode cxMode = lastCxOpMode_;
+            CxOpMode targetCxMode = lastCxOpMode_;
             lastCxOpMode_ = currMode;
             // Attempt to reset the mode
-            setCxOpMode(cxMode);
+            setCxOpMode(targetCxMode);
         } else {
             uiManager_->clearMessage(MsgID::CXError);
+            lastGoodCxOpMode_ = now;
         }
     } else {
         lastCxOpMode_ = CxOpMode::Error;
@@ -346,8 +374,30 @@ void outputTask(void *) {
             currentState_ = outCtrl_->update(systemOn_, zioState);
         }
 
+        checkStuckValves(zioState.valve_sw);
+        if (!testMode_) {
+            setCxOpMode(currentState_.heatPumpMode);
+            pollCxStatus();
+
+            if (currentState_.zonePump &&
+                std::chrono::steady_clock::now() - lastGoodCxOpMode_ > ZONE_PUMP_MAX_CX_MODE_AGE) {
+                // Disable the zone pump if we don't have up to date CX mode info
+                currentState_.zonePump = false;
+                // Only log the first time we disable to avoid massive log chunder
+                if (lastState.zonePump) {
+                    ESP_LOGW(TAG, "Disabling zone pump due to stale CX mode info");
+                }
+                uiManager_->setMessage(MsgID::StaleCXMode, true,
+                                       "Disabling zone pump, stale CX mode");
+            } else {
+                uiManager_->clearMessage(MsgID::StaleCXMode);
+            }
+        }
+        setIOStates(currentState_);
+
         if (currentState_ != lastState || (std::chrono::steady_clock::now() -
                                            lastLoggedSystemState) > SYSTEM_STATE_LOG_INTERVAL) {
+            // TODO: fix double logging when zio state changes
             zone_io_log_state(zioState);
             logSystemState(currentState_);
             checkValveSWConsistency(zioState.valve_sw);
@@ -356,13 +406,6 @@ void outputTask(void *) {
         lastState = currentState_;
 
         uiManager_->updateState(currentState_);
-
-        checkStuckValves(zioState.valve_sw);
-        if (!testMode_) {
-            setCxOpMode(currentState_.heatPumpMode);
-            pollCxStatus();
-        }
-        setIOStates(currentState_);
 
         if (pollUIEvent(true)) {
             // If we found something in the queue, clear the queue before proceeeding with

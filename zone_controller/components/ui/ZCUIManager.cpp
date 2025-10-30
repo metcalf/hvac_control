@@ -52,7 +52,8 @@ ZCUIManager::ZCUIManager(SystemState state, size_t nMsgIds, eventCb_t eventCb) :
     ui_init();
 
     sleepMgr_ = new SleepManager(ui_Home, GPIO_NUM_48);
-    msgMgr_ = new MessageManager(nMsgIds, ui_normal_mode_footer, &ui_font_MaterialSymbols24, NULL);
+    msgMgr_ = new MessageManager(nMsgIds, ui_normal_mode_footer, &ui_font_MaterialSymbols24,
+                                 new cancelCbFn_t([this](uint8_t msgID) { onCancelMsg(msgID); }));
 
     lv_obj_add_event_cb(ui_system_on_button, uiEventCb, LV_EVENT_CLICKED,
                         new uiCbFn([this](lv_event_t *e) { onSystemPower(true); }));
@@ -201,5 +202,10 @@ void ZCUIManager::onZoneToggle(uint8_t i) {
 
 void ZCUIManager::onPumpToggle(Pump pump) {
     Event evt{EventType::TestTogglePump, EventPayload{.pump = pump}};
+    eventCb_(evt);
+}
+
+void ZCUIManager::onCancelMsg(uint8_t msgID) {
+    Event evt{EventType::MsgCancel, EventPayload{.msgID = msgID}};
     eventCb_(evt);
 }
