@@ -5,14 +5,19 @@
 #include "OutCtrl.h"
 #include "ZCUIManager.h"
 
+// TODO: for testability:
+// zone_io_client
+
 class ZCApp {
   public:
+    typedef std::function<InputState()> getZioState_t;
     typedef std::function<bool(ZCUIManager::Event *, uint16_t)> uiEvtRcv_t;
 
     ZCApp(ZCUIManager *uiManager, const uiEvtRcv_t &uiEvtRcv, BaseOutIO *outIO, OutCtrl *outCtrl,
-          BaseModbusClient *mbClient, ValveStateManager *valveStateManager)
+          BaseModbusClient *mbClient, ValveStateManager *valveStateManager,
+          const getZioState_t &getZioState)
         : uiManager_(uiManager), uiEvtRcv_(uiEvtRcv), outIO_(outIO), outCtrl_(outCtrl),
-          mbClient_(mbClient), valveStateManager_(valveStateManager) {};
+          mbClient_(mbClient), valveStateManager_(valveStateManager), getZioState_(getZioState) {};
     virtual ~ZCApp() = default;
 
     void task();
@@ -30,6 +35,7 @@ class ZCApp {
     OutCtrl *outCtrl_;
     BaseModbusClient *mbClient_;
     ValveStateManager *valveStateManager_;
+    getZioState_t getZioState_;
 
     InputState lastZioState_;
     SystemState lastState_, currentState_;
@@ -52,4 +58,5 @@ class ZCApp {
     bool isValveSWConsistent(ValveState *valves, ValveSWState sw);
     void checkValveSWConsistency(ValveSWState sws[2]);
     void checkStuckValves(ValveSWState sws[2]);
+    void logInputState(const InputState &s);
 };

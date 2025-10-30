@@ -2,8 +2,6 @@
 
 #include "esp_log.h"
 
-#include "zone_io_client.h"
-
 #define OUTPUT_UPDATE_PERIOD_MS 500
 // Check the CX status every minute to see if it differs from what we expect
 #define CHECK_CX_STATUS_INTERVAL std::chrono::seconds(60)
@@ -19,9 +17,9 @@
 static const char *TAG = "APP";
 
 void ZCApp::task() {
-    InputState zioState = zone_io_get_state();
+    InputState zioState = getZioState_();
     if (zioState != lastZioState_) {
-        zone_io_log_state(zioState);
+        logInputState(zioState);
     }
     lastZioState_ = zioState;
 
@@ -55,7 +53,7 @@ void ZCApp::task() {
     if (currentState_ != lastState_ ||
         (std::chrono::steady_clock::now() - lastLoggedSystemState_) > SYSTEM_STATE_LOG_INTERVAL) {
         // TODO: fix double logging when zio state changes
-        zone_io_log_state(zioState);
+        logInputState(zioState);
         logSystemState(currentState_);
         checkValveSWConsistency(zioState.valve_sw);
         lastLoggedSystemState_ = std::chrono::steady_clock::now();
@@ -302,4 +300,16 @@ void ZCApp::checkStuckValves(ValveSWState sws[2]) {
     } else {
         uiManager_->clearMessage(MsgID::ValveStuckError);
     }
+}
+
+void ZCApp::logInputState(const InputState &s) {
+    ESP_LOGW(
+        "ZIO", "FC:%d%d|%d%d|%d%d|%d%d V:%c%c|%c%c|%c%c|%c%c SW: %d|%d",
+        // Fancoils
+        s.fc[0].v, s.fc[0].ob, s.fc[1].v, s.fc[1].ob, s.fc[2].v, s.fc[2].ob, s.fc[3].v, s.fc[3].ob,
+        // Thermostats
+        s.ts[0].w ? 'w' : '_', s.ts[0].y ? 'y' : '_', s.ts[1].w ? 'w' : '_', s.ts[1].y ? 'y' : '_',
+        s.ts[2].w ? 'w' : '_', s.ts[2].y ? 'y' : '_', s.ts[3].w ? 'w' : '_', s.ts[3].y ? 'y' : '_',
+        // Valve SW
+        static_cast<int>(s.valve_sw[0]), static_cast<int>(s.valve_sw[1]));
 }
