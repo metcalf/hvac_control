@@ -61,7 +61,9 @@ class ZCApp {
     std::chrono::steady_clock::time_point valveLastSet_[4];
 
     StateChangeRateLimiter valveChangeLimiters_[4]{};
+    bool valveInLimit_[4]{false};
     StateChangeRateLimiter zonePumpChangeLimiter_{}, fcPumpChangeLimiter_{};
+    bool zonePumpInLimit_ = false, fcPumpInLimit_ = false;
 
     void logSystemState(SystemState state);
     void handleCancelMessage(MsgID id);

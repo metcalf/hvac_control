@@ -120,9 +120,12 @@ void ZCApp::handleCancelMessage(MsgID id) {
     case MsgID::StateChangeRateLimited:
         for (int i = 0; i < ZONE_IO_NUM_TS; i++) {
             valveChangeLimiters_[i].reset();
+            valveInLimit_[i] = false;
         }
         zonePumpChangeLimiter_.reset();
+        zonePumpInLimit_ = false;
         fcPumpChangeLimiter_.reset();
+        fcPumpInLimit_ = false;
         break;
     default:
         ESP_LOGE(TAG, "Unexpected message cancellation for: %d", static_cast<int>(id));
@@ -174,9 +177,12 @@ bool ZCApp::pollUIEvent(bool wait) {
     return true;
 }
 
-#define ON_LIMITED(...)                                                                            \
+#define ON_LIMITED(inLimit, ...)                                                                   \
     limited = true;                                                                                \
-    ESP_LOGW(TAG, __VA_ARGS__);                                                                    \
+    if (!*inLimit) {                                                                               \
+        ESP_LOGW(TAG, __VA_ARGS__);                                                                \
+        *inLimit = true;                                                                           \
+    }                                                                                              \
     uiManager_->setMessage(MsgID::StateChangeRateLimited, true, "Output change rate limited");
 
 void ZCApp::setIOStates(SystemState &state) {
@@ -187,20 +193,22 @@ void ZCApp::setIOStates(SystemState &state) {
         if (valveChangeLimiters_[i].update(on, steadyNow())) {
             outIO_->setValve(i, on);
         } else {
-            ON_LIMITED("Valve %d change rate limited", i);
+            ON_LIMITED(&valveInLimit_[i], "Valve %d change rate limited", i);
         }
     }
 
     // TODO: Also implement preventing rapid changing of any IOs
     if (zonePumpChangeLimiter_.update(state.zonePump, steadyNow())) {
         outIO_->setZonePump(state.zonePump);
+        zonePumpInLimit_ = false;
     } else {
-        ON_LIMITED("Zone pump change rate limited");
+        ON_LIMITED(&zonePumpInLimit_, "Zone pump change rate limited");
     }
     if (fcPumpChangeLimiter_.update(state.fcPump, steadyNow())) {
         outIO_->setFancoilPump(state.fcPump);
+        fcPumpInLimit_ = false;
     } else {
-        ON_LIMITED("Fancoil pump change rate limited");
+        ON_LIMITED(&fcPumpInLimit_, "Fancoil pump change rate limited");
     }
 
     if (!limited) {
