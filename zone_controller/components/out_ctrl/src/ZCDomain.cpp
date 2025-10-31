@@ -52,7 +52,7 @@ int ZCDomain::writeCallStates(const ZCDomain::Call calls[4], char *buffer, size_
             callStr = "unkn";
         }
 
-        rv = snprintf(buffer + wrote, bufferSize - wrote, "%s%s ", i == 0 ? "" : "|", callStr);
+        rv = snprintf(buffer + wrote, bufferSize - wrote, "%s%s", i == 0 ? "" : "|", callStr);
         if (rv < 0) {
             return rv; // Error writing to buffer
         }
@@ -64,7 +64,7 @@ int ZCDomain::writeCallStates(const ZCDomain::Call calls[4], char *buffer, size_
 int ZCDomain::writeValveStates(const ValveState valves[4], char *buffer, size_t bufferSize) {
     int wrote = 0, rv;
     for (int i = 0; i < 4; i++) {
-        rv = snprintf(buffer + wrote, bufferSize - wrote, "%s%d,%c ", i == 0 ? "" : "|",
+        rv = snprintf(buffer + wrote, bufferSize - wrote, "%s%d,%c", i == 0 ? "" : "|",
                       valves[i].target, charForValveAction(valves[i].action));
         if (rv < 0) {
             return rv; // Error writing to buffer

@@ -73,19 +73,19 @@ void ZCApp::logSystemState(SystemState state) {
     size_t pos = 0;
     int wrote;
 
-    wrote = snprintf(buffer, sizeof(buffer) - pos, "ts=");
+    wrote = snprintf(buffer + pos, sizeof(buffer) - pos, "ts=");
     CHECK_STRING_ERROR_AND_ADVANCE(wrote, pos)
 
     wrote = ZCDomain::writeCallStates(state.thermostats, buffer + pos, sizeof(buffer) - pos);
     CHECK_STRING_ERROR_AND_ADVANCE(wrote, pos)
 
-    wrote = snprintf(buffer, sizeof(buffer) - pos, "vlvs=");
+    wrote = snprintf(buffer + pos, sizeof(buffer) - pos, " vlvs=");
     CHECK_STRING_ERROR_AND_ADVANCE(wrote, pos)
 
     wrote = ZCDomain::writeValveStates(state.valves, buffer + pos, sizeof(buffer) - pos);
     CHECK_STRING_ERROR_AND_ADVANCE(wrote, pos)
 
-    wrote = snprintf(buffer, sizeof(buffer) - pos, "fc=");
+    wrote = snprintf(buffer + pos, sizeof(buffer) - pos, " fc=");
     CHECK_STRING_ERROR_AND_ADVANCE(wrote, pos)
 
     wrote = ZCDomain::writeCallStates(state.fancoils, buffer + pos, sizeof(buffer) - pos);
@@ -100,7 +100,7 @@ void ZCApp::logSystemState(SystemState state) {
 
     wrote =
         snprintf(buffer + pos, sizeof(buffer) - pos,
-                 "zone_pump=%d fc_pump=%d hp_mode=%s cx_mode=%s hp_out_t=%0.1f hp_hz=%d",
+                 " zone_pump=%d fc_pump=%d hp_mode=%s cx_mode=%s hp_out_t=%0.1f hp_hz=%d",
                  state.zonePump, state.fcPump, ZCDomain::stringForHeatPumpMode(state.heatPumpMode),
                  BaseModbusClient::cxOpModeToString(cxOpMode), hpOutT, hpHz);
     CHECK_STRING_ERROR_AND_ADVANCE(wrote, pos)
