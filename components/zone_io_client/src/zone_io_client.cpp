@@ -58,6 +58,7 @@ bool do_rx(size_t to_rx) {
         ESP_LOGD(TAG, "Read %d bytes (of %d expected)", rx_bytes, to_rx);
         return false;
     } else if (rx_bytes == 3) {
+        // Special case is just for debug logging, it's OK if we don't receive 3 bytes at a time.
         ESP_LOGD(TAG,
                  "Read %d bytes: " BYTE_TO_BINARY_PATTERN " " BYTE_TO_BINARY_PATTERN
                  " " BYTE_TO_BINARY_PATTERN,
