@@ -155,6 +155,7 @@ extern "C" void zc_main() {
     ZCDomain::SystemState state{};
     uiManager_ = new ZCUIManager(state, static_cast<size_t>(ZCDomain::MsgID::_Last), uiEvtCb);
     ota_ = new ESPOTAClient("zone_controller", otaMsgCb, UI_MAX_MSG_LEN);
+    uiManager_->setFirmwareVersion(ota_->currentVersion());
     outCtrl_ = new OutCtrl(valveStateManager_, *uiManager_);
     zcApp_ = new ZCApp(uiManager_, uiEvtRcv, &outIO_, outCtrl_, &mbClient_, &valveStateManager_,
                        zone_io_get_state);

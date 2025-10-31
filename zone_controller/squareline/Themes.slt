@@ -3,7 +3,7 @@
     "name": "Default",
     "properties": [
       {
-        "nid": 0,
+        "nid": 839719744,
         "strtype": "THEME_COLOR",
         "strval": "border",
         "intarray": [
@@ -15,7 +15,7 @@
         "InheritedType": 0
       },
       {
-        "nid": 0,
+        "nid": 392115080,
         "strtype": "THEME_COLOR",
         "strval": "heat",
         "intarray": [
@@ -27,7 +27,7 @@
         "InheritedType": 0
       },
       {
-        "nid": 0,
+        "nid": 229120187,
         "strtype": "THEME_COLOR",
         "strval": "cool",
         "intarray": [
@@ -39,7 +39,7 @@
         "InheritedType": 0
       },
       {
-        "nid": 0,
+        "nid": -458387043,
         "strtype": "THEME_COLOR",
         "strval": "button bg",
         "intarray": [

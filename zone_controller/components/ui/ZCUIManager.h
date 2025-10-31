@@ -37,6 +37,12 @@ class ZCUIManager : public AbstractZCUIManager {
     }
     void updateState(ZCDomain::SystemState state) override;
 
+    void setFirmwareVersion(const char *version) {
+        xSemaphoreTake(mutex_, portMAX_DELAY);
+        lv_label_set_text(ui_app_version_label, version);
+        xSemaphoreGive(mutex_);
+    }
+
   private:
     using Call = ZCDomain::Call;
     using ValveAction = ZCDomain::ValveAction;
