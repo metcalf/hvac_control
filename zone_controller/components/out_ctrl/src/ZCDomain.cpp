@@ -98,6 +98,8 @@ const char *ZCDomain::msgIDToS(MsgID id) {
         return "OTA";
     case MsgID::StaleCXMode:
         return "StaleCXMode";
+    case MsgID::StateChangeRateLimited:
+        return "StateChangeRateLimited";
     case MsgID::_Last:
         return "";
     }
