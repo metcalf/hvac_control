@@ -12,7 +12,7 @@ class TestZCApp : public ZCApp {
     // It's important that these values not be zero since we sometimes use
     // zero to flag a condition.
     std::chrono::steady_clock::time_point now_ =
-        std::chrono::steady_clock::time_point(std::chrono::seconds(1));
+        std::chrono::steady_clock::time_point(std::chrono::hours(100));
 
     void setSteadyNow(std::chrono::steady_clock::time_point t) { now_ = t; }
     std::chrono::steady_clock::time_point steadyNow() const override { return now_; }
@@ -112,7 +112,47 @@ TEST_F(ZCAppTest, TurnsOffZonePumpWithPersistentHeatPumpError) {
     ASSERT_FALSE(outIO_.getZonePump());
 
     mbClient_.setTestErr(ESP_OK);
+    app_->setSteadyNow(app_->steadyNow() + std::chrono::minutes(1)); // Advance for rate limit
     app_->task();
     ASSERT_TRUE(outIO_.getValve(0));
     ASSERT_TRUE(outIO_.getZonePump());
+}
+
+TEST_F(ZCAppTest, RespectsValveAndZonePumpStateChangeRateLimit) {
+    inputState_.ts[0].w = true;
+    app_->task();
+    inputState_.valve_sw[0] = ValveSWState::One;
+    app_->task();
+    ASSERT_TRUE(outIO_.getZonePump());
+    ASSERT_TRUE(outIO_.getValve(0));
+
+    // Attempt to turn off valve before rate limit interval expires
+    inputState_.ts[0].w = false;
+    app_->setSteadyNow(app_->steadyNow() + std::chrono::seconds(1));
+    app_->task();
+    ASSERT_TRUE(outIO_.getZonePump());
+    ASSERT_TRUE(outIO_.getValve(0));
+
+    // Advance past rate limit interval and try again
+    app_->setSteadyNow(app_->steadyNow() + std::chrono::minutes(1));
+    app_->task();
+    ASSERT_FALSE(outIO_.getZonePump());
+    ASSERT_FALSE(outIO_.getValve(0));
+}
+
+TEST_F(ZCAppTest, RespectsFancoilPumpStateChangeRateLimit) {
+    inputState_.fc[0].v = true;
+    app_->task();
+    ASSERT_TRUE(outIO_.getFancoilPump());
+
+    // Attempt to turn off pump before rate limit interval expires
+    inputState_.fc[0].v = false;
+    app_->setSteadyNow(app_->steadyNow() + std::chrono::seconds(1));
+    app_->task();
+    ASSERT_TRUE(outIO_.getFancoilPump());
+
+    // Advance past rate limit interval and try again
+    app_->setSteadyNow(app_->steadyNow() + std::chrono::minutes(1));
+    app_->task();
+    ASSERT_FALSE(outIO_.getFancoilPump());
 }

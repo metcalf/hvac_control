@@ -4,6 +4,7 @@
 #include "BaseModbusClient.h"
 #include "BaseOutIO.h"
 #include "OutCtrl.h"
+#include "StateChangeRateLimiter.h"
 
 #define OUTPUT_UPDATE_PERIOD_MS 500
 // Check the CX status every minute to see if it differs from what we expect
@@ -58,6 +59,9 @@ class ZCApp {
     std::chrono::steady_clock::time_point lastGoodCxOpMode_{};
 
     std::chrono::steady_clock::time_point valveLastSet_[4];
+
+    StateChangeRateLimiter valveChangeLimiters_[4]{};
+    StateChangeRateLimiter zonePumpChangeLimiter_{}, fcPumpChangeLimiter_{};
 
     void logSystemState(SystemState state);
     void handleCancelMessage(MsgID id);

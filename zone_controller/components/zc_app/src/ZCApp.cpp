@@ -117,6 +117,13 @@ void ZCApp::handleCancelMessage(MsgID id) {
         // Reset the clock on CX staleness
         lastGoodCxOpMode_ = steadyNow();
         break;
+    case MsgID::StateChangeRateLimited:
+        for (int i = 0; i < ZONE_IO_NUM_TS; i++) {
+            valveChangeLimiters_[i].reset();
+        }
+        zonePumpChangeLimiter_.reset();
+        fcPumpChangeLimiter_.reset();
+        break;
     default:
         ESP_LOGE(TAG, "Unexpected message cancellation for: %d", static_cast<int>(id));
     }
@@ -167,17 +174,38 @@ bool ZCApp::pollUIEvent(bool wait) {
     return true;
 }
 
+#define ON_LIMITED(...)                                                                            \
+    limited = true;                                                                                \
+    ESP_LOGW(TAG, __VA_ARGS__);                                                                    \
+    uiManager_->setMessage(MsgID::StateChangeRateLimited, true, "Output change rate limited");
+
 void ZCApp::setIOStates(SystemState &state) {
+    bool limited = false;
+
     for (int i = 0; i < ZONE_IO_NUM_TS; i++) {
-        outIO_->setValve(i, state.valves[i].on());
+        bool on = state.valves[i].on();
+        if (valveChangeLimiters_[i].update(on, steadyNow())) {
+            outIO_->setValve(i, on);
+        } else {
+            ON_LIMITED("Valve %d change rate limited", i);
+        }
     }
 
-    // Do not enable the zone pump if we don't know the state of the heat pump to avoid
-    // running condensing cold water (except in test mode).
-    // TODO: This may be causing rapid switching of the pump freezing it up
     // TODO: Also implement preventing rapid changing of any IOs
-    outIO_->setZonePump(state.zonePump);
-    outIO_->setFancoilPump(state.fcPump);
+    if (zonePumpChangeLimiter_.update(state.zonePump, steadyNow())) {
+        outIO_->setZonePump(state.zonePump);
+    } else {
+        ON_LIMITED("Zone pump change rate limited");
+    }
+    if (fcPumpChangeLimiter_.update(state.fcPump, steadyNow())) {
+        outIO_->setFancoilPump(state.fcPump);
+    } else {
+        ON_LIMITED("Fancoil pump change rate limited");
+    }
+
+    if (!limited) {
+        uiManager_->clearMessage(MsgID::StateChangeRateLimited);
+    }
 }
 
 esp_err_t ZCApp::setCxOpMode(CxOpMode cxMode) {

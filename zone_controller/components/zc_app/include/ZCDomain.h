@@ -43,6 +43,7 @@ enum class MsgID {
     PowerOut,
     OTA,
     StaleCXMode,
+    StateChangeRateLimited,
     _Last,
 };
 
