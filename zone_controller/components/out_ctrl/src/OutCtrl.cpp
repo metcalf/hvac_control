@@ -163,17 +163,27 @@ void OutCtrl::setCalls(ZCDomain::SystemState &state, const InputState &zioState)
     }
 }
 
-ZCDomain::SystemState OutCtrl::update(bool systemOn, const InputState &zioState) {
-    SystemState state{};
-
+void OutCtrl::checkTSConflictingCalls(const InputState &zioState) {
+    bool conflict = false;
     for (int i = 0; i < ZONE_IO_NUM_TS; i++) {
         ThermostatState ts = zioState.ts[i];
         if (ts.w && ts.y) {
             // Note: logging is in static setCalls
-            uiManager_.setMessage(MsgID::TSConflictingCallsError, false, "W+Y on thermostat");
+            conflict = true;
         }
     }
 
+    if (conflict) {
+        uiManager_.setMessage(MsgID::TSConflictingCallsError, false, "W+Y on thermostat");
+    } else {
+        uiManager_.clearMessage(MsgID::TSConflictingCallsError);
+    }
+}
+
+ZCDomain::SystemState OutCtrl::update(bool systemOn, const InputState &zioState) {
+    SystemState state{};
+
+    checkTSConflictingCalls(zioState);
     setCalls(state, zioState);
     selectMode(state, systemOn, zioState);
 

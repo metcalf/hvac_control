@@ -48,6 +48,7 @@ class OutCtrl {
     HeatPumpMode lastHeatPumpMode_ = HeatPumpMode::Off;
     std::chrono::steady_clock::time_point lastHeat_{}, lastCool_{};
 
+    void checkTSConflictingCalls(const InputState &zioState);
     bool checkModeLockout(std::chrono::steady_clock::time_point lastTargetMode,
                           std::chrono::steady_clock::time_point lastOtherMode,
                           std::chrono::steady_clock::duration lockoutInterval);

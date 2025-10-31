@@ -23,7 +23,7 @@
     "theme_color2": 0,
     "uiExportFolderPath": "/Users/andrew/code/hvac_control/zone_controller/components/ui/export",
     "projectExportFolderPath": "",
-    "backup_cnt": 528,
+    "backup_cnt": 531,
     "autosave_cnt": 0,
     "lvgl_version": "8.3.11",
     "callfuncsexport": "CPP_FILE",
