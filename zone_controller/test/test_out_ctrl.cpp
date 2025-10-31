@@ -1,28 +1,16 @@
 #include <gtest/gtest.h>
 
-#include "AbstractZCUIManager.h"
 #include "InputState.h"
 #include "OutCtrl.h"
 #include "ZCDomain.h"
+
+#include "FakeUIManager.h"
 
 using SystemState = ZCDomain::SystemState;
 using HeatPumpMode = ZCDomain::HeatPumpMode;
 using MsgID = ZCDomain::MsgID;
 
-class FakeUIManager : public AbstractZCUIManager {
-  public:
-    void setMessage(MsgID msgID, bool allowCancel, const char *msg) override {
-        msgs_[static_cast<int>(msgID)] = true;
-    }
-    void clearMessage(MsgID msgID) override { msgs_[static_cast<int>(msgID)] = false; }
 
-    bool isSet(MsgID msgID) { return msgs_[static_cast<int>(msgID)]; }
-
-    void updateState(ZCDomain::SystemState state) override {}
-
-  private:
-    bool msgs_[static_cast<int>(MsgID::_Last)] = {};
-};
 
 class TestOutCtrl : public OutCtrl {
   public:
