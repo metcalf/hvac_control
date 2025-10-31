@@ -11,6 +11,23 @@
 #define UART_BAUD 9600
 #define SEND_INTERVAL_MS 450
 
+// Poll 200 times at 1200hz. Gives us 20 full cycles of data and takes ~167ms
+// Our read strategy is designed to filter out external noise at the optoisolator inputs.
+// The Taco valves in particular throw off a lot of noise and cause pins to flicker.
+#define N_SAMPLES 200
+// The optoisolators are pretty sensitive so it should read high
+// most of the time if the pin is high. The internal pull-ups is very weak (~35kohm)
+// so a tiny amount of current (<0.1mA) should pull the pin high. This corresponds to
+// something like 0.2mA at the opto input which requires 5-6V.
+#define INPUT_THRESHOLD (N_SAMPLES / 4)
+// We can set a very low threshold for the one channel state since there should be
+// *nothing* on the pin when no channels are on. This also helps avoid rapid switching
+// of the pump if the controller thinks the only active channel is rapidly turning on and off.
+// We're stuck using a somewhat higher threshold for the both channels state since it has
+// to be larger than half the total samples or we could falsely trigger it when only one channel is on.
+#define ONE_VALVE_THRESHOLD (N_SAMPLES / 8)
+#define BOTH_VALVE_THRESHOLD (uint8_t)(N_SAMPLES * 0.53)
+
 volatile uint16_t vlv12_sw_period_, vlv34_sw_period_;
 volatile uint8_t port_read_flag_;
 volatile uint8_t port_in_values_[3];
@@ -119,15 +136,12 @@ int main(void) {
 
         uint8_t port_counts[3][8] = {};
 
-        // Poll 200 times at 1200hz. Gives us 20 full cycles of data and takes ~167ms
-        // Our read strategy here is designed to filter out external noise at the optoisolator inputs.
-        // The Taco valves in particular throw off a lot of noise and cause pins to flicker.
         port_read_flag_ = 0;
         TCA0.SINGLE.INTFLAGS |= TCA_SINGLE_OVF_bm; // Clear interrupt flag
         TCA0.SINGLE.CNT = 0;                       // Start at zero
         TCA0.SINGLE.CTRLA |= TCA_SINGLE_ENABLE_bm; // Start the timer
 
-        for (int i = 0; i < 200; i++) {
+        for (int i = 0; i < N_SAMPLES; i++) {
             while (1) {
                 uint8_t read;
                 ATOMIC_BLOCK(ATOMIC_FORCEON) { read = port_read_flag_; }
@@ -152,11 +166,8 @@ int main(void) {
 
         for (uint8_t port_idx = 0; port_idx < 3; port_idx++) {
             for (uint8_t pin = 0; pin < 8; pin++) {
-                // The optoisolators are pretty sensitive so it should read high
-                // most of the time if the pin is high. The internal pull-ups is very weak (~35kohm)
-                // so a tiny amount of current (<0.1mA) should pull the pin high. This corresponds to
-                // something like 0.2mA at the opto input which requires 5-6V.
-                if (port_counts[port_idx][pin] > 60) {
+
+                if (port_counts[port_idx][pin] > INPUT_THRESHOLD) {
                     port_states[port_idx] |= (1 << pin);
                 }
             }
@@ -167,14 +178,9 @@ int main(void) {
             // PC2 and PC3 are used for VLV1/2 and VLV3/4 respectively
             uint8_t count = port_counts[2][i + 2];
 
-            // We can set a very low threshold for the one channel state since there should be
-            // *nothing* on the pin when no channels are on. This also helps avoid rapid switching
-            // of the pump if the controller thinks the only active channel is rapidly turning on and off.
-            // We're stuck using a somewhat higher threshold for the both channels state since it has
-            // to be larger than half the total samples or we could falsely trigger it when only one channel is on.
-            if (count > 105) {
+            if (count > BOTH_VALVE_THRESHOLD) {
                 vlv_states[i] = 2; // Both channels on
-            } else if (count > 10) {
+            } else if (count > ONE_VALVE_THRESHOLD) {
                 vlv_states[i] = 1; // One channel on
             } else {
                 vlv_states[i] = 0; // Off
