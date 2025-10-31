@@ -119,7 +119,7 @@ int main(void) {
 
         uint8_t port_counts[3][8] = {};
 
-        // Poll 100 times at 1200hz. Gives us 10 full cycles of data and takes ~83ms
+        // Poll 200 times at 1200hz. Gives us 20 full cycles of data and takes ~167ms
         // Our read strategy here is designed to filter out external noise at the optoisolator inputs.
         // The Taco valves in particular throw off a lot of noise and cause pins to flicker.
         port_read_flag_ = 0;
@@ -127,7 +127,7 @@ int main(void) {
         TCA0.SINGLE.CNT = 0;                       // Start at zero
         TCA0.SINGLE.CTRLA |= TCA_SINGLE_ENABLE_bm; // Start the timer
 
-        for (int i = 0; i < 100; i++) {
+        for (int i = 0; i < 200; i++) {
             while (1) {
                 uint8_t read;
                 ATOMIC_BLOCK(ATOMIC_FORCEON) { read = port_read_flag_; }
@@ -167,9 +167,14 @@ int main(void) {
             // PC2 and PC3 are used for VLV1/2 and VLV3/4 respectively
             uint8_t count = port_counts[2][i + 2];
 
-            if (count > 60) {
+            // We can set a very low threshold for the one channel state since there should be
+            // *nothing* on the pin when no channels are on. This also helps avoid rapid switching
+            // of the pump if the controller thinks the only active channel is rapidly turning on and off.
+            // We're stuck using a somewhat higher threshold for the both channels state since it has
+            // to be larger than half the total samples or we could falsely trigger it when only one channel is on.
+            if (count > 105) {
                 vlv_states[i] = 2; // Both channels on
-            } else if (count > 30) {
+            } else if (count > 10) {
                 vlv_states[i] = 1; // One channel on
             } else {
                 vlv_states[i] = 0; // Off
