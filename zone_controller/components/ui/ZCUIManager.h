@@ -9,8 +9,8 @@
 #include "MessageManager.h"
 #include "SleepManager.h"
 #include "ZCDomain.h"
-#include "ui.h"
-#include "ui_events.h"
+#include "export/ui.h"
+#include "export/ui_events.h"
 
 #define UI_MAX_MSG_LEN 18 * 2
 
