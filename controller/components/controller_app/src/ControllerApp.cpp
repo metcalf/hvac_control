@@ -563,9 +563,10 @@ uint16_t ControllerApp::localMinOfDay() {
 }
 
 void ControllerApp::logState(const ControllerDomain::FreshAirState &freshAirState,
-                             const ControllerDomain::SensorData &sensorData, double rawOnBoardTempC, double rawOffBoardTempC,
-                             double ventDemand, double fanCoolDemand, double heatDemand,
-                             double coolDemand, const ControllerDomain::Setpoints &setpoints,
+                             const ControllerDomain::SensorData &sensorData,
+                             double ventDemand, double fanCoolDemand,
+                             double heatDemand, double coolDemand,
+                             const ControllerDomain::Setpoints &setpoints,
                              const ControllerDomain::HVACState hvacState, const FanSpeed fanSpeed) {
     esp_log_level_t statusLevel;
     auto now = steadyNow();
@@ -602,27 +603,27 @@ void ControllerApp::logState(const ControllerDomain::FreshAirState &freshAirStat
                   freshAirState.tempC, config_.outTempOffsetC, freshAirState.humidity,
                   freshAirState.pressurePa, freshAirState.fanRpm, fanSpeed,
                   fanSpeedReasonToS(fanSpeedReason_));
-    ESP_LOG_LEVEL(statusLevel, TAG,
-                  "ctrl:"
-                  // Sensors
-                  " in_t=%0.2f raw_in_t_1=%0.2f raw_in_t_2=%0.2f out_t=%0.2f h=%0.1f p=%" PRIu32 " co2=%u"
-                  // Setpoints
-                  " set_h=%.2f set_c=%.2f set_co2=%u set_r=%s"
-                  // DemandRequest
-                  " vent_d=%.2f fancool_d=%.2f heat_d=%.2f cool_d=%.2f"
-                  // HVACState
-                  " hvac=%s speed=%s ac=%s coil_c=%d",
-                  // Sensors
-                  sensorData.onBoardTempC, rawOnBoardTempC, rawOffBoardTempC, outdoorTempC(), sensorData.humidity,
-                  sensorData.pressurePa, sensorData.co2,
-                  // Setpoints
-                  setpoints.heatTempC, setpoints.coolTempC, setpoints.co2,
-                  setpointReasonToS(setpointReason_),
-                  // Demands
-                  ventDemand, fanCoolDemand, heatDemand, coolDemand,
-                  // HVACState
-                  ControllerDomain::hvacStateToS(hvacState),
-                  ControllerDomain::fancoilSpeedToS(lastHvacSpeed_), acModeToS(acMode_), coilTempC);
+    ESP_LOG_LEVEL(
+        statusLevel, TAG,
+        "ctrl:"
+        // Sensors
+        " in_t=%0.2f raw_in_t_1=%0.2f raw_in_t_2=%0.2f out_t=%0.2f h=%0.1f p=%" PRIu32 " co2=%u"
+        // Setpoints
+        " set_h=%.2f set_c=%.2f set_co2=%u set_r=%s"
+        // DemandRequest
+        " vent_d=%.2f fancool_d=%.2f heat_d=%.2f cool_d=%.2f"
+        // HVACState
+        " hvac=%s speed=%s ac=%s coil_c=%d",
+        // Sensors
+        sensorData.tempC, sensorData.rawOnBoardTempC, sensorData.rawOffBoardTempC, outdoorTempC(), sensorData.humidity,
+        sensorData.pressurePa, sensorData.co2,
+        // Setpoints
+        setpoints.heatTempC, setpoints.coolTempC, setpoints.co2, setpointReasonToS(setpointReason_),
+        // Demands
+        ventDemand, fanCoolDemand, heatDemand, coolDemand,
+        // HVACState
+        ControllerDomain::hvacStateToS(hvacState),
+        ControllerDomain::fancoilSpeedToS(lastHvacSpeed_), acModeToS(acMode_), coilTempC);
 }
 
 void ControllerApp::checkWifiState() {
@@ -942,9 +943,7 @@ void ControllerApp::task(bool firstTime) {
     uiManager_->setCurrentSetpoints(setpoints.heatTempC, setpoints.coolTempC);
 
     SensorData sensorData = sensors_->getLatest();
-    double rawOnBoardTempC = sensorData.onBoardTempC;
-    double rawOffBoardTempC = sensorData.offBoardTempC;
-    sensorData.onBoardTempC += config_.inTempOffsetC + inTempBaseOffsetC_;
+    sensorData.tempC += config_.inTempOffsetC;
 
     double ventDemand = 0, fanCoolDemand = 0, heatDemand = 0, coolDemand = 0;
 
@@ -957,7 +956,7 @@ void ControllerApp::task(bool firstTime) {
 
         clearMessage(MsgID::SensorErr);
 
-        uiManager_->setInTempC(sensorData.onBoardTempC);
+        uiManager_->setInTempC(sensorData.tempC);
         uiManager_->setInCO2(sensorData.co2);
     } else {
         ESP_LOGE(TAG, "%s", sensorData.errMsg);
@@ -974,7 +973,7 @@ void ControllerApp::task(bool firstTime) {
     FanSpeed speed = computeFanSpeed(ventDemand, fanCoolDemand, wantOutdoorTemp);
     setFanSpeed(speed);
 
-    updateACMode(coolDemand, setpoints.coolTempC, sensorData.onBoardTempC, outdoorTempC());
+    updateACMode(coolDemand, setpoints.coolTempC, sensorData.tempC, outdoorTempC());
     HVACState hvacState = setHVAC(heatDemand, coolDemand, speed);
 
     checkModbusErrors();
@@ -983,8 +982,8 @@ void ControllerApp::task(bool firstTime) {
         uiManager_->bootDone();
     }
 
-    logState(freshAirState, sensorData, rawOnBoardTempC, rawOffBoardTempC, ventDemand, fanCoolDemand, heatDemand,
-             coolDemand, setpoints, hvacState, speed);
+    logState(freshAirState, sensorData, ventDemand,
+             fanCoolDemand, heatDemand, coolDemand, setpoints, hvacState, speed);
 
     if (pollUIEvent(true)) {
         // If we found something in the queue, clear the queue before proceeeding with

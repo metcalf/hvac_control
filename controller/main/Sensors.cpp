@@ -11,6 +11,9 @@
 
 #define CO2_MIN_CALIBRATION_UPTIME_MS 5 * 60 * 1000
 
+// Fixed temperature offset to correct for PCB heating effects
+#define IN_TEMP_BASE_OFFSET_C -3.3
+
 static const char *TAG = "SNS";
 
 static NVSConfigStore<CO2Calibration::State> co2CalibrationStore =
@@ -158,9 +161,10 @@ bool Sensors::readStsTemperature(uint8_t address, const char* sensorName, Sensor
     if (err == 0) {
         double tempC = stsTempMC / 1000.0;
         if (address == STS3X_ADDR_PIN_LOW_ADDRESS) {
-            data.onBoardTempC = tempC;
+            data.rawOnBoardTempC = tempC;
+            data.tempC = tempC + IN_TEMP_BASE_OFFSET_C;
         } else {
-            data.offBoardTempC = tempC;
+            data.rawOffBoardTempC = tempC;
         }
         ESP_LOGD(TAG, "%s temp updated: t=%.1f", sensorName, tempC);
         return true;

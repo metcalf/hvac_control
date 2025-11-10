@@ -7,7 +7,7 @@ double PIDAlgorithm::update(const ControllerDomain::SensorData &sensorData,
                             std::chrono::steady_clock::time_point now) {
     double setpoint_c = isHeater_ ? setpoints.heatTempC : setpoints.coolTempC;
 
-    double deltaC = setpoint_c - sensorData.onBoardTempC;
+    double deltaC = setpoint_c - sensorData.tempC;
     int sign = isHeater_ ? 1 : -1;
 
     // Reset the integral when the setpoint changes

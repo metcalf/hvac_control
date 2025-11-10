@@ -160,7 +160,8 @@
       "scd4x_sensirion_common.h": "c",
       "__availability": "cpp",
       "regex": "cpp",
-      "delay.h": "c"
+      "delay.h": "c",
+      "span": "cpp"
     },
     "search.exclude": {
       "**/build": true

@@ -6,9 +6,9 @@ double ValveAlgorithm::update(const ControllerDomain::SensorData &sensorData,
                               std::chrono::steady_clock::time_point now) {
     double delta;
     if (isHeater_) {
-        delta = setpoints.heatTempC - sensorData.onBoardTempC;
+        delta = setpoints.heatTempC - sensorData.tempC;
     } else {
-        delta = sensorData.onBoardTempC - setpoints.coolTempC;
+        delta = sensorData.tempC - setpoints.coolTempC;
     }
 
     if (isOn_) {

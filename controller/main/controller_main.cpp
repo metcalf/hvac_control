@@ -51,9 +51,6 @@
 
 #define POSIX_TZ_STR "PST8PDT,M3.2.0/2:00:00,M11.1.0/2:00:00"
 
-// All of the devices read high, I think due to heating from the board so correct for that
-// in addition to any per-device offset.
-#define IN_TEMP_BASE_OFFSET_C -3.3
 
 static const char *TAG = "MAIN";
 
@@ -231,8 +228,7 @@ extern "C" void controller_main() {
     valveCtrl_.init();
 
     app_ = new ControllerApp(config, uiManager_, modbusController_, &sensors_, &valveCtrl_, &wifi_,
-                             &appConfigStore_, &homeCli_, ota_, uiEvtRcv, esp_restart,
-                             IN_TEMP_BASE_OFFSET_C);
+                             &appConfigStore_, &homeCli_, ota_, uiEvtRcv, esp_restart);
     xTaskCreate(uiTask, "uiTask", UI_TASK_STACK_SIZE, uiManager_, UI_TASK_PRIO, NULL);
 
     setenv("TZ", POSIX_TZ_STR, 1);
@@ -268,7 +264,7 @@ extern "C" void controller_main() {
     netTaskMgr_->start();
 
     // Wait for sensors to have valid data
-    while (std::isnan(sensors_.getLatest().onBoardTempC)) {
+    while (std::isnan(sensors_.getLatest().rawOnBoardTempC)) {
         vTaskDelay(pdMS_TO_TICKS(100));
     }
 
