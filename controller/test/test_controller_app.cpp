@@ -538,8 +538,53 @@ TEST_F(ControllerAppTest, InvalidTimeSetpoints) {
     app_->task();
 }
 
-// TODO: Write lots more tests!!
+TEST_F(ControllerAppTest, AllowHVACChangeLimit) {
+    sensors_.setLatest({.tempC = 16.0, .humidity = 2.0, .co2 = 500});
+
+    // Initial heating call
+    app_->task();
+    auto fcReq = modbusController_.getFancoilRequest();
+    EXPECT_FALSE(fcReq.cool);
+    EXPECT_EQ(FancoilSpeed::High, fcReq.speed);
+
+    // Changing speed is OK without waiting
+    sensors_.setLatest({.tempC = 18.5, .humidity = 2.0, .co2 = 500});
+    app_->task();
+    fcReq = modbusController_.getFancoilRequest();
+    EXPECT_FALSE(fcReq.cool);
+    EXPECT_EQ(FancoilSpeed::Low, fcReq.speed);
+
+    // Immediate request to turn off should be delayed
+    sensors_.setLatest({.tempC = 22.0, .humidity = 2.0, .co2 = 500});
+    app_->task();
+    app_->task();
+    fcReq = modbusController_.getFancoilRequest();
+    EXPECT_FALSE(fcReq.cool);
+    EXPECT_EQ(FancoilSpeed::Low, fcReq.speed);
+
+    // Immediate request to switch modes should be delayed
+    sensors_.setLatest({.tempC = 30.0, .humidity = 2.0, .co2 = 500});
+    setOutdoorTempC(AC_ON_MIN_OUT_TEMP_C);
+    app_->task();
+    fcReq = modbusController_.getFancoilRequest();
+    EXPECT_FALSE(fcReq.cool);
+    EXPECT_EQ(FancoilSpeed::Low, fcReq.speed);
+
+    // After the minimum interval, the change should be allowed
+    app_->steadyNow_ += MIN_HVAC_ON_INTERVAL;
+    app_->task();
+    fcReq = modbusController_.getFancoilRequest();
+    EXPECT_TRUE(fcReq.cool);
+    EXPECT_EQ(FancoilSpeed::High, fcReq.speed);
+
+    // After the minimum interval, turning off should be allowed
+    sensors_.setLatest({.tempC = 20.0, .humidity = 2.0, .co2 = 500});
+    app_->steadyNow_ += MIN_HVAC_ON_INTERVAL;
+    app_->task();
+    fcReq = modbusController_.getFancoilRequest();
+    EXPECT_EQ(FancoilSpeed::Off, fcReq.speed);
+}
+
 // Indoor and outdoor temp offsets?
 // Separate tests for PID algorithm?
-// allowHVACChange (and consequences)
 // static pressure measurement

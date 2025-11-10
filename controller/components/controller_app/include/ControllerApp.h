@@ -246,8 +246,8 @@ class ControllerApp {
     void setTempOverride(AbstractUIManager::TempOverride);
     uint16_t localMinOfDay();
     void logState(const ControllerDomain::FreshAirState &freshAirState,
-                  const ControllerDomain::SensorData &sensorData,
-                  double ventDemand, double fanCoolDemand, double heatDemand, double coolDemand,
+                  const ControllerDomain::SensorData &sensorData, double ventDemand,
+                  double fanCoolDemand, double heatDemand, double coolDemand,
                   const ControllerDomain::Setpoints &setpoints,
                   const ControllerDomain::HVACState hvacState, const FanSpeed fanSpeed);
     void checkWifiState();
@@ -259,7 +259,10 @@ class ControllerApp {
     void setVacation(bool on);
     void setSystemPower(bool on);
     bool allowHVACChange(bool cool, bool on);
-    void resetHVACChangeLimit() { hvacLastTurnedOn_ = {}; }
+    void resetHVACChangeLimit() {
+        hvacLastTurnedOn_ = {};
+        hvacChangeLimited_ = false;
+    }
     const char *hvacModeStr(bool cool, bool on);
 
     Config config_;
@@ -298,6 +301,7 @@ class ControllerApp {
 
     std::chrono::steady_clock::time_point hvacLastTurnedOn_{};
     bool hvacLastCool_;
+    bool hvacChangeLimited_ = false;
     Setpoints lastSetpoints_{};
     FancoilSpeed lastHvacSpeed_ = FancoilSpeed::Off; // High == valve on
 

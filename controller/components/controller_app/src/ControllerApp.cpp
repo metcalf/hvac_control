@@ -509,6 +509,7 @@ bool ControllerApp::allowHVACChange(bool cool, bool on) {
         allow = true;
 
         if (on) {
+            ESP_LOGW(TAG, "HVAC turning on to %s", hvacModeStr(cool, on));
             hvacLastCool_ = cool;
             hvacLastTurnedOn_ = now;
         }
@@ -533,8 +534,13 @@ bool ControllerApp::allowHVACChange(bool cool, bool on) {
     }
 
     if (allow) {
+        if (hvacChangeLimited_) {
+            ESP_LOGW(TAG, "HVAC change to %s allowed after delay", hvacModeStr(cool, on));
+        }
+        hvacChangeLimited_ = false;
         clearMessage(MsgID::HVACChangeLimit);
-    } else {
+    } else if (!hvacChangeLimited_) {
+        hvacChangeLimited_ = true;
         setErrMessageF(MsgID::HVACChangeLimit, true, "delaying switch from %s to %s",
                        hvacModeStr(hvacLastCool_, wasOn), hvacModeStr(cool, on));
     }
