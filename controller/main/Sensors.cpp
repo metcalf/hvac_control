@@ -28,10 +28,10 @@ Sensors::Sensors() {
 bool Sensors::init() {
     int8_t err;
 
-    err = sts3x_probe();
+    err = sts3x_probe(STS3X_ADDR_PIN_LOW_ADDRESS);
     if (err != 0) {
         vTaskDelay(pdMS_TO_TICKS(2));
-        err = sts3x_probe();
+        err = sts3x_probe(STS3X_ADDR_PIN_LOW_ADDRESS);
         if (err != 0) {
             ESP_LOGE(TAG, "STS init error %d", err);
             return false;
@@ -54,7 +54,7 @@ bool Sensors::pollInternal(SensorData &prevData) {
     prevData.errMsg[0] = 0;
     int16_t err;
 
-    err = sts3x_measure();
+    err = sts3x_measure(STS3X_ADDR_PIN_LOW_ADDRESS);
     if (err != 0) {
         snprintf(prevData.errMsg, sizeof(prevData.errMsg), "Temp measure error %d", err);
         return false;
@@ -91,7 +91,7 @@ bool Sensors::pollInternal(SensorData &prevData) {
     xTaskDelayUntil(&start, pdMS_TO_TICKS((STS3X_MEASUREMENT_DURATION_USEC + 500) / 1000));
 
     int32_t stsTempMC;
-    err = sts3x_read(&stsTempMC);
+    err = sts3x_read(STS3X_ADDR_PIN_LOW_ADDRESS, &stsTempMC);
     if (err == 0) {
         prevData.tempC = stsTempMC / 1000.0;
         ESP_LOGD(TAG, "Temp updated: t=%.1f", prevData.tempC);
