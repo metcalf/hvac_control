@@ -6,7 +6,7 @@
 
 class MockUIManager : public AbstractUIManager {
   public:
-    MOCK_METHOD(void, setAQI, (uint16_t aqi), (override));
+    MOCK_METHOD(void, setAQI, (int16_t aqi), (override));
     MOCK_METHOD(void, setCurrentFanSpeed, (uint8_t speed), (override));
     MOCK_METHOD(void, setOutTempC, (double tc), (override));
     MOCK_METHOD(void, setInTempC, (double tc), (override));
