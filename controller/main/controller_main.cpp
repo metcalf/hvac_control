@@ -264,7 +264,7 @@ extern "C" void controller_main() {
     netTaskMgr_->start();
 
     // Wait for sensors to have valid data
-    while (std::isnan(sensors_.getLatest().rawOnBoardTempC)) {
+    while (std::isnan(sensors_.getLatest().tempC)) {
         vTaskDelay(pdMS_TO_TICKS(100));
     }
 
