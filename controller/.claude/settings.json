@@ -1,0 +1,6 @@
+{
+  "permissions": {
+    "additionalDirectories": ["../components"],
+    "deny": ["./squareline/**"]
+  }
+}
