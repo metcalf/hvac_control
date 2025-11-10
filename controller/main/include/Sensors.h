@@ -26,6 +26,8 @@ class Sensors : public AbstractSensors {
     SensorData lastData_ = {};
     SemaphoreHandle_t mutex_;
     CO2Calibration *co2Calibration_;
+    bool offBoardSensorAvailable_ = false;
 
     bool pollInternal(SensorData &);
+    bool readStsTemperature(uint8_t address, const char* sensorName, SensorData& data);
 };

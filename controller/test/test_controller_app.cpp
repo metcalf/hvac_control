@@ -147,7 +147,7 @@ class ControllerAppTest : public testing::Test {
 TEST_F(ControllerAppTest, Boots) {
     ExpectationSet uiInits;
 
-    sensors_.setLatest({.tempC = 20.0, .humidity = 2.0, .co2 = 456});
+    sensors_.setLatest({.onBoardTempC = 20.0, .humidity = 2.0, .co2 = 456});
 
     // AtMost is somewhat arbitrary, just making sure it's not crazy high
     EXPECT_CALL(uiManager_, clearMessage(_)).Times(AtMost(10));
@@ -166,7 +166,7 @@ TEST_F(ControllerAppTest, Boots) {
 }
 
 TEST_F(ControllerAppTest, CallsForVenting) {
-    sensors_.setLatest({.tempC = 20.0, .humidity = 2.0, .co2 = 1150});
+    sensors_.setLatest({.onBoardTempC = 20.0, .humidity = 2.0, .co2 = 1150});
 
     // Start venting
     app_->task();
@@ -190,7 +190,7 @@ TEST_F(ControllerAppTest, CallsForVenting) {
 }
 
 TEST_F(ControllerAppTest, UsesFanCoolingWhenOutdoorTempAllows) {
-    sensors_.setLatest({.tempC = 25.0, .humidity = 2.0, .co2 = 500});
+    sensors_.setLatest({.onBoardTempC = 25.0, .humidity = 2.0, .co2 = 500});
 
     // Fan cooling should come on.
     setOutdoorTempC(22);
@@ -214,14 +214,14 @@ TEST_F(ControllerAppTest, CallsForValveHVAC) {
     app_->setConfig(cfg);
 
     // Off
-    sensors_.setLatest({.tempC = 18.8, .humidity = 2.0, .co2 = 500});
+    sensors_.setLatest({.onBoardTempC = 18.8, .humidity = 2.0, .co2 = 500});
     app_->task();
     EXPECT_TRUE(valveCtrl_.set_);
     valveCtrl_.set_ = false;
     EXPECT_FALSE(valveCtrl_.heat_);
 
     // Turn heat on
-    sensors_.setLatest({.tempC = 18.5, .humidity = 2.0, .co2 = 500});
+    sensors_.setLatest({.onBoardTempC = 18.5, .humidity = 2.0, .co2 = 500});
     app_->task();
     EXPECT_TRUE(valveCtrl_.set_);
     valveCtrl_.set_ = false;
@@ -229,7 +229,7 @@ TEST_F(ControllerAppTest, CallsForValveHVAC) {
     EXPECT_TRUE(valveCtrl_.heat_);
 
     // Stays on from hysteresis
-    sensors_.setLatest({.tempC = 18.8, .humidity = 2.0, .co2 = 500});
+    sensors_.setLatest({.onBoardTempC = 18.8, .humidity = 2.0, .co2 = 500});
     app_->task();
     EXPECT_TRUE(valveCtrl_.set_);
     valveCtrl_.set_ = false;
@@ -237,7 +237,7 @@ TEST_F(ControllerAppTest, CallsForValveHVAC) {
     EXPECT_TRUE(valveCtrl_.heat_);
 
     // Turns off
-    sensors_.setLatest({.tempC = 19.1, .humidity = 2.0, .co2 = 500});
+    sensors_.setLatest({.onBoardTempC = 19.1, .humidity = 2.0, .co2 = 500});
     app_->steadyNow_ += MIN_HVAC_ON_INTERVAL; // allowHVACChange
     app_->task();
     EXPECT_TRUE(valveCtrl_.set_);
@@ -246,7 +246,7 @@ TEST_F(ControllerAppTest, CallsForValveHVAC) {
     EXPECT_FALSE(valveCtrl_.heat_);
 
     // Cools
-    sensors_.setLatest({.tempC = 25.0, .humidity = 2.0, .co2 = 500});
+    sensors_.setLatest({.onBoardTempC = 25.0, .humidity = 2.0, .co2 = 500});
     setOutdoorTempC(AC_ON_MIN_OUT_TEMP_C);
     app_->task();
     EXPECT_TRUE(valveCtrl_.set_);
@@ -285,7 +285,7 @@ TEST_F(ControllerAppTest, CallsForFancoilHVAC) {
     setOutdoorTempC(AC_ON_MIN_OUT_TEMP_C);
 
     for (int i = 0; i < nHvacCalls; i++) {
-        sensors_.setLatest({.tempC = fcCallTempSeq[i], .humidity = 2.0, .co2 = 500});
+        sensors_.setLatest({.onBoardTempC = fcCallTempSeq[i], .humidity = 2.0, .co2 = 500});
         app_->steadyNow_ += MIN_HVAC_ON_INTERVAL; // allowHVACChange
         app_->task();
 
@@ -297,7 +297,7 @@ TEST_F(ControllerAppTest, CallsForFancoilHVAC) {
 }
 
 TEST_F(ControllerAppTest, IncreasesFancoilSpeedOverTime) {
-    sensors_.setLatest({.tempC = 18.3, .humidity = 2.0, .co2 = 500});
+    sensors_.setLatest({.onBoardTempC = 18.3, .humidity = 2.0, .co2 = 500});
 
     modbusController_.setFancoilState({.coilTempC = COIL_COLD_TEMP_C + 1}, app_->steadyNow_);
     app_->task();
@@ -314,7 +314,7 @@ TEST_F(ControllerAppTest, IncreasesFancoilSpeedOverTime) {
 
 TEST_F(ControllerAppTest, IncreasesFanSpeedOverTime) {
     // Establish cooling demand and outdoor temp
-    sensors_.setLatest({.tempC = 23, .humidity = 2.0, .co2 = 500});
+    sensors_.setLatest({.onBoardTempC = 23, .humidity = 2.0, .co2 = 500});
     setOutdoorTempC(15);
 
     app_->task();
@@ -328,7 +328,7 @@ TEST_F(ControllerAppTest, IncreasesFanSpeedOverTime) {
 }
 
 TEST_F(ControllerAppTest, CallsForACWithColdCoil) {
-    sensors_.setLatest({.tempC = 22.5, .humidity = 2.0, .co2 = 500});
+    sensors_.setLatest({.onBoardTempC = 22.5, .humidity = 2.0, .co2 = 500});
     setOutdoorTempC(AC_ON_MIN_OUT_TEMP_C);
 
     modbusController_.setFancoilState({.coilTempC = COIL_COLD_TEMP_C + 1}, app_->steadyNow_);
@@ -345,7 +345,7 @@ TEST_F(ControllerAppTest, CallsForACWithColdCoil) {
 }
 
 TEST_F(ControllerAppTest, CallsForACWithHighOutdoorTemp) {
-    sensors_.setLatest({.tempC = 22.5, .humidity = 2.0, .co2 = 500});
+    sensors_.setLatest({.onBoardTempC = 22.5, .humidity = 2.0, .co2 = 500});
     setOutdoorTempC(23);
 
     app_->task();
@@ -361,7 +361,7 @@ TEST_F(ControllerAppTest, CallsForACWithHighOutdoorTemp) {
 }
 
 TEST_F(ControllerAppTest, FanSpeedOverride) {
-    sensors_.setLatest({.tempC = 20.0, .humidity = 2.0, .co2 = 456});
+    sensors_.setLatest({.onBoardTempC = 20.0, .humidity = 2.0, .co2 = 456});
     auto evt = AbstractUIManager::Event{
         AbstractUIManager::EventType::FanOverride,
         {.fanOverride = AbstractUIManager::FanOverride{100, 20}},
@@ -383,7 +383,7 @@ TEST_F(ControllerAppTest, FanSpeedOverride) {
 }
 
 TEST_F(ControllerAppTest, TempOverride) {
-    sensors_.setLatest({.tempC = 23, .humidity = 2.0, .co2 = 456});
+    sensors_.setLatest({.onBoardTempC = 23, .humidity = 2.0, .co2 = 456});
     setOutdoorTempC(AC_ON_MIN_OUT_TEMP_C);
     auto evt = AbstractUIManager::Event{
         AbstractUIManager::EventType::TempOverride,
@@ -414,7 +414,7 @@ TEST_F(ControllerAppTest, TempOverride) {
 }
 
 TEST_F(ControllerAppTest, ACOverride) {
-    sensors_.setLatest({.tempC = 23, .humidity = 2.0, .co2 = 456});
+    sensors_.setLatest({.onBoardTempC = 23, .humidity = 2.0, .co2 = 456});
     setOutdoorTempC(AC_ON_MIN_OUT_TEMP_C);
 
     // No A/C
@@ -444,7 +444,7 @@ TEST_F(ControllerAppTest, ACOverride) {
     EXPECT_EQ(FancoilSpeed::Off, fcReq.speed);
 
     // Override "Normal"
-    sensors_.setLatest({.tempC = 30.0, .humidity = 2.0, .co2 = 456});
+    sensors_.setLatest({.onBoardTempC = 30.0, .humidity = 2.0, .co2 = 456});
     evt.payload.acOverride = AbstractUIManager::ACOverride::Normal;
     evt_ = &evt;
     app_->task();
@@ -464,7 +464,7 @@ TEST_F(ControllerAppTest, MakeupDemand) {
 }
 
 TEST_F(ControllerAppTest, Precooling) {
-    sensors_.setLatest({.tempC = 25.5, .humidity = 2.0, .co2 = 456});
+    sensors_.setLatest({.onBoardTempC = 25.5, .humidity = 2.0, .co2 = 456});
     setRealNow(std::tm{
         .tm_hour = 12,
         .tm_min = 1,

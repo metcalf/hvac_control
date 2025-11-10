@@ -47,7 +47,7 @@ struct FreshAirState {
 };
 
 struct SensorData {
-    double tempC = std::nan(""), humidity = std::nan("");
+    double onBoardTempC = std::nan(""), offBoardTempC = std::nan(""), humidity = std::nan("");
     uint32_t pressurePa;
     uint16_t co2;
     std::chrono::steady_clock::time_point updateTime;

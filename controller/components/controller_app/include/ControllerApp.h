@@ -247,7 +247,7 @@ class ControllerApp {
     void setTempOverride(AbstractUIManager::TempOverride);
     uint16_t localMinOfDay();
     void logState(const ControllerDomain::FreshAirState &freshAirState,
-                  const ControllerDomain::SensorData &sensorData, double rawInTempC,
+                  const ControllerDomain::SensorData &sensorData, double rawOnBoardTempC, double rawOffBoardTempC,
                   double ventDemand, double fanCoolDemand, double heatDemand, double coolDemand,
                   const ControllerDomain::Setpoints &setpoints,
                   const ControllerDomain::HVACState hvacState, const FanSpeed fanSpeed);

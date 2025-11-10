@@ -33,11 +33,27 @@ bool Sensors::init() {
         vTaskDelay(pdMS_TO_TICKS(2));
         err = sts3x_probe(STS3X_ADDR_PIN_LOW_ADDRESS);
         if (err != 0) {
-            ESP_LOGE(TAG, "STS init error %d", err);
+            ESP_LOGE(TAG, "On-board STS init error %d", err);
             return false;
         }
     }
-    ESP_LOGD(TAG, "STS init successful");
+    ESP_LOGD(TAG, "On-board STS init successful");
+
+    err = sts3x_probe(STS3X_ADDR_PIN_HIGH_ADDRESS);
+    if (err != 0) {
+        vTaskDelay(pdMS_TO_TICKS(2));
+        err = sts3x_probe(STS3X_ADDR_PIN_HIGH_ADDRESS);
+        if (err != 0) {
+            ESP_LOGI(TAG, "Off-board STS not available (error %d)", err);
+            offBoardSensorAvailable_ = false;
+        } else {
+            ESP_LOGD(TAG, "Off-board STS init successful");
+            offBoardSensorAvailable_ = true;
+        }
+    } else {
+        ESP_LOGD(TAG, "Off-board STS init successful");
+        offBoardSensorAvailable_ = true;
+    }
 
     err = co2_init();
     if (err != 0) {
@@ -56,11 +72,20 @@ bool Sensors::pollInternal(SensorData &prevData) {
 
     err = sts3x_measure(STS3X_ADDR_PIN_LOW_ADDRESS);
     if (err != 0) {
-        snprintf(prevData.errMsg, sizeof(prevData.errMsg), "Temp measure error %d", err);
+        snprintf(prevData.errMsg, sizeof(prevData.errMsg), "On-board temp measure error %d", err);
         return false;
     }
     TickType_t start = xTaskGetTickCount();
-    ESP_LOGD(TAG, "STS measurement started");
+    ESP_LOGD(TAG, "On-board STS measurement started");
+
+    if (offBoardSensorAvailable_) {
+        err = sts3x_measure(STS3X_ADDR_PIN_HIGH_ADDRESS);
+        if (err != 0) {
+            snprintf(prevData.errMsg, sizeof(prevData.errMsg), "Off-board temp measure error %d", err);
+            return false;
+        }
+        ESP_LOGD(TAG, "Off-board STS measurement started");
+    }
 
     // Attempt to read CO2 sensor while we wait for the STS to read
     uint16_t co2ppm;
@@ -90,14 +115,10 @@ bool Sensors::pollInternal(SensorData &prevData) {
     // Delay until STS is ready
     xTaskDelayUntil(&start, pdMS_TO_TICKS((STS3X_MEASUREMENT_DURATION_USEC + 500) / 1000));
 
-    int32_t stsTempMC;
-    err = sts3x_read(STS3X_ADDR_PIN_LOW_ADDRESS, &stsTempMC);
-    if (err == 0) {
-        prevData.tempC = stsTempMC / 1000.0;
-        ESP_LOGD(TAG, "Temp updated: t=%.1f", prevData.tempC);
-        tempUpdated = true;
-    } else {
-        snprintf(prevData.errMsg, sizeof(prevData.errMsg), "Temp read error %d", err);
+    tempUpdated = readStsTemperature(STS3X_ADDR_PIN_LOW_ADDRESS, "On-board", prevData);
+
+    if (offBoardSensorAvailable_) {
+        tempUpdated ||= readStsTemperature(STS3X_ADDR_PIN_HIGH_ADDRESS, "Off-board", prevData);
     }
 
     return co2Updated && tempUpdated;
@@ -129,4 +150,22 @@ SensorData Sensors::getLatest() {
     xSemaphoreGive(mutex_);
 
     return data;
+}
+
+bool Sensors::readStsTemperature(uint8_t address, const char* sensorName, SensorData& data) {
+    int32_t stsTempMC;
+    int16_t err = sts3x_read(address, &stsTempMC);
+    if (err == 0) {
+        double tempC = stsTempMC / 1000.0;
+        if (address == STS3X_ADDR_PIN_LOW_ADDRESS) {
+            data.onBoardTempC = tempC;
+        } else {
+            data.offBoardTempC = tempC;
+        }
+        ESP_LOGD(TAG, "%s temp updated: t=%.1f", sensorName, tempC);
+        return true;
+    } else {
+        snprintf(data.errMsg, sizeof(data.errMsg), "%s temp read error %d", sensorName, err);
+        return false;
+    }
 }

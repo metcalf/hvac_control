@@ -563,7 +563,7 @@ uint16_t ControllerApp::localMinOfDay() {
 }
 
 void ControllerApp::logState(const ControllerDomain::FreshAirState &freshAirState,
-                             const ControllerDomain::SensorData &sensorData, double rawInTempC,
+                             const ControllerDomain::SensorData &sensorData, double rawOnBoardTempC, double rawOffBoardTempC,
                              double ventDemand, double fanCoolDemand, double heatDemand,
                              double coolDemand, const ControllerDomain::Setpoints &setpoints,
                              const ControllerDomain::HVACState hvacState, const FanSpeed fanSpeed) {
@@ -605,7 +605,7 @@ void ControllerApp::logState(const ControllerDomain::FreshAirState &freshAirStat
     ESP_LOG_LEVEL(statusLevel, TAG,
                   "ctrl:"
                   // Sensors
-                  " in_t=%0.2f raw_in_t=%0.2f out_t=%0.2f h=%0.1f p=%" PRIu32 " co2=%u"
+                  " in_t=%0.2f raw_in_t_1=%0.2f raw_in_t_2=%0.2f out_t=%0.2f h=%0.1f p=%" PRIu32 " co2=%u"
                   // Setpoints
                   " set_h=%.2f set_c=%.2f set_co2=%u set_r=%s"
                   // DemandRequest
@@ -613,7 +613,7 @@ void ControllerApp::logState(const ControllerDomain::FreshAirState &freshAirStat
                   // HVACState
                   " hvac=%s speed=%s ac=%s coil_c=%d",
                   // Sensors
-                  sensorData.tempC, rawInTempC, outdoorTempC(), sensorData.humidity,
+                  sensorData.onBoardTempC, rawOnBoardTempC, rawOffBoardTempC, outdoorTempC(), sensorData.humidity,
                   sensorData.pressurePa, sensorData.co2,
                   // Setpoints
                   setpoints.heatTempC, setpoints.coolTempC, setpoints.co2,
@@ -942,8 +942,9 @@ void ControllerApp::task(bool firstTime) {
     uiManager_->setCurrentSetpoints(setpoints.heatTempC, setpoints.coolTempC);
 
     SensorData sensorData = sensors_->getLatest();
-    double rawInTempC = sensorData.tempC;
-    sensorData.tempC += config_.inTempOffsetC + inTempBaseOffsetC_;
+    double rawOnBoardTempC = sensorData.onBoardTempC;
+    double rawOffBoardTempC = sensorData.offBoardTempC;
+    sensorData.onBoardTempC += config_.inTempOffsetC + inTempBaseOffsetC_;
 
     double ventDemand = 0, fanCoolDemand = 0, heatDemand = 0, coolDemand = 0;
 
@@ -956,7 +957,7 @@ void ControllerApp::task(bool firstTime) {
 
         clearMessage(MsgID::SensorErr);
 
-        uiManager_->setInTempC(sensorData.tempC);
+        uiManager_->setInTempC(sensorData.onBoardTempC);
         uiManager_->setInCO2(sensorData.co2);
     } else {
         ESP_LOGE(TAG, "%s", sensorData.errMsg);
@@ -965,7 +966,7 @@ void ControllerApp::task(bool firstTime) {
 
     // Not using temp sensor in the fresh air unit for now since it doesn't seem accurate.
     bool wantOutdoorTemp = false;
-    // double coolSetpointDeltaC = sensorData.tempC - setpoints.coolTempC;
+    // double coolSetpointDeltaC = sensorData.onBoardTempC - setpoints.coolTempC;
     // bool wantOutdoorTemp = (coolSetpointDeltaC > 0 && (std::isnan(rawOutdoorTempC_) ||
     //                                                    (steadyNow() - lastOutdoorTempUpdate_) >
     //                                                        OUTDOOR_TEMP_UPDATE_INTERVAL));
@@ -973,7 +974,7 @@ void ControllerApp::task(bool firstTime) {
     FanSpeed speed = computeFanSpeed(ventDemand, fanCoolDemand, wantOutdoorTemp);
     setFanSpeed(speed);
 
-    updateACMode(coolDemand, setpoints.coolTempC, sensorData.tempC, outdoorTempC());
+    updateACMode(coolDemand, setpoints.coolTempC, sensorData.onBoardTempC, outdoorTempC());
     HVACState hvacState = setHVAC(heatDemand, coolDemand, speed);
 
     checkModbusErrors();
@@ -982,7 +983,7 @@ void ControllerApp::task(bool firstTime) {
         uiManager_->bootDone();
     }
 
-    logState(freshAirState, sensorData, rawInTempC, ventDemand, fanCoolDemand, heatDemand,
+    logState(freshAirState, sensorData, rawOnBoardTempC, rawOffBoardTempC, ventDemand, fanCoolDemand, heatDemand,
              coolDemand, setpoints, hvacState, speed);
 
     if (pollUIEvent(true)) {

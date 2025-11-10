@@ -7,7 +7,7 @@ double LinearVentAlgorithm::update(const SensorData &sensorData, const Setpoints
     if (std::isnan(outdoorTempC)) {
         max = 1;
     } else {
-        max = computeVentLimit(setpoints, sensorData.tempC, outdoorTempC);
+        max = computeVentLimit(setpoints, sensorData.onBoardTempC, outdoorTempC);
     }
 
     target = co2_venting_range_.getOutput(sensorData.co2 - setpoints.co2);

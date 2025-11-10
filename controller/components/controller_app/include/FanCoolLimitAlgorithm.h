@@ -13,7 +13,7 @@ class FanCoolLimitAlgorithm : public AbstractDemandAlgorithm {
         if (std::isnan(outdoorTempC)) {
             max = 0;
         } else {
-            max = outdoorTempDeltaCoolingRange_.getOutput(outdoorTempC - sensorData.tempC);
+            max = outdoorTempDeltaCoolingRange_.getOutput(outdoorTempC - sensorData.onBoardTempC);
         }
         double target = algo_->update(sensorData, setpoints, outdoorTempC, now);
 
