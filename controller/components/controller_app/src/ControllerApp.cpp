@@ -563,9 +563,8 @@ uint16_t ControllerApp::localMinOfDay() {
 }
 
 void ControllerApp::logState(const ControllerDomain::FreshAirState &freshAirState,
-                             const ControllerDomain::SensorData &sensorData,
-                             double ventDemand, double fanCoolDemand,
-                             double heatDemand, double coolDemand,
+                             const ControllerDomain::SensorData &sensorData, double ventDemand,
+                             double fanCoolDemand, double heatDemand, double coolDemand,
                              const ControllerDomain::Setpoints &setpoints,
                              const ControllerDomain::HVACState hvacState, const FanSpeed fanSpeed) {
     esp_log_level_t statusLevel;
@@ -615,8 +614,8 @@ void ControllerApp::logState(const ControllerDomain::FreshAirState &freshAirStat
         // HVACState
         " hvac=%s speed=%s ac=%s coil_c=%d",
         // Sensors
-        sensorData.tempC, sensorData.rawOnBoardTempC, sensorData.rawOffBoardTempC, outdoorTempC(), sensorData.humidity,
-        sensorData.pressurePa, sensorData.co2,
+        sensorData.tempC, sensorData.rawOnBoardTempC, sensorData.rawOffBoardTempC, outdoorTempC(),
+        sensorData.humidity, sensorData.pressurePa, sensorData.co2,
         // Setpoints
         setpoints.heatTempC, setpoints.coolTempC, setpoints.co2, setpointReasonToS(setpointReason_),
         // Demands
@@ -965,7 +964,7 @@ void ControllerApp::task(bool firstTime) {
 
     // Not using temp sensor in the fresh air unit for now since it doesn't seem accurate.
     bool wantOutdoorTemp = false;
-    // double coolSetpointDeltaC = sensorData.onBoardTempC - setpoints.coolTempC;
+    // double coolSetpointDeltaC = sensorData.tempC - setpoints.coolTempC;
     // bool wantOutdoorTemp = (coolSetpointDeltaC > 0 && (std::isnan(rawOutdoorTempC_) ||
     //                                                    (steadyNow() - lastOutdoorTempUpdate_) >
     //                                                        OUTDOOR_TEMP_UPDATE_INTERVAL));
@@ -982,8 +981,8 @@ void ControllerApp::task(bool firstTime) {
         uiManager_->bootDone();
     }
 
-    logState(freshAirState, sensorData, ventDemand,
-             fanCoolDemand, heatDemand, coolDemand, setpoints, hvacState, speed);
+    logState(freshAirState, sensorData, ventDemand, fanCoolDemand, heatDemand, coolDemand,
+             setpoints, hvacState, speed);
 
     if (pollUIEvent(true)) {
         // If we found something in the queue, clear the queue before proceeeding with

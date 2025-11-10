@@ -52,7 +52,7 @@ struct SensorData {
     uint32_t pressurePa;
     uint16_t co2;
     std::chrono::steady_clock::time_point updateTime;
-    char errMsg[32];
+    char errMsg[36];
 };
 
 struct Setpoints {

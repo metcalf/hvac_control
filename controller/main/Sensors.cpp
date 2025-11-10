@@ -121,7 +121,7 @@ bool Sensors::pollInternal(SensorData &prevData) {
     tempUpdated = readStsTemperature(STS3X_ADDR_PIN_LOW_ADDRESS, "On-board", prevData);
 
     if (offBoardSensorAvailable_) {
-        tempUpdated ||= readStsTemperature(STS3X_ADDR_PIN_HIGH_ADDRESS, "Off-board", prevData);
+        tempUpdated = tempUpdated || readStsTemperature(STS3X_ADDR_PIN_HIGH_ADDRESS, "Off-board", prevData);
     }
 
     return co2Updated && tempUpdated;
