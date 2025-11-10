@@ -32,7 +32,7 @@
 // since we want to get ahead of the heat
 #define AC_ON_OUT_TEMP_THRESHOLD_C REL_F_TO_C(8.0)
 // Do not turn A/C on if outdoor temp is below this
-#define AC_ON_MIN_OUT_TEMP_C ABS_F_TO_C(72.0)
+#define AC_ON_MIN_OUT_TEMP_C ABS_F_TO_C(70.0)
 // Turn A/C off if outdoor temp falls below this
 #define AC_OFF_OUT_TEMP_C ABS_F_TO_C(60.0)
 // Turn on the A/C if cooling demand exceeds this and another condition is met
