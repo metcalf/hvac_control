@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "additionalDirectories": [
+      "../../components/embedded-sts",
+      "../../components/i2c_manager"
+    ]
+  }
+}

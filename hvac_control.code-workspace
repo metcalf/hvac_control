@@ -51,6 +51,9 @@
     {
       "name": "fancoil_tester",
       "path": "manual_testing/fancoil_tester"
+    },
+    {
+      "path": "manual_testing/temp_board_tester"
     }
   ],
   "settings": {
