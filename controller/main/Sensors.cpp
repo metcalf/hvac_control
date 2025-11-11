@@ -12,7 +12,8 @@
 #define CO2_MIN_CALIBRATION_UPTIME_MS 5 * 60 * 1000
 
 // Fixed temperature offset to correct for PCB heating effects
-#define IN_TEMP_BASE_OFFSET_C -3.3
+#define ONBOARD_TEMP_OFFSET_C -3.3
+#define OFFBOARD_TEMP_OFFSET_C -1.3
 
 static const char *TAG = "SNS";
 
@@ -31,32 +32,19 @@ Sensors::Sensors() {
 bool Sensors::init() {
     int8_t err;
 
-    err = sts3x_probe(STS3X_ADDR_PIN_LOW_ADDRESS);
+    err = initStsTemperature(STS3X_ADDR_PIN_LOW_ADDRESS);
     if (err != 0) {
-        vTaskDelay(pdMS_TO_TICKS(2));
-        err = sts3x_probe(STS3X_ADDR_PIN_LOW_ADDRESS);
-        if (err != 0) {
-            ESP_LOGE(TAG, "On-board STS init error %d", err);
-            return false;
-        }
+        ESP_LOGE(TAG, "On-board STS init error %d", err);
+        return false;
     }
     ESP_LOGD(TAG, "On-board STS init successful");
 
-    err = sts3x_probe(STS3X_ADDR_PIN_HIGH_ADDRESS);
+    err = initStsTemperature(STS3X_ADDR_PIN_HIGH_ADDRESS);
     if (err != 0) {
-        vTaskDelay(pdMS_TO_TICKS(2));
-        err = sts3x_probe(STS3X_ADDR_PIN_HIGH_ADDRESS);
-        if (err != 0) {
-            ESP_LOGI(TAG, "Off-board STS not available (error %d)", err);
-            offBoardSensorAvailable_ = false;
-        } else {
-            ESP_LOGD(TAG, "Off-board STS init successful");
-            offBoardSensorAvailable_ = true;
-        }
-    } else {
-        ESP_LOGD(TAG, "Off-board STS init successful");
-        offBoardSensorAvailable_ = true;
+        ESP_LOGE(TAG, "Off-board STS init error %d", err);
+        return false;
     }
+    ESP_LOGD(TAG, "Off-board STS init successful");
 
     err = co2_init();
     if (err != 0) {
@@ -69,27 +57,28 @@ bool Sensors::init() {
 }
 
 bool Sensors::pollInternal(SensorData &prevData) {
-    bool co2Updated = false, tempUpdated = false;
+    bool co2Updated = false, tempUpdated = false, onboardTempMeasuring = false;
     prevData.errMsg[0] = 0;
     int16_t err;
+
+    err = sts3x_measure(STS3X_ADDR_PIN_HIGH_ADDRESS);
+    if (err != 0) {
+        snprintf(prevData.errMsg, sizeof(prevData.errMsg), "Off-board temp measure error %d", err);
+        ESP_LOGE(TAG, "%s", prevData.errMsg);
+        return false;
+    }
+    ESP_LOGD(TAG, "Off-board STS measurement started");
 
     err = sts3x_measure(STS3X_ADDR_PIN_LOW_ADDRESS);
     if (err != 0) {
         snprintf(prevData.errMsg, sizeof(prevData.errMsg), "On-board temp measure error %d", err);
-        return false;
+        ESP_LOGE(TAG, "%s", prevData.errMsg);
+    } else {
+        ESP_LOGD(TAG, "On-board STS measurement started");
+        onboardTempMeasuring = true;
     }
-    TickType_t start = xTaskGetTickCount();
-    ESP_LOGD(TAG, "On-board STS measurement started");
 
-    if (offBoardSensorAvailable_) {
-        err = sts3x_measure(STS3X_ADDR_PIN_HIGH_ADDRESS);
-        if (err != 0) {
-            snprintf(prevData.errMsg, sizeof(prevData.errMsg), "Off-board temp measure error %d",
-                     err);
-            return false;
-        }
-        ESP_LOGD(TAG, "Off-board STS measurement started");
-    }
+    TickType_t start = xTaskGetTickCount();
 
     // Attempt to read CO2 sensor while we wait for the STS to read
     uint16_t co2ppm;
@@ -97,6 +86,7 @@ bool Sensors::pollInternal(SensorData &prevData) {
     err = co2_read(&co2Updated, &co2ppm, &co2TempC, &co2Humidity);
     if (err != 0) {
         snprintf(prevData.errMsg, sizeof(prevData.errMsg), "CO2 read error %d", err);
+        ESP_LOGE(TAG, "%s", prevData.errMsg);
     } else if (co2Updated) {
         // If the device hasn't been on long enough to stablize, don't update any calibration
         // data, just read it out.
@@ -119,14 +109,24 @@ bool Sensors::pollInternal(SensorData &prevData) {
     // Delay until STS is ready
     xTaskDelayUntil(&start, pdMS_TO_TICKS((STS3X_MEASUREMENT_DURATION_USEC + 500) / 1000));
 
-    bool onBoardTempUpdated = readStsTemperature(STS3X_ADDR_PIN_LOW_ADDRESS, prevData);
-
-    bool offBoardTempUpdated = true;
-    if (offBoardSensorAvailable_) {
-        offBoardTempUpdated = readStsTemperature(STS3X_ADDR_PIN_HIGH_ADDRESS, prevData);
+    // We're no longer using the onboard temp sensor so just read it for logging purposes
+    if (onboardTempMeasuring) {
+        err = readStsTemperature(STS3X_ADDR_PIN_LOW_ADDRESS, prevData.rawOnBoardTempC);
+        if (err != 0) {
+            ESP_LOGW(TAG, "On-board temp read error %d", err);
+        }
     }
 
-    return co2Updated && onBoardTempUpdated && offBoardTempUpdated;
+    err = readStsTemperature(STS3X_ADDR_PIN_HIGH_ADDRESS, prevData.rawOffBoardTempC);
+    if (err == 0) {
+        prevData.tempC = prevData.rawOffBoardTempC + OFFBOARD_TEMP_OFFSET_C;
+        tempUpdated = true;
+    } else {
+        snprintf(prevData.errMsg, sizeof(prevData.errMsg), "Off-board temp read error %d", err);
+        ESP_LOGE(TAG, "%s", prevData.errMsg);
+    }
+
+    return co2Updated && tempUpdated;
 }
 
 bool Sensors::poll() {
@@ -157,22 +157,25 @@ SensorData Sensors::getLatest() {
     return data;
 }
 
-bool Sensors::readStsTemperature(uint8_t address, SensorData &data) {
+int8_t Sensors::initStsTemperature(uint8_t address) {
+    int8_t err = sts3x_probe(address);
+    if (err != 0) {
+        vTaskDelay(pdMS_TO_TICKS(2));
+        err = sts3x_probe(address);
+        if (err != 0) {
+            return false;
+        }
+    }
+    return true;
+}
+
+int16_t Sensors::readStsTemperature(uint8_t address, double &tempC) {
     int32_t stsTempMC;
     int16_t err = sts3x_read(address, &stsTempMC);
     const char *sensorName = (address == STS3X_ADDR_PIN_LOW_ADDRESS) ? "On-board" : "Off-board";
     if (err == 0) {
-        double tempC = stsTempMC / 1000.0;
-        if (address == STS3X_ADDR_PIN_LOW_ADDRESS) {
-            data.rawOnBoardTempC = tempC;
-            data.tempC = tempC + IN_TEMP_BASE_OFFSET_C;
-        } else {
-            data.rawOffBoardTempC = tempC;
-        }
+        tempC = stsTempMC / 1000.0;
         ESP_LOGD(TAG, "%s temp updated: t=%.1f", sensorName, tempC);
-        return true;
-    } else {
-        snprintf(data.errMsg, sizeof(data.errMsg), "%s temp read error %d", sensorName, err);
-        return false;
     }
+    return err;
 }

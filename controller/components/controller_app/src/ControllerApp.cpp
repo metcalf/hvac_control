@@ -965,7 +965,6 @@ void ControllerApp::task(bool firstTime) {
         uiManager_->setInTempC(sensorData.tempC);
         uiManager_->setInCO2(sensorData.co2);
     } else {
-        ESP_LOGE(TAG, "%s", sensorData.errMsg);
         setMessage(MsgID::SensorErr, false, sensorData.errMsg);
     }
 
