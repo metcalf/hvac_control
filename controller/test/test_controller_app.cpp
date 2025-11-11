@@ -341,7 +341,21 @@ TEST_F(ControllerAppTest, CallsForACWithColdCoil) {
     app_->task();
 
     actual = modbusController_.getFancoilRequest();
+    EXPECT_TRUE(actual.cool);
     EXPECT_EQ(actual.speed, FancoilSpeed::Low); // Turns onn with a cold coil
+}
+
+TEST_F(ControllerAppTest, CallsForACWithoutOutdoorTemp) {
+    sensors_.setLatest({.tempC = 25, .humidity = 2.0, .co2 = 500});
+    homeCli_.setState({.weatherObsTime = std::chrono::system_clock::time_point(),
+                       .weatherTempC = std::nan(""),
+                       .err = AbstractHomeClient::Error::FetchError});
+
+    app_->task();
+
+    auto actual = modbusController_.getFancoilRequest();
+    EXPECT_TRUE(actual.cool);
+    EXPECT_EQ(actual.speed, FancoilSpeed::High); // Turns on without outdoor temp
 }
 
 TEST_F(ControllerAppTest, CallsForACWithHighOutdoorTemp) {
@@ -351,12 +365,14 @@ TEST_F(ControllerAppTest, CallsForACWithHighOutdoorTemp) {
     app_->task();
 
     auto actual = modbusController_.getFancoilRequest();
+    EXPECT_TRUE(actual.cool);
     EXPECT_EQ(actual.speed, FancoilSpeed::Off); // Off at lower outdoor temp
 
     setOutdoorTempC(30);
     app_->task();
 
     actual = modbusController_.getFancoilRequest();
+    EXPECT_TRUE(actual.cool);
     EXPECT_EQ(actual.speed, FancoilSpeed::Low); // Turns on with higher outdoor temp
 }
 

@@ -84,7 +84,8 @@ void ControllerApp::updateACMode(const double coolDemand, const double coolSetpo
         // as long as the outdoor temp is above threshold
         if (
             // Outdoor temp and demand must be high enough to turn on at all
-            outTempC >= AC_ON_MIN_OUT_TEMP_C && coolDemand > AC_ON_DEMAND_THRESHOLD &&
+            (outTempC >= AC_ON_MIN_OUT_TEMP_C || std::isnan(outTempC)) &&
+            coolDemand > AC_ON_DEMAND_THRESHOLD &&
             ((inTempC - coolSetpointC) > AC_ON_THRESHOLD_C ||           // Indoor temp is high
              (outTempC - coolSetpointC) > AC_ON_OUT_TEMP_THRESHOLD_C || // Outdoor temp is high
              isCoilCold()                                               // Coil is cold anyway
