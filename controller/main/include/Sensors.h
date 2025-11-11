@@ -29,5 +29,5 @@ class Sensors : public AbstractSensors {
     bool offBoardSensorAvailable_ = false;
 
     bool pollInternal(SensorData &);
-    bool readStsTemperature(uint8_t address, const char* sensorName, SensorData& data);
+    bool readStsTemperature(uint8_t address, SensorData &data);
 };

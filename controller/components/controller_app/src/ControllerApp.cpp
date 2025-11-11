@@ -612,7 +612,8 @@ void ControllerApp::logState(const ControllerDomain::FreshAirState &freshAirStat
         statusLevel, TAG,
         "ctrl:"
         // Sensors
-        " in_t=%0.2f raw_in_t_1=%0.2f raw_in_t_2=%0.2f out_t=%0.2f h=%0.1f p=%" PRIu32 " co2=%u"
+        " in_t=%0.2f raw_in_t_onbrd=%0.2f raw_in_t_offbrd=%0.2f out_t=%0.2f h=%0.1f p=%" PRIu32
+        " co2=%u"
         // Setpoints
         " set_h=%.2f set_c=%.2f set_co2=%u set_r=%s"
         // DemandRequest

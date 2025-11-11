@@ -84,7 +84,8 @@ bool Sensors::pollInternal(SensorData &prevData) {
     if (offBoardSensorAvailable_) {
         err = sts3x_measure(STS3X_ADDR_PIN_HIGH_ADDRESS);
         if (err != 0) {
-            snprintf(prevData.errMsg, sizeof(prevData.errMsg), "Off-board temp measure error %d", err);
+            snprintf(prevData.errMsg, sizeof(prevData.errMsg), "Off-board temp measure error %d",
+                     err);
             return false;
         }
         ESP_LOGD(TAG, "Off-board STS measurement started");
@@ -118,13 +119,14 @@ bool Sensors::pollInternal(SensorData &prevData) {
     // Delay until STS is ready
     xTaskDelayUntil(&start, pdMS_TO_TICKS((STS3X_MEASUREMENT_DURATION_USEC + 500) / 1000));
 
-    tempUpdated = readStsTemperature(STS3X_ADDR_PIN_LOW_ADDRESS, "On-board", prevData);
+    bool onBoardTempUpdated = readStsTemperature(STS3X_ADDR_PIN_LOW_ADDRESS, prevData);
 
+    bool offBoardTempUpdated = true;
     if (offBoardSensorAvailable_) {
-        tempUpdated = tempUpdated || readStsTemperature(STS3X_ADDR_PIN_HIGH_ADDRESS, "Off-board", prevData);
+        offBoardTempUpdated = readStsTemperature(STS3X_ADDR_PIN_HIGH_ADDRESS, prevData);
     }
 
-    return co2Updated && tempUpdated;
+    return co2Updated && onBoardTempUpdated && offBoardTempUpdated;
 }
 
 bool Sensors::poll() {
@@ -155,9 +157,10 @@ SensorData Sensors::getLatest() {
     return data;
 }
 
-bool Sensors::readStsTemperature(uint8_t address, const char* sensorName, SensorData& data) {
+bool Sensors::readStsTemperature(uint8_t address, SensorData &data) {
     int32_t stsTempMC;
     int16_t err = sts3x_read(address, &stsTempMC);
+    const char *sensorName = (address == STS3X_ADDR_PIN_LOW_ADDRESS) ? "On-board" : "Off-board";
     if (err == 0) {
         double tempC = stsTempMC / 1000.0;
         if (address == STS3X_ADDR_PIN_LOW_ADDRESS) {
