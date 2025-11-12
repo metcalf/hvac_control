@@ -4,7 +4,7 @@
 
 double PIDAlgorithm::update(const ControllerDomain::SensorData &sensorData,
                             const ControllerDomain::Setpoints &setpoints, const double outdoorTempC,
-                            std::chrono::steady_clock::time_point now) {
+                            std::chrono::steady_clock::time_point now, bool outputActive) {
     double setpoint_c = isHeater_ ? setpoints.heatTempC : setpoints.coolTempC;
 
     double deltaC = setpoint_c - sensorData.tempC;
@@ -16,10 +16,11 @@ double PIDAlgorithm::update(const ControllerDomain::SensorData &sensorData,
         lastSetpointC_ = setpoint_c;
     }
 
-    return getDemand(sign * deltaC, now);
+    return getDemand(sign * deltaC, now, outputActive);
 }
 
-double PIDAlgorithm::getDemand(double deltaC, std::chrono::steady_clock::time_point now) {
+double PIDAlgorithm::getDemand(double deltaC, std::chrono::steady_clock::time_point now,
+                               bool outputActive) {
     double err = deltaC / pRangeC_;
 
     std::chrono::seconds deltaS =
@@ -28,10 +29,10 @@ double PIDAlgorithm::getDemand(double deltaC, std::chrono::steady_clock::time_po
 
     double iBefore = i_;
 
-    // Do not integrate when 0 < deltaC < deadband to avoid windup close to setpoint
+    // Do not integrate when the output is not active to avoid windup close to setpoint
     // causing fans to oscillate on/off. We continue to integrate negative
     // errors since we want to keep recovery from overshoot smooth.
-    if (deltaC < 0 || deltaC > iDeadbandC_) {
+    if (deltaC < 0 || outputActive) {
         i_ += err * deltaS.count();
     }
     double iAfterAdd = i_;
@@ -41,7 +42,7 @@ double PIDAlgorithm::getDemand(double deltaC, std::chrono::steady_clock::time_po
     i_ = clamp(i_, 0.0, tiSecs_ * (1 - err)); // Keep err + iDemand <= 1
     double iAfterClamp2 = i_;
 
-    double iDemand = i_ / tiSecs_;
+    double iDemand = (i_ / tiSecs_);
     double demand = clamp(err + iDemand);
 
     ESP_LOGD("PID",

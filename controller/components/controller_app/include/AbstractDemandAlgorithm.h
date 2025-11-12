@@ -33,7 +33,7 @@ class AbstractDemandAlgorithm {
 
     virtual double update(const ControllerDomain::SensorData &sensor_data,
                           const ControllerDomain::Setpoints &setpoints, const double outdoorTempC,
-                          std::chrono::steady_clock::time_point now) = 0;
+                          std::chrono::steady_clock::time_point now, bool outputActive) = 0;
 
   protected:
     using Setpoints = ControllerDomain::Setpoints;

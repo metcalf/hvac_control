@@ -8,14 +8,14 @@ class FanCoolLimitAlgorithm : public AbstractDemandAlgorithm {
 
     double update(const ControllerDomain::SensorData &sensorData,
                   const ControllerDomain::Setpoints &setpoints, const double outdoorTempC,
-                  std::chrono::steady_clock::time_point now) override {
+                  std::chrono::steady_clock::time_point now, bool outputActive) override {
         double max;
         if (std::isnan(outdoorTempC)) {
             max = 0;
         } else {
             max = outdoorTempDeltaCoolingRange_.getOutput(outdoorTempC - sensorData.tempC);
         }
-        double target = algo_->update(sensorData, setpoints, outdoorTempC, now);
+        double target = algo_->update(sensorData, setpoints, outdoorTempC, now, outputActive);
 
         return std::min(target, max);
     }

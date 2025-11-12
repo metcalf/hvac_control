@@ -272,7 +272,7 @@ bool ControllerApp::pollUIEvent(bool wait) {
         localtime_r(&expireUTC, &expireLocalTm);
 
         setMessageF(MsgID::FanOverride, true, "Fan set to %u%% until %02d:%02d%s",
-                    (uint8_t)(fanOverrideSpeed_ / 255.0 * 100), 
+                    (uint8_t)(fanOverrideSpeed_ / 255.0 * 100),
                     expireLocalTm.tm_hour % 12 == 0 ? 12 : expireLocalTm.tm_hour % 12,
                     expireLocalTm.tm_min, expireLocalTm.tm_hour < 12 ? "AM" : "PM");
         break;
@@ -957,11 +957,16 @@ void ControllerApp::task(bool firstTime) {
     double ventDemand = 0, fanCoolDemand = 0, heatDemand = 0, coolDemand = 0;
 
     if (strlen(sensorData.errMsg) == 0) {
-        ventDemand = ventAlgo_->update(sensorData, setpoints, outdoorTempC(), steadyNow());
+        bool hvacWasOn = (lastHvacSpeed_ != FancoilSpeed::Off);
+
+        ventDemand =
+            ventAlgo_->update(sensorData, setpoints, outdoorTempC(), steadyNow(), fanIsOn_);
         fanCoolDemand =
-            fanCoolLimitAlgo_->update(sensorData, setpoints, outdoorTempC(), steadyNow());
-        heatDemand = heatAlgo_->update(sensorData, setpoints, outdoorTempC(), steadyNow());
-        coolDemand = coolAlgo_->update(sensorData, setpoints, outdoorTempC(), steadyNow());
+            fanCoolLimitAlgo_->update(sensorData, setpoints, outdoorTempC(), steadyNow(), fanIsOn_);
+        heatDemand = heatAlgo_->update(sensorData, setpoints, outdoorTempC(), steadyNow(),
+                                       hvacWasOn && !hvacLastCool_);
+        coolDemand = coolAlgo_->update(sensorData, setpoints, outdoorTempC(), steadyNow(),
+                                       hvacWasOn && hvacLastCool_);
 
         clearMessage(MsgID::SensorErr);
 

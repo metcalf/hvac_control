@@ -2,7 +2,7 @@
 
 double LinearVentAlgorithm::update(const SensorData &sensorData, const Setpoints &setpoints,
                                    const double outdoorTempC,
-                                   std::chrono::steady_clock::time_point now) {
+                                   std::chrono::steady_clock::time_point now, bool outputActive) {
     double max, target;
     if (std::isnan(outdoorTempC)) {
         max = 1;

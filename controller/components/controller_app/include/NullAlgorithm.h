@@ -8,7 +8,7 @@ class NullAlgorithm : public AbstractDemandAlgorithm {
 
     double update(const ControllerDomain::SensorData &sensorData,
                   const ControllerDomain::Setpoints &setpoints, const double outdoorTempC,
-                  std::chrono::steady_clock::time_point now) override {
+                  std::chrono::steady_clock::time_point now, bool outputActive) override {
         return 0;
     }
 };

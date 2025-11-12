@@ -2,7 +2,7 @@
 
 double LinearFancoilAlgorithm::update(const SensorData &sensorData, const Setpoints &setpoints,
                                       const double outdoorTempC,
-                                      std::chrono::steady_clock::time_point now) {
+                                      std::chrono::steady_clock::time_point now, bool outputActive) {
 
     double delta;
     if (isHeater_) {
