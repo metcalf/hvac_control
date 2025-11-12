@@ -266,13 +266,15 @@ bool ControllerApp::pollUIEvent(bool wait) {
         ESP_LOGI(TAG, "FanOveride: speed=%u mins=%u", fanOverrideSpeed_,
                  uiEvent.payload.fanOverride.timeMins);
 
-        struct tm nowLocalTm;
-        time_t nowUTC = std::chrono::system_clock::to_time_t(realNow());
-        localtime_r(&nowUTC, &nowLocalTm);
+        struct tm expireLocalTm;
+        time_t expireUTC = std::chrono::system_clock::to_time_t(
+            realNow() + std::chrono::minutes{uiEvent.payload.fanOverride.timeMins});
+        localtime_r(&expireUTC, &expireLocalTm);
 
         setMessageF(MsgID::FanOverride, true, "Fan set to %u%% until %02d:%02d%s",
-                    (uint8_t)(fanOverrideSpeed_ / 255.0 * 100), (nowLocalTm.tm_hour % 12) + 1,
-                    nowLocalTm.tm_min, nowLocalTm.tm_hour < 11 ? "AM" : "PM");
+                    (uint8_t)(fanOverrideSpeed_ / 255.0 * 100), 
+                    expireLocalTm.tm_hour % 12 == 0 ? 12 : expireLocalTm.tm_hour % 12,
+                    expireLocalTm.tm_min, expireLocalTm.tm_hour < 12 ? "AM" : "PM");
         break;
     }
     case EventType::TempOverride: {

@@ -384,6 +384,14 @@ TEST_F(ControllerAppTest, FanSpeedOverride) {
     };
     evt_ = &evt;
 
+    // Confirm that the override message is correct but ignore other setMessage calls
+    EXPECT_CALL(uiManager_, setMessage(static_cast<uint8_t>(ControllerApp::MsgID::FanOverride),
+                                       true, testing::StrEq("Fan set to 39% until 02:20AM")));
+    EXPECT_CALL(uiManager_,
+                setMessage(testing::Ne(static_cast<uint8_t>(ControllerApp::MsgID::FanOverride)),
+                           testing::_, testing::_))
+        .Times(testing::AnyNumber());
+
     // Since we poll for the UI event at the end of `task`, we need to call twice to
     // update the fan in response to the UI event.
     app_->task();
