@@ -114,25 +114,26 @@ def write_tsv(name, rows):
     if not rows:
         return
 
-    # Collect all unique keys across all rows
-    all_keys = set()
-    for row in rows:
-        all_keys.update(row.keys())
+    # Collect all unique keys in the order they first appear
+    ordered_keys = ['timestamp']
+    seen_keys = {'timestamp'}
 
-    # Sort keys: timestamp first, then alphabetically
-    all_keys.discard('timestamp')
-    sorted_keys = ['timestamp'] + sorted(all_keys)
+    for row in rows:
+        for key in row.keys():
+            if key not in seen_keys:
+                ordered_keys.append(key)
+                seen_keys.add(key)
 
     # Write TSV
     output_file = f"{name}.tsv"
     with open(output_file, 'w', encoding='utf-8') as f:
         # Write header
-        f.write('\t'.join(sorted_keys) + '\n')
+        f.write('\t'.join(ordered_keys) + '\n')
 
         # Write data rows
         for row in rows:
             values = []
-            for key in sorted_keys:
+            for key in ordered_keys:
                 if key == 'timestamp':
                     # Format timestamp for Excel/Sheets (without microseconds and timezone)
                     ts = row.get(key, '')
