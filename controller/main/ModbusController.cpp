@@ -21,7 +21,7 @@ void ModbusController::doMakeup() {
 
 void ModbusController::doSetFreshAir() {
     xSemaphoreTake(mutex_, portMAX_DELAY);
-    FanSpeed speed = requestFreshAirSpeed_;
+    const FanSpeed speed = requestFreshAirSpeed_;
     xSemaphoreGive(mutex_);
 
     esp_err_t err = client_.setFreshAirSpeed(speed);
@@ -83,7 +83,7 @@ void ModbusController::doSetFancoil() {
     }
 
     xSemaphoreTake(mutex_, portMAX_DELAY);
-    FancoilRequest req = requestFancoil_;
+    const FancoilRequest req = requestFancoil_;
     xSemaphoreGive(mutex_);
 
     err = client_.setFancoil(req);
@@ -207,7 +207,7 @@ void ModbusController::setFreshAirSpeed(FanSpeed speed) {
 
     makeRequest(RequestType::SetFreshAirSpeed);
 }
-void ModbusController::setFancoil(const FancoilRequest req) {
+void ModbusController::setFancoil(FancoilRequest req) {
     xSemaphoreTake(mutex_, portMAX_DELAY);
     requestFancoil_ = req;
     xSemaphoreGive(mutex_);

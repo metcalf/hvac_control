@@ -39,7 +39,7 @@ class ModbusController : public AbstractModbusController {
     esp_err_t lastSetFancoilErr() override;
 
     void setFreshAirSpeed(ControllerDomain::FanSpeed speed) override;
-    void setFancoil(const ControllerDomain::FancoilRequest req) override;
+    void setFancoil(ControllerDomain::FancoilRequest req) override;
 
   private:
     using FanSpeed = ControllerDomain::FanSpeed;

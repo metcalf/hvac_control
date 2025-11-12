@@ -433,7 +433,7 @@ ControllerDomain::HVACState ControllerApp::setHVAC(const double heatDemand, cons
         break;
     }
     case Config::HVACType::Valve:
-        bool wantOn = demand > ON_DEMAND_THRESHOLD;
+        const bool wantOn = demand > ON_DEMAND_THRESHOLD;
         if (allowHVACChange(cool, wantOn)) {
             lastHvacSpeed_ = FancoilSpeed::High; // Use `high` for valve on
             valveCtrl_->setMode(cool, wantOn);
@@ -551,7 +551,7 @@ bool ControllerApp::allowHVACChange(bool cool, bool on) {
     return allow;
 }
 
-const char *ControllerApp::hvacModeStr(bool cool, bool on) {
+const char *ControllerApp::hvacModeStr(bool cool, bool on) const {
     if (on) {
         if (cool) {
             return "cool";
@@ -664,7 +664,7 @@ void ControllerApp::checkWifiState() {
     setMessageF(MsgID::Wifi, "Wifi %s%s%s", stateMsg, sep, wifiMsg_);
 }
 
-double ControllerApp::outdoorTempC() { return rawOutdoorTempC_ + config_.outTempOffsetC; }
+double ControllerApp::outdoorTempC() const { return rawOutdoorTempC_ + config_.outTempOffsetC; }
 
 AbstractDemandAlgorithm *ControllerApp::getAlgoForEquipment(ControllerDomain::Config::HVACType type,
                                                             bool isHeat) {

@@ -41,7 +41,7 @@ class SetpointHandler {
         return currentState();
     };
 
-    OutputT currentState() { return cutoffs_[state_idx_].output; }
+    OutputT currentState() const { return cutoffs_[state_idx_].output; }
 
   private:
     const Cutoff *cutoffs_;

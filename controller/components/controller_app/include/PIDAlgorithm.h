@@ -17,10 +17,11 @@ class PIDAlgorithm : public AbstractDemandAlgorithm {
                   std::chrono::steady_clock::time_point now) override;
 
   private:
-    bool isHeater_;
-    double pRangeC_, iDeadbandC_, tiSecs_, i_ = 0, maxIDemand_ = 0.5, lastSetpointC_ = std::nan("");
+    const bool isHeater_;
+    const double pRangeC_, iDeadbandC_, tiSecs_, maxIDemand_ = 0.5;
+    double i_ = 0, lastSetpointC_ = std::nan("");
     std::chrono::steady_clock::time_point lastTime_;
-    std::chrono::seconds maxInterval_;
+    const std::chrono::seconds maxInterval_;
 
     double getDemand(double deltaC, std::chrono::steady_clock::time_point now);
 

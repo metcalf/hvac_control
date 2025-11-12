@@ -134,7 +134,7 @@ class ControllerApp {
 
     enum class ACMode { Off, On, Standby };
 
-    const char *acModeToS(ACMode acMode) {
+    const char *acModeToS(ACMode acMode) const {
         switch (acMode) {
         case ACMode::Off:
             return "OFF";
@@ -147,7 +147,7 @@ class ControllerApp {
         __builtin_unreachable();
     }
 
-    const char *msgIDToS(MsgID id) {
+    const char *msgIDToS(MsgID id) const {
         switch (id) {
         case MsgID::SystemOff:
             return "SystemOff";
@@ -186,7 +186,7 @@ class ControllerApp {
         __builtin_unreachable();
     }
 
-    const char *fanSpeedReasonToS(FanSpeedReason reason) {
+    const char *fanSpeedReasonToS(FanSpeedReason reason) const {
         switch (reason) {
         case FanSpeedReason::Unknown:
             return "unknown";
@@ -207,7 +207,7 @@ class ControllerApp {
         __builtin_unreachable();
     }
 
-    const char *setpointReasonToS(SetpointReason reason) {
+    const char *setpointReasonToS(SetpointReason reason) const {
         switch (reason) {
         case SetpointReason::Unknown:
             return "unknown";
@@ -243,7 +243,7 @@ class ControllerApp {
     ControllerDomain::FreshAirState getFreshAirState();
     int getScheduleIdx(int offset);
     Setpoints getCurrentSetpoints();
-    void setTempOverride(AbstractUIManager::TempOverride);
+    void setTempOverride(AbstractUIManager::TempOverride tempOverride);
     uint16_t localMinOfDay();
     void logState(const ControllerDomain::FreshAirState &freshAirState,
                   const ControllerDomain::SensorData &sensorData, double ventDemand,
@@ -251,7 +251,7 @@ class ControllerApp {
                   const ControllerDomain::Setpoints &setpoints,
                   const ControllerDomain::HVACState hvacState, const FanSpeed fanSpeed);
     void checkWifiState();
-    double outdoorTempC();
+    double outdoorTempC() const;
     AbstractDemandAlgorithm *getAlgoForEquipment(ControllerDomain::Config::HVACType type,
                                                  bool isHeat);
     FancoilSpeed getSpeedForDemand(bool cool, double demand);
@@ -263,7 +263,7 @@ class ControllerApp {
         hvacLastTurnedOn_ = {};
         hvacChangeLimited_ = false;
     }
-    const char *hvacModeStr(bool cool, bool on);
+    const char *hvacModeStr(bool cool, bool on) const;
 
     Config config_;
     bool vacationOn_ = false;
