@@ -162,11 +162,8 @@ int8_t Sensors::initStsTemperature(uint8_t address) {
     if (err != 0) {
         vTaskDelay(pdMS_TO_TICKS(2));
         err = sts3x_probe(address);
-        if (err != 0) {
-            return false;
-        }
     }
-    return true;
+    return err;
 }
 
 int16_t Sensors::readStsTemperature(uint8_t address, double &tempC) {
