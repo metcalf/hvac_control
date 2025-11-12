@@ -6,7 +6,6 @@ Parse HVAC log files and output TSV files grouped by device name.
 import sys
 import gzip
 import re
-from collections import defaultdict
 from datetime import datetime
 from pathlib import Path
 
@@ -56,9 +55,9 @@ def open_file(filepath):
 def process_files(filepaths):
     """
     Process log files and extract paired FreshAir/ctrl lines.
-    Returns: dict mapping name -> list of data rows
+    Returns: list of data rows
     """
-    data_by_name = defaultdict(list)
+    all_rows = []
 
     for filepath in filepaths:
         with open_file(filepath) as f:
@@ -88,7 +87,7 @@ def process_files(filepaths):
 
                         if next_name == name and next_label == 'ctrl':
                             # We have a valid pair!
-                            row = {'timestamp': timestamp}
+                            row = {'timestamp': timestamp, 'name': name}
 
                             # Add FreshAir data with prefix
                             for key, value in kv_dict.items():
@@ -98,7 +97,7 @@ def process_files(filepaths):
                             for key, value in next_kv_dict.items():
                                 row[f'ctrl_{key}'] = value
 
-                            data_by_name[name].append(row)
+                            all_rows.append(row)
 
                             # Skip the next line since we've processed it
                             i += 2
@@ -106,17 +105,17 @@ def process_files(filepaths):
 
             i += 1
 
-    return data_by_name
+    return all_rows
 
 
-def write_tsv(name, rows):
-    """Write data rows to a TSV file."""
+def write_tsv(rows, output_file='output.tsv'):
+    """Write all data rows to a single TSV file."""
     if not rows:
         return
 
     # Collect all unique keys in the order they first appear
-    ordered_keys = ['timestamp']
-    seen_keys = {'timestamp'}
+    ordered_keys = ['timestamp', 'name']
+    seen_keys = {'timestamp', 'name'}
 
     for row in rows:
         for key in row.keys():
@@ -125,7 +124,6 @@ def write_tsv(name, rows):
                 seen_keys.add(key)
 
     # Write TSV
-    output_file = f"{name}.tsv"
     with open(output_file, 'w', encoding='utf-8') as f:
         # Write header
         f.write('\t'.join(ordered_keys) + '\n')
@@ -138,8 +136,8 @@ def write_tsv(name, rows):
                     # Format timestamp for Excel/Sheets (without microseconds and timezone)
                     ts = row.get(key, '')
                     if isinstance(ts, datetime):
-                        # Format as: YYYY-MM-DD HH:MM:SS
-                        ts = ts.strftime('%Y-%m-%d %H:%M:%S')
+                        # Format as: M/D/YYYY H:MM:SS (Google Sheets auto-parses this)
+                        ts = ts.strftime('%-m/%-d/%Y %-H:%M:%S')
                     values.append(str(ts))
                 else:
                     values.append(str(row.get(key, '')))
@@ -156,11 +154,10 @@ def main():
     filepaths = sys.argv[1:]
 
     # Process all files
-    data_by_name = process_files(filepaths)
+    rows = process_files(filepaths)
 
-    # Write TSV files for each name
-    for name, rows in data_by_name.items():
-        write_tsv(name, rows)
+    # Write single TSV file with all data
+    write_tsv(rows)
 
 
 if __name__ == '__main__':
