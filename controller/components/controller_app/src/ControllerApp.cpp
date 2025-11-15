@@ -261,20 +261,25 @@ bool ControllerApp::pollUIEvent(bool wait) {
         break;
     case EventType::FanOverride: {
         fanOverrideSpeed_ = uiEvent.payload.fanOverride.speed;
-        fanOverrideUntil_ =
-            steadyNow() + std::chrono::minutes{uiEvent.payload.fanOverride.timeMins};
-        ESP_LOGI(TAG, "FanOveride: speed=%u mins=%u", fanOverrideSpeed_,
-                 uiEvent.payload.fanOverride.timeMins);
+        uint8_t speedPct = (uint8_t)(fanOverrideSpeed_ / 255.0 * 100);
+        if (uiEvent.payload.fanOverride.timeMins == 0) {
+            fanOverrideUntil_ = std::chrono::steady_clock::time_point::max();
+            setMessageF(MsgID::FanOverride, true, "Fan set to %u%% indefinitely", speedPct);
+        } else {
+            fanOverrideUntil_ =
+                steadyNow() + std::chrono::minutes{uiEvent.payload.fanOverride.timeMins};
+            ESP_LOGI(TAG, "FanOveride: speed=%u mins=%u", fanOverrideSpeed_,
+                     uiEvent.payload.fanOverride.timeMins);
 
-        struct tm expireLocalTm;
-        time_t expireUTC = std::chrono::system_clock::to_time_t(
-            realNow() + std::chrono::minutes{uiEvent.payload.fanOverride.timeMins});
-        localtime_r(&expireUTC, &expireLocalTm);
+            struct tm expireLocalTm;
+            time_t expireUTC = std::chrono::system_clock::to_time_t(
+                realNow() + std::chrono::minutes{uiEvent.payload.fanOverride.timeMins});
+            localtime_r(&expireUTC, &expireLocalTm);
 
-        setMessageF(MsgID::FanOverride, true, "Fan set to %u%% until %02d:%02d%s",
-                    (uint8_t)(fanOverrideSpeed_ / 255.0 * 100),
-                    expireLocalTm.tm_hour % 12 == 0 ? 12 : expireLocalTm.tm_hour % 12,
-                    expireLocalTm.tm_min, expireLocalTm.tm_hour < 12 ? "AM" : "PM");
+            setMessageF(MsgID::FanOverride, true, "Fan set to %u%% until %02d:%02d%s", speedPct,
+                        expireLocalTm.tm_hour % 12 == 0 ? 12 : expireLocalTm.tm_hour % 12,
+                        expireLocalTm.tm_min, expireLocalTm.tm_hour < 12 ? "AM" : "PM");
+        }
         break;
     }
     case EventType::TempOverride: {

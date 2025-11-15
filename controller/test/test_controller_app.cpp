@@ -406,6 +406,41 @@ TEST_F(ControllerAppTest, FanSpeedOverride) {
     EXPECT_EQ(FanSpeedReason::Off, app_->fanSpeedReason());
 }
 
+TEST_F(ControllerAppTest, FanSpeedOverrideIndefinite) {
+    sensors_.setLatest({.tempC = 20.0, .humidity = 2.0, .co2 = 456});
+    auto evt = AbstractUIManager::Event{
+        AbstractUIManager::EventType::FanOverride,
+        {.fanOverride = AbstractUIManager::FanOverride{100, 0}},
+    };
+    evt_ = &evt;
+
+    // Confirm that the override message is correct but ignore other setMessage calls
+    EXPECT_CALL(uiManager_, setMessage(static_cast<uint8_t>(ControllerApp::MsgID::FanOverride),
+                                       true, testing::StrEq("Fan set to 39% indefinitely")));
+    EXPECT_CALL(uiManager_,
+                setMessage(testing::Ne(static_cast<uint8_t>(ControllerApp::MsgID::FanOverride)),
+                           testing::_, testing::_))
+        .Times(testing::AnyNumber());
+
+    // Since we poll for the UI event at the end of `task`, we need to call twice to
+    // update the fan in response to the UI event.
+    app_->task();
+    app_->task();
+    EXPECT_EQ(100, modbusController_.getFreshAirSpeed());
+    EXPECT_EQ(FanSpeedReason::Override, app_->fanSpeedReason());
+
+    // Cancel override
+    evt = AbstractUIManager::Event{
+        AbstractUIManager::EventType::MsgCancel,
+        {.msgID = static_cast<uint8_t>(ControllerApp::MsgID::FanOverride)},
+    };
+    evt_ = &evt;
+    app_->task();
+    app_->task();
+    EXPECT_EQ(0, modbusController_.getFreshAirSpeed());
+    EXPECT_EQ(FanSpeedReason::Off, app_->fanSpeedReason());
+}
+
 TEST_F(ControllerAppTest, TempOverride) {
     sensors_.setLatest({.tempC = 23, .humidity = 2.0, .co2 = 456});
     setOutdoorTempC(AC_ON_MIN_OUT_TEMP_C);
