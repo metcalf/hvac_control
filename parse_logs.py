@@ -108,8 +108,8 @@ def process_files(filepaths):
     return all_rows
 
 
-def write_tsv(rows, output_file='output.tsv'):
-    """Write all data rows to a single TSV file."""
+def write_tsv(rows):
+    """Write all data rows to stdout as TSV."""
     if not rows:
         return
 
@@ -123,27 +123,26 @@ def write_tsv(rows, output_file='output.tsv'):
                 ordered_keys.append(key)
                 seen_keys.add(key)
 
-    # Write TSV
-    with open(output_file, 'w', encoding='utf-8') as f:
-        # Write header
-        f.write('\t'.join(ordered_keys) + '\n')
+    # Write header
+    print('\t'.join(ordered_keys))
 
-        # Write data rows
-        for row in rows:
-            values = []
-            for key in ordered_keys:
-                if key == 'timestamp':
-                    # Format timestamp for Excel/Sheets (without microseconds and timezone)
-                    ts = row.get(key, '')
-                    if isinstance(ts, datetime):
-                        # Format as: M/D/YYYY H:MM:SS (Google Sheets auto-parses this)
-                        ts = ts.strftime('%-m/%-d/%Y %-H:%M:%S')
-                    values.append(str(ts))
-                else:
-                    values.append(str(row.get(key, '')))
-            f.write('\t'.join(values) + '\n')
+    # Write data rows
+    for row in rows:
+        values = []
+        for key in ordered_keys:
+            if key == 'timestamp':
+                # Format timestamp for Excel/Sheets (without microseconds and timezone)
+                ts = row.get(key, '')
+                if isinstance(ts, datetime):
+                    # Format as: M/D/YYYY H:MM:SS (Google Sheets auto-parses this)
+                    ts = ts.strftime('%-m/%-d/%Y %-H:%M:%S')
+                values.append(str(ts))
+            else:
+                values.append(str(row.get(key, '')))
+        print('\t'.join(values))
 
-    print(f"Wrote {len(rows)} rows to {output_file}")
+    # Write status to stderr so it doesn't interfere with TSV output
+    print(f"Wrote {len(rows)} rows", file=sys.stderr)
 
 
 def main():
