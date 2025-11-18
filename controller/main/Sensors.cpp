@@ -13,7 +13,7 @@
 
 // Fixed temperature offset to correct for PCB heating effects
 #define ONBOARD_TEMP_OFFSET_C -3.3
-#define OFFBOARD_TEMP_OFFSET_C -2.05
+#define OFFBOARD_TEMP_OFFSET_C -2.25
 
 static const char *TAG = "SNS";
 
