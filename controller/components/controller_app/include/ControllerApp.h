@@ -242,7 +242,7 @@ class ControllerApp {
     void handleHomeClient();
     ControllerDomain::FreshAirState getFreshAirState();
     int getScheduleIdx(int offset);
-    Setpoints getCurrentSetpoints();
+    Setpoints getCurrentSetpoints(double currTempC);
     void setTempOverride(AbstractUIManager::TempOverride tempOverride);
     uint16_t localMinOfDay();
     void logState(const ControllerDomain::FreshAirState &freshAirState,

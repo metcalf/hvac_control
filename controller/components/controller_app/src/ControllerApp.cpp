@@ -741,7 +741,7 @@ int ControllerApp::getScheduleIdx(int offset) {
     return idx < 0 ? idx + NUM_SCHEDULE_TIMES : idx; // Ensure positive modulus
 }
 
-Setpoints ControllerApp::getCurrentSetpoints() {
+Setpoints ControllerApp::getCurrentSetpoints(double currTempC) {
     int idx = getScheduleIdx(0);
 
     if (idx != -1 && idx == tempOverrideUntilScheduleIdx_) {
@@ -795,8 +795,10 @@ Setpoints ControllerApp::getCurrentSetpoints() {
     };
 
     // If the next scheduled time is at a lower temperature, we adjust the setpoint
-    // to start cooling now.
-    if (config_.systemOn && setpoints.coolTempC > nextSchedule.coolC) {
+    // to start cooling now. We don't display a precooling message if the current
+    // temp is already lower than the next setpoint to avoid unnecessary/confusing messages.
+    if (config_.systemOn && setpoints.coolTempC > nextSchedule.coolC &&
+        currTempC > nextSchedule.coolC) {
         int minsUntilNext = (nextSchedule.startMinOfDay() - localMinOfDay()) % (60 * 24);
         if (minsUntilNext <= PRECOOL_MINS) {
             double precoolC = nextSchedule.coolC + minsUntilNext * PRECOOL_DEG_PER_MIN;
@@ -947,7 +949,10 @@ void ControllerApp::task(bool firstTime) {
     handleHomeClient();
     ControllerDomain::FreshAirState freshAirState = getFreshAirState();
 
-    Setpoints setpoints = getCurrentSetpoints();
+    SensorData sensorData = sensors_->getLatest();
+    sensorData.tempC += config_.inTempOffsetC;
+
+    Setpoints setpoints = getCurrentSetpoints(sensorData.tempC);
     if (setpoints.coolTempC != lastSetpoints_.coolTempC ||
         setpoints.heatTempC != lastSetpoints_.heatTempC) {
         // If the setpoints have changed, allow changes to HVAC state immediately
@@ -955,9 +960,6 @@ void ControllerApp::task(bool firstTime) {
     }
     lastSetpoints_ = setpoints;
     uiManager_->setCurrentSetpoints(setpoints.heatTempC, setpoints.coolTempC);
-
-    SensorData sensorData = sensors_->getLatest();
-    sensorData.tempC += config_.inTempOffsetC;
 
     double ventDemand = 0, fanCoolDemand = 0, heatDemand = 0, coolDemand = 0;
 
