@@ -322,10 +322,10 @@ class ControllerApp {
     // I then tried to map this to some reasonable cutoffs
     static constexpr FancoilCutoff fancoilCoolCutoffs_[] = {
         FancoilCutoff{FancoilSpeed::Off, 0.01}, FancoilCutoff{FancoilSpeed::Low, 0.4},
-        FancoilCutoff{FancoilSpeed::Med, 0.8}, FancoilCutoff{FancoilSpeed::High, 0.99}};
+        FancoilCutoff{FancoilSpeed::Med, 0.7}, FancoilCutoff{FancoilSpeed::High, 0.9}};
     static constexpr FancoilCutoff fancoilHeatCutoffs_[] = {
-        fancoilCoolCutoffs_[0], FancoilCutoff{FancoilSpeed::Min, 0.25},
-        FancoilCutoff{FancoilSpeed::Low, 0.5}, fancoilCoolCutoffs_[2], fancoilCoolCutoffs_[3]};
+        fancoilCoolCutoffs_[0], FancoilCutoff{FancoilSpeed::Min, 0.15}, fancoilCoolCutoffs_[1],
+        fancoilCoolCutoffs_[2], fancoilCoolCutoffs_[3]};
     FancoilSetpointHandler fancoilCoolHandler_;
     FancoilSetpointHandler fancoilHeatHandler_;
 };
