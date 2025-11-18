@@ -42,7 +42,7 @@ class ZCAppTest : public testing::Test {
 
     TestZCApp *app_;
 
-    InputState inputState_;
+    InputState inputState_{.load_control = true};
     AbstractZCUIManager::Event *evt_;
 
     FakeOutIO outIO_;
@@ -88,6 +88,18 @@ TEST_F(ZCAppTest, TurnsOnHeatPump) {
 
     ASSERT_EQ(1, mbClient_.getTestParam(CxRegister::SwitchOnOff));
     ASSERT_EQ(1, mbClient_.getTestParam(CxRegister::ACMode));
+}
+
+TEST_F(ZCAppTest, TurnsOffHeatPumpWhenLoadShedding) {
+    inputState_.fc[0].v = true;
+    app_->task();
+
+    ASSERT_EQ(1, mbClient_.getTestParam(CxRegister::SwitchOnOff));
+
+    inputState_.load_control = false;
+    app_->task();
+
+    ASSERT_EQ(0, mbClient_.getTestParam(CxRegister::SwitchOnOff));
 }
 
 TEST_F(ZCAppTest, TurnsOffZonePumpWithPersistentHeatPumpError) {

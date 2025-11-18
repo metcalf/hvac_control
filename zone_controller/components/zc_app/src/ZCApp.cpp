@@ -18,7 +18,13 @@ void ZCApp::task() {
         OutCtrl::setCalls(currentState_, zioState);
         valveStateManager_->update(currentState_.valves, zioState.valve_sw);
     } else {
-        currentState_ = outCtrl_->update(systemOn_, zioState);
+        currentState_ = outCtrl_->update(systemOn_ && zioState.load_control, zioState);
+    }
+
+    if (!zioState.load_control && systemOn_) {
+        uiManager_->setMessage(MsgID::OffGrid, true, "Power outage--system off");
+    } else {
+        uiManager_->clearMessage(MsgID::OffGrid);
     }
 
     checkStuckValves(zioState.valve_sw);
@@ -127,6 +133,11 @@ void ZCApp::handleCancelMessage(MsgID id) {
         fcPumpChangeLimiter_.reset();
         fcPumpInLimit_ = false;
         break;
+    case MsgID::SystemOff:
+        // Updating the on/off button visibility is handled in ZCUIManager#onCancelMsg
+        // to avoid having to expand the interface of ZCUIManager and deal with locking.
+        systemOn_ = true;
+        break;
     default:
         ESP_LOGE(TAG, "Unexpected message cancellation for: %d", static_cast<int>(id));
     }
@@ -147,6 +158,11 @@ bool ZCApp::pollUIEvent(bool wait) {
         break;
     case EventType::SetSystemPower:
         systemOn_ = evt.payload.systemPower;
+        if (systemOn_) {
+            uiManager_->clearMessage(MsgID::SystemOff);
+        } else {
+            uiManager_->setMessage(MsgID::SystemOff, true, "System off");
+        }
         break;
     case EventType::ResetHVACLockout:
         outCtrl_->resetLockout();
@@ -331,12 +347,14 @@ void ZCApp::checkStuckValves(ValveSWState sws[2]) {
 
 void ZCApp::logInputState(const InputState &s) {
     ESP_LOGW(
-        "ZIO", "FC:%d%d|%d%d|%d%d|%d%d V:%c%c|%c%c|%c%c|%c%c SW: %d|%d",
+        "ZIO", "FC:%d%d|%d%d|%d%d|%d%d V:%c%c|%c%c|%c%c|%c%c SW: %d|%d LC:%d",
         // Fancoils
         s.fc[0].v, s.fc[0].ob, s.fc[1].v, s.fc[1].ob, s.fc[2].v, s.fc[2].ob, s.fc[3].v, s.fc[3].ob,
         // Thermostats
         s.ts[0].w ? 'w' : '_', s.ts[0].y ? 'y' : '_', s.ts[1].w ? 'w' : '_', s.ts[1].y ? 'y' : '_',
         s.ts[2].w ? 'w' : '_', s.ts[2].y ? 'y' : '_', s.ts[3].w ? 'w' : '_', s.ts[3].y ? 'y' : '_',
         // Valve SW
-        static_cast<int>(s.valve_sw[0]), static_cast<int>(s.valve_sw[1]));
+        static_cast<int>(s.valve_sw[0]), static_cast<int>(s.valve_sw[1]),
+        // Load control
+        s.load_control);
 }

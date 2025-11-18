@@ -40,10 +40,11 @@ enum class MsgID {
     ValveSWError,
     HVACLockout,
     Vacation,
-    PowerOut,
+    OffGrid,
     OTA,
     StaleCXMode,
     StateChangeRateLimited,
+    SystemOff,
     _Last,
 };
 

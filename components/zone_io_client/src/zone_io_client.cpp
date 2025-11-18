@@ -75,7 +75,8 @@ bool do_rx(size_t to_rx) {
         BitByte byte = {.byte = zio_buf_[i]};
         if (byte.bits.b7) {
             input_state.ts[2] = {.w = byte.bits.b0, .y = 0};
-            input_state.ts[3] = {.w = byte.bits.b1, .y = 0};
+            // input_state.ts[3] = {.w = byte.bits.b1, .y = 0};
+            input_state.load_control = byte.bits.b1;
             input_state.valve_sw[0] = static_cast<ValveSWState>((byte.byte >> 2) & 0x03);
             input_state.valve_sw[1] = static_cast<ValveSWState>((byte.byte >> 4) & 0x03);
         } else if (byte.bits.b6) {
@@ -88,6 +89,8 @@ bool do_rx(size_t to_rx) {
             input_state.fc[2] = {.v = byte.bits.b4, .ob = byte.bits.b5};
         }
     }
+
+    input_state.load_control = true; // TODO: Remove when powerwall is online
 
     if (input_state == last_input_state_) {
         return false;

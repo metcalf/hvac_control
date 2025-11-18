@@ -21,6 +21,7 @@ struct InputState {
     FancoilState fc[ZONE_IO_NUM_FC];
     ThermostatState ts[ZONE_IO_NUM_TS];
     ValveSWState valve_sw[ZONE_IO_NUM_SW];
+    bool load_control;
 
     bool operator==(const InputState &) const = default;
 };

@@ -92,14 +92,16 @@ const char *ZCDomain::msgIDToS(MsgID id) {
         return "HVACLockout";
     case MsgID::Vacation:
         return "Vacation";
-    case MsgID::PowerOut:
-        return "PowerOut";
+    case MsgID::OffGrid:
+        return "OffGrid";
     case MsgID::OTA:
         return "OTA";
     case MsgID::StaleCXMode:
         return "StaleCXMode";
     case MsgID::StateChangeRateLimited:
         return "StateChangeRateLimited";
+    case MsgID::SystemOff:
+        return "SystemOff";
     case MsgID::_Last:
         return "";
     }

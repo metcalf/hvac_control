@@ -162,11 +162,14 @@ const char *ZCUIManager::getHeatPumpText(HeatPumpMode state) {
 }
 
 void ZCUIManager::onSystemPower(bool on) {
-    objSetVisibility(on, ui_system_off_button);
-    objSetVisibility(!on, ui_system_on_button);
-
+    setSystemPower(on);
     Event evt{EventType::SetSystemPower, EventPayload{.systemPower = on}};
     eventCb_(evt);
+}
+
+void ZCUIManager::setSystemPower(bool on) {
+    objSetVisibility(on, ui_system_off_button);
+    objSetVisibility(!on, ui_system_on_button);
 }
 
 void ZCUIManager::onTestMode(bool on) {
@@ -206,6 +209,10 @@ void ZCUIManager::onPumpToggle(Pump pump) {
 }
 
 void ZCUIManager::onCancelMsg(uint8_t msgID) {
+    if (msgID == static_cast<uint8_t>(ZCDomain::MsgID::SystemOff)) {
+        setSystemPower(true);
+    }
+
     Event evt{EventType::MsgCancel, EventPayload{.msgID = msgID}};
     eventCb_(evt);
 }

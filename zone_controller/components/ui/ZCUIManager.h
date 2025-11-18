@@ -62,6 +62,7 @@ class ZCUIManager : public AbstractZCUIManager {
     const char *getHeatPumpText(HeatPumpMode state);
 
     void onSystemPower(bool on);
+    void setSystemPower(bool on);
     void onTestMode(bool on);
     void onEndLockout();
     void onZoneToggle(uint8_t i);
