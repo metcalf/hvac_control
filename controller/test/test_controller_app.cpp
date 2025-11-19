@@ -259,7 +259,7 @@ double fcCallTempSeq[] = {
     20.0, // Off
     18.6, // Min heating demand
     15.0, // High heating demand
-    18.3, // Medium heating demand
+    18.6, // Medium heating demand
     23.0, // Establish cooling demand below the "ac on" threshold
     25.0, // Establish cooling demand at a high enough level to trigger "ac on"
     22.3, // With reduced cooling demand, AC should stay on
@@ -611,7 +611,7 @@ TEST_F(ControllerAppTest, AllowHVACChangeLimit) {
     app_->task();
     fcReq = modbusController_.getFancoilRequest();
     EXPECT_FALSE(fcReq.cool);
-    EXPECT_EQ(FancoilSpeed::Low, fcReq.speed);
+    EXPECT_EQ(FancoilSpeed::Med, fcReq.speed);
 
     // Immediate request to turn off should be delayed
     sensors_.setLatest({.tempC = 22.0, .humidity = 2.0, .co2 = 500});
@@ -619,7 +619,7 @@ TEST_F(ControllerAppTest, AllowHVACChangeLimit) {
     app_->task();
     fcReq = modbusController_.getFancoilRequest();
     EXPECT_FALSE(fcReq.cool);
-    EXPECT_EQ(FancoilSpeed::Low, fcReq.speed);
+    EXPECT_EQ(FancoilSpeed::Med, fcReq.speed);
 
     // Immediate request to switch modes should be delayed
     sensors_.setLatest({.tempC = 30.0, .humidity = 2.0, .co2 = 500});
@@ -627,7 +627,7 @@ TEST_F(ControllerAppTest, AllowHVACChangeLimit) {
     app_->task();
     fcReq = modbusController_.getFancoilRequest();
     EXPECT_FALSE(fcReq.cool);
-    EXPECT_EQ(FancoilSpeed::Low, fcReq.speed);
+    EXPECT_EQ(FancoilSpeed::Med, fcReq.speed);
 
     // After the minimum interval, the change should be allowed
     app_->steadyNow_ += MIN_HVAC_ON_INTERVAL;
