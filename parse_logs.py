@@ -8,6 +8,15 @@ import gzip
 import re
 from datetime import datetime
 from pathlib import Path
+from zoneinfo import ZoneInfo
+
+HVAC_SPEEDS = {
+    "OFF": 0,
+    "MIN": 64,
+    "LOW": 128,
+    "MED": 191,
+    "HI": 255,
+}
 
 
 def parse_line(line):
@@ -17,7 +26,7 @@ def parse_line(line):
     """
     # Match: TIMESTAMP NAME CONTEXT LABEL: key=value ...
     # Example: 2025-11-12T05:26:25.361003+00:00 hvac_ctrl_office CTRL: FreshAir: t=23.4 ...
-    match = re.match(r'^(\S+)\s+(\S+)\s+\S+\s+(\w+):\s+(.+)$', line)
+    match = re.match(r"^(\S+)\s+(\S+)\s+\S+\s+(\w+):\s+(.+)$", line)
     if not match:
         return None
 
@@ -26,8 +35,8 @@ def parse_line(line):
     # Parse key-value pairs
     kv_dict = {}
     for kv in rest.split():
-        if '=' in kv:
-            key, value = kv.split('=', 1)
+        if "=" in kv:
+            key, value = kv.split("=", 1)
             kv_dict[key] = value
 
     # Parse timestamp
@@ -42,14 +51,14 @@ def parse_line(line):
 
 def open_file(filepath):
     """Open a file, handling gzip compression and stdin."""
-    if filepath == '-':
+    if filepath == "-":
         return sys.stdin
 
     path = Path(filepath)
-    if path.suffix == '.gz':
-        return gzip.open(filepath, 'rt', encoding='utf-8')
+    if path.suffix == ".gz":
+        return gzip.open(filepath, "rt", encoding="utf-8")
     else:
-        return open(filepath, 'r', encoding='utf-8')
+        return open(filepath, "r", encoding="utf-8")
 
 
 def process_files(filepaths):
@@ -76,26 +85,28 @@ def process_files(filepaths):
             timestamp, name, label, kv_dict = parsed
 
             # Check if this is a FreshAir line
-            if label == 'FreshAir':
+            if label == "FreshAir":
                 # Check if next line is a ctrl line with the same name
                 if i + 1 < len(lines):
                     next_line = lines[i + 1].strip()
                     next_parsed = parse_line(next_line)
 
                     if next_parsed:
-                        next_timestamp, next_name, next_label, next_kv_dict = next_parsed
+                        next_timestamp, next_name, next_label, next_kv_dict = (
+                            next_parsed
+                        )
 
-                        if next_name == name and next_label == 'ctrl':
+                        if next_name == name and next_label == "ctrl":
                             # We have a valid pair!
-                            row = {'timestamp': timestamp, 'name': name}
+                            row = {"timestamp": timestamp, "name": name}
 
                             # Add FreshAir data with prefix
                             for key, value in kv_dict.items():
-                                row[f'freshair_{key}'] = value
+                                row[f"freshair_{key}"] = value
 
                             # Add ctrl data with prefix
                             for key, value in next_kv_dict.items():
-                                row[f'ctrl_{key}'] = value
+                                row[f"ctrl_{key}"] = value
 
                             all_rows.append(row)
 
@@ -114,8 +125,8 @@ def write_tsv(rows):
         return
 
     # Collect all unique keys in the order they first appear
-    ordered_keys = ['timestamp', 'name']
-    seen_keys = {'timestamp', 'name'}
+    ordered_keys = ["timestamp", "name"]
+    seen_keys = {"timestamp", "name"}
 
     for row in rows:
         for key in row.keys():
@@ -123,23 +134,55 @@ def write_tsv(rows):
                 ordered_keys.append(key)
                 seen_keys.add(key)
 
+    ordered_keys.extend(
+        (
+            "Fan On",
+            "Local Time",
+            "Cool Speed",
+            "Heat Speed",
+        )
+    )
+
     # Write header
-    print('\t'.join(ordered_keys))
+    print("\t".join(ordered_keys))
 
     # Write data rows
     for row in rows:
         values = []
         for key in ordered_keys:
-            if key == 'timestamp':
+            if key == "timestamp":
                 # Format timestamp for Excel/Sheets (without microseconds and timezone)
-                ts = row.get(key, '')
+                ts = row.get(key, "")
                 if isinstance(ts, datetime):
                     # Format as: M/D/YYYY H:MM:SS (Google Sheets auto-parses this)
-                    ts = ts.strftime('%-m/%-d/%Y %-H:%M:%S')
+                    ts = ts.strftime("%-m/%-d/%Y %-H:%M:%S")
                 values.append(str(ts))
+            elif key == "Local Time":
+                # Convert timestamp to Pacific Time
+                ts = row.get("timestamp", "")
+                if isinstance(ts, datetime):
+                    # Convert to Pacific Time
+                    pacific_tz = ZoneInfo("America/Los_Angeles")
+                    local_ts = ts.astimezone(pacific_tz)
+                    # Format as: M/D/YYYY H:MM:SS
+                    ts = local_ts.strftime("%-m/%-d/%Y %-H:%M:%S")
+                values.append(str(ts))
+            elif key == "Fan On":
+                values.append(
+                    "255" if row.get("freshair_target_speed", "0") != "0" else "0"
+                )
+            elif key in ("Cool Speed", "Heat Speed"):
+                mode = row.get("ctrl_hvac", "")
+                if (mode == "COOL" and key == "Cool Speed") or (
+                    mode == "HEAT" and key == "Heat Speed"
+                ):
+                    v = str(HVAC_SPEEDS[row["ctrl_speed"]])
+                else:
+                    v = "0"
+                values.append(v)
             else:
-                values.append(str(row.get(key, '')))
-        print('\t'.join(values))
+                values.append(str(row.get(key, "")))
+        print("\t".join(values))
 
     # Write status to stderr so it doesn't interfere with TSV output
     print(f"Wrote {len(rows)} rows", file=sys.stderr)
@@ -159,5 +202,5 @@ def main():
     write_tsv(rows)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
