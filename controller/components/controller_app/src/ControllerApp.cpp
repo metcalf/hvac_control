@@ -687,12 +687,18 @@ AbstractDemandAlgorithm *ControllerApp::getAlgoForEquipment(ControllerDomain::Co
 
 ControllerDomain::FancoilSpeed ControllerApp::getSpeedForDemand(bool cool, double demand) {
     FancoilSetpointHandler *curr, *other;
+
+    // Check if this is a PBR system (logName ends with "_pbr")
+    const char *logName = config_.wifi.logName;
+    size_t logNameLen = strlen(logName);
+    bool isPBR = (logNameLen >= 4 && strcmp(logName + logNameLen - 4, "_pbr") == 0);
+
     if (cool) {
-        curr = &fancoilCoolHandler_;
-        other = &fancoilHeatHandler_;
+        curr = isPBR ? &fancoilPBRCoolHandler_ : &fancoilCoolHandler_;
+        other = isPBR ? &fancoilPBRHeatHandler_ : &fancoilHeatHandler_;
     } else {
-        curr = &fancoilHeatHandler_;
-        other = &fancoilCoolHandler_;
+        curr = isPBR ? &fancoilPBRHeatHandler_ : &fancoilHeatHandler_;
+        other = isPBR ? &fancoilPBRCoolHandler_ : &fancoilCoolHandler_;
     }
 
     other->update(0);

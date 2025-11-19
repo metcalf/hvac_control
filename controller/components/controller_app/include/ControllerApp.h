@@ -56,7 +56,9 @@ class ControllerApp {
           sensors_(sensors), valveCtrl_(valveCtrl), wifi_(wifi), cfgStore_(cfgStore),
           homeCli_(homeCli), ota_(ota), uiEvtRcv_(uiEvtRcv), restartCb_(restartCb),
           fancoilCoolHandler_(fancoilCoolCutoffs_, std::size(fancoilCoolCutoffs_)),
-          fancoilHeatHandler_(fancoilHeatCutoffs_, std::size(fancoilHeatCutoffs_)) {
+          fancoilHeatHandler_(fancoilHeatCutoffs_, std::size(fancoilHeatCutoffs_)),
+          fancoilPBRCoolHandler_(fancoilPBRCoolCutoffs_, std::size(fancoilPBRCoolCutoffs_)),
+          fancoilPBRHeatHandler_(fancoilPBRHeatCutoffs_, std::size(fancoilPBRHeatCutoffs_)) {
         ventAlgo_ = new LinearVentAlgorithm();
         fanCoolAlgo_ = new PIDAlgorithm(false, REL_F_TO_C(4.0));
         fanCoolLimitAlgo_ = new FanCoolLimitAlgorithm(fanCoolAlgo_);
@@ -319,13 +321,24 @@ class ControllerApp {
     //Low: 70%
     // Medium: 80%
     // High: 100%
-    // I then tried to map this to some reasonable cutoffs
+    // I then tried to map this to some reasonable cutoffs. But have since adjusted
+    // based on actual behavior.
     static constexpr FancoilCutoff fancoilCoolCutoffs_[] = {
-        FancoilCutoff{FancoilSpeed::Off, 0.01}, FancoilCutoff{FancoilSpeed::Low, 0.4},
+        FancoilCutoff{FancoilSpeed::Off, 0.01},
+        FancoilCutoff{FancoilSpeed::Low, AC_ON_DEMAND_THRESHOLD},
         FancoilCutoff{FancoilSpeed::Med, 0.7}, FancoilCutoff{FancoilSpeed::High, 0.9}};
     static constexpr FancoilCutoff fancoilHeatCutoffs_[] = {
-        fancoilCoolCutoffs_[0], FancoilCutoff{FancoilSpeed::Min, 0.15}, fancoilCoolCutoffs_[1],
-        fancoilCoolCutoffs_[2], fancoilCoolCutoffs_[3]};
+        fancoilCoolCutoffs_[0], FancoilCutoff{FancoilSpeed::Min, 0.15},
+        FancoilCutoff{FancoilSpeed::Low, 0.4}, fancoilCoolCutoffs_[2], fancoilCoolCutoffs_[3]};
     FancoilSetpointHandler fancoilCoolHandler_;
     FancoilSetpointHandler fancoilHeatHandler_;
+
+    static constexpr FancoilCutoff fancoilPBRCoolCutoffs_[] = {
+        fancoilCoolCutoffs_[0], fancoilCoolCutoffs_[1], FancoilCutoff{FancoilSpeed::Med, 0.4},
+        FancoilCutoff{FancoilSpeed::High, 0.5}};
+    static constexpr FancoilCutoff fancoilPBRHeatCutoffs_[] = {
+        fancoilCoolCutoffs_[0], FancoilCutoff{FancoilSpeed::Low, 0.2},
+        FancoilCutoff{FancoilSpeed::Med, 0.5}, FancoilCutoff{FancoilSpeed::High, 0.7}};
+    FancoilSetpointHandler fancoilPBRCoolHandler_;
+    FancoilSetpointHandler fancoilPBRHeatHandler_;
 };

@@ -262,7 +262,7 @@ double fcCallTempSeq[] = {
     18.6, // Medium heating demand
     23.0, // Establish cooling demand below the "ac on" threshold
     25.0, // Establish cooling demand at a high enough level to trigger "ac on"
-    22.3, // With reduced cooling demand, AC should stay on
+    22.2, // With reduced cooling demand, AC should stay on
     21.5, // With low enough demand, AC should turn off
 };
 int nHvacCalls = std::size(fcCallTempSeq);
