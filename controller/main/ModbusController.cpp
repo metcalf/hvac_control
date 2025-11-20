@@ -5,6 +5,20 @@
 #define POLL_INTERVAL_SECS 5
 #define FRESH_AIR_TEMP_OFFSET_C -REL_F_TO_C(2.5)
 
+void ModbusController::setHasFancoil(bool has) {
+    xSemaphoreTake(mutex_, portMAX_DELAY);
+    hasFancoil_ = has;
+    setFancoilErr_ = ESP_OK;
+    fancoilStateErr_ = ESP_OK;
+    xSemaphoreGive(mutex_);
+}
+void ModbusController::setHasMakeupDemand(bool has) {
+    xSemaphoreTake(mutex_, portMAX_DELAY);
+    hasMakeupDemand_ = has;
+    makeupDemandErr_ = ESP_OK;
+    xSemaphoreGive(mutex_);
+}
+
 void ModbusController::doMakeup() {
     bool makeupDemand;
 
@@ -61,13 +75,6 @@ void ModbusController::doGetFreshAir() {
 }
 
 void ModbusController::doSetFancoil() {
-    if (!hasFancoil_) {
-        xSemaphoreTake(mutex_, portMAX_DELAY);
-        setFancoilErr_ = ESP_ERR_NOT_SUPPORTED;
-        xSemaphoreGive(mutex_);
-        return;
-    }
-
     esp_err_t err;
 
     if (!fancoilConfigured_) {
@@ -112,7 +119,7 @@ void ModbusController::task() {
         if (bits & requestBits(RequestType::SetFreshAirSpeed)) {
             doSetFreshAir();
         }
-        if (bits & requestBits(RequestType::SetFancoil)) {
+        if (bits & requestBits(RequestType::SetFancoil) && hasFancoil_) {
             doSetFancoil();
         }
 

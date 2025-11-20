@@ -10,8 +10,8 @@ class AbstractModbusController {
   public:
     virtual ~AbstractModbusController() {}
 
-    void setHasFancoil(bool has) { hasFancoil_ = has; }
-    void setHasMakeupDemand(bool has) { hasMakeupDemand_ = has; };
+    virtual void setHasFancoil(bool has) = 0;
+    virtual void setHasMakeupDemand(bool has) = 0;
 
     virtual ControllerDomain::FreshAirModel getFreshAirModelId() = 0;
     virtual esp_err_t getFancoilState(ControllerDomain::FancoilState *state,
@@ -31,4 +31,7 @@ class AbstractModbusController {
   protected:
     bool hasFancoil_ = false;
     bool hasMakeupDemand_ = false;
+
+    std::chrono::steady_clock::time_point lastFreshAirState_{}, lastFreshAirSpeed_{},
+        lastMakeupDemand_{}, lastFancoilState_{};
 };
