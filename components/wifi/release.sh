@@ -16,9 +16,17 @@ PROJECT_NAME="$(basename "$PWD")"
 FIRMWARE_PATH="build/${PROJECT_NAME}.bin"
 REMOTE_ROOT="/var/www/local/esp-ota"
 REMOTE_PATH="${REMOTE_ROOT}/hvac_control_${PROJECT_NAME}"
+VERSION_PATH="${REMOTE_PATH}/latest_version"
 # This should contain a single string with an SCP target of the form user@host
 # Newlines stripped for convenience.
 REMOTE_SPEC=$(cat ${SCRIPT_DIR}/remote_spec.cfg | tr -d '\n')
+
+# Handle --lock argument
+if [[ "${1:-}" == "--lock" ]]; then
+    ssh "${REMOTE_SPEC}" "sudo chmod a-r ${VERSION_PATH}"
+    echo "Locked ${VERSION_PATH}"
+    exit 0
+fi
 
 get_version() {
     git describe --always --tags --dirty
@@ -49,4 +57,5 @@ fi
 ssh "${REMOTE_SPEC}" "sudo mkdir -p ${REMOTE_PATH} && sudo chown -R www-data:adm ${REMOTE_ROOT}"
 scp "${FIRMWARE_PATH}" "${REMOTE_SPEC}:/tmp/${version}.bin"
 ssh "${REMOTE_SPEC}" "sudo mv /tmp/${version}.bin ${REMOTE_PATH}/${version}.bin"
-ssh "${REMOTE_SPEC}" "echo -n ${version} | sudo tee ${REMOTE_PATH}/latest_version"
+ssh "${REMOTE_SPEC}" "echo -n ${version} | sudo tee ${VERSION_PATH}"
+ssh "${REMOTE_SPEC}" "sudo chmod a+r ${VERSION_PATH}"
