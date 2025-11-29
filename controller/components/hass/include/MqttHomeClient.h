@@ -21,7 +21,6 @@ class MqttHomeClient : public BaseMqttClient, public AbstractHomeClient {
   private:
     SemaphoreHandle_t mutex_;
     
-    void setResult(const HomeState &result);
     void parseVacationMessage(const char* data, int data_len);
     void parseOutdoorTempMessage(const char* data, int data_len);
     void parseAirQualityMessage(const char* data, int data_len);

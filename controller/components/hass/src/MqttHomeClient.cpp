@@ -32,17 +32,17 @@ BaseMqttClient::Subscriptions MqttHomeClient::getSubscriptions() {
 }
 
 namespace {
-    bool matchesTopic(const char* receivedTopic, int receivedTopicLen, const char* expectedTopic) {
-        return receivedTopicLen == strlen(expectedTopic) && 
-               strncmp(receivedTopic, expectedTopic, receivedTopicLen) == 0;
-    }
+bool matchesTopic(const char *receivedTopic, int receivedTopicLen, const char *expectedTopic) {
+    return receivedTopicLen == strlen(expectedTopic) &&
+           strncmp(receivedTopic, expectedTopic, receivedTopicLen) == 0;
 }
+} // namespace
 
 void MqttHomeClient::onMsg(char *topic, int topicLen, char *data, int dataLen) {
-    static constexpr const char* vacationTopic = "homeassistant/on_vacation";
-    static constexpr const char* outdoorTempTopic = "homeassistant/outdoor_temp_c";
-    static constexpr const char* airQualityTopic = "homeassistant/air_quality_index";
-    
+    static constexpr const char *vacationTopic = "homeassistant/on_vacation";
+    static constexpr const char *outdoorTempTopic = "homeassistant/outdoor_temp_c";
+    static constexpr const char *airQualityTopic = "homeassistant/air_quality_index";
+
     if (matchesTopic(topic, topicLen, vacationTopic)) {
         parseVacationMessage(data, dataLen);
     } else if (matchesTopic(topic, topicLen, outdoorTempTopic)) {
@@ -56,44 +56,42 @@ void MqttHomeClient::onMsg(char *topic, int topicLen, char *data, int dataLen) {
 
 void MqttHomeClient::onErr(esp_mqtt_error_codes_t err) {
     ESP_LOGE(TAG, "MQTT error occurred: %d", err.error_type);
-    setResult(HomeState{.err = Error::FetchError});
+    xSemaphoreTake(mutex_, portMAX_DELAY);
+    state_.err = Error::FetchError;
+    xSemaphoreGive(mutex_);
 }
 
 void MqttHomeClient::parseVacationMessage(const char *data, int data_len) {
+    xSemaphoreTake(mutex_, portMAX_DELAY);
+
     if (data_len <= 0) {
         ESP_LOGE(TAG, "Empty vacation message");
-        setResult(HomeState{.err = Error::ParseError});
+        state_.err = Error::ParseError;
+        xSemaphoreGive(mutex_);
         return;
     }
 
-    HomeState currentState;
-    xSemaphoreTake(mutex_, portMAX_DELAY);
-    currentState = state_;
-    xSemaphoreGive(mutex_);
-
     if (data_len == 1 && (data[0] == '0' || data[0] == '1')) {
-        currentState.vacationOn = (data[0] == '1');
-        currentState.err = Error::OK;
-        ESP_LOGI(TAG, "Vacation status updated: %s", currentState.vacationOn ? "ON" : "OFF");
-        setResult(currentState);
+        state_.vacationOn = (data[0] == '1');
+        state_.err = Error::OK;
+        ESP_LOGI(TAG, "Vacation status updated: %s", state_.vacationOn ? "ON" : "OFF");
     } else {
         ESP_LOGE(TAG, "Failed to parse vacation message: %.*s", data_len, data);
-        currentState.err = Error::ParseError;
-        setResult(currentState);
+        state_.err = Error::ParseError;
     }
+
+    xSemaphoreGive(mutex_);
 }
 
 void MqttHomeClient::parseOutdoorTempMessage(const char *data, int data_len) {
+    xSemaphoreTake(mutex_, portMAX_DELAY);
+
     if (data_len <= 0) {
         ESP_LOGE(TAG, "Empty outdoor temp message");
-        setResult(HomeState{.err = Error::ParseError});
+        state_.err = Error::ParseError;
+        xSemaphoreGive(mutex_);
         return;
     }
-
-    HomeState currentState;
-    xSemaphoreTake(mutex_, portMAX_DELAY);
-    currentState = state_;
-    xSemaphoreGive(mutex_);
 
     char buffer[data_len + 1];
     memcpy(buffer, data, data_len);
@@ -103,30 +101,28 @@ void MqttHomeClient::parseOutdoorTempMessage(const char *data, int data_len) {
     long epochTime;
 
     if (sscanf(buffer, "%lf %ld", &temp, &epochTime) == 2) {
-        currentState.weatherTempC = temp;
-        currentState.weatherObsTime =
+        state_.weatherTempC = temp;
+        state_.weatherObsTime =
             std::chrono::system_clock::time_point(std::chrono::seconds(epochTime));
-        currentState.err = Error::OK;
+        state_.err = Error::OK;
         ESP_LOGI(TAG, "Outdoor temp updated: %.1f°C at epoch %ld", temp, epochTime);
-        setResult(currentState);
     } else {
         ESP_LOGE(TAG, "Failed to parse outdoor temp message: %.*s", data_len, data);
-        currentState.err = Error::ParseError;
-        setResult(currentState);
+        state_.err = Error::ParseError;
     }
+
+    xSemaphoreGive(mutex_);
 }
 
 void MqttHomeClient::parseAirQualityMessage(const char *data, int data_len) {
+    xSemaphoreTake(mutex_, portMAX_DELAY);
+
     if (data_len <= 0) {
         ESP_LOGE(TAG, "Empty air quality message");
-        setResult(HomeState{.err = Error::ParseError});
+        state_.err = Error::ParseError;
+        xSemaphoreGive(mutex_);
         return;
     }
-
-    HomeState currentState;
-    xSemaphoreTake(mutex_, portMAX_DELAY);
-    currentState = state_;
-    xSemaphoreGive(mutex_);
 
     char buffer[data_len + 1];
     memcpy(buffer, data, data_len);
@@ -134,19 +130,13 @@ void MqttHomeClient::parseAirQualityMessage(const char *data, int data_len) {
 
     int aqi;
     if (sscanf(buffer, "%d", &aqi) == 1) {
-        currentState.aqi = (int16_t)aqi;
-        currentState.err = Error::OK;
+        state_.aqi = (int16_t)aqi;
+        state_.err = Error::OK;
         ESP_LOGI(TAG, "Air quality index updated: %d", aqi);
-        setResult(currentState);
     } else {
         ESP_LOGE(TAG, "Failed to parse air quality message: %.*s", data_len, data);
-        currentState.err = Error::ParseError;
-        setResult(currentState);
+        state_.err = Error::ParseError;
     }
-}
 
-void MqttHomeClient::setResult(const HomeState &result) {
-    xSemaphoreTake(mutex_, portMAX_DELAY);
-    state_ = result;
     xSemaphoreGive(mutex_);
 }
