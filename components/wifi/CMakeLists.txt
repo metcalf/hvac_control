@@ -7,7 +7,7 @@ endif()
 idf_component_register(
     SRCS ${SOURCES}
     INCLUDE_DIRS "include"
-    REQUIRES esp_http_client log
+    REQUIRES esp_http_client log mqtt
     PRIV_REQUIRES esp_https_ota esp_wifi esp_partition app_update esp_https_ota lwip esp_netif esp_ringbuf esp_timer
     EMBED_TXTFILES "isrgrootx1.pem"
 )
