@@ -11,13 +11,16 @@ void app_main() {
     //esp_log_level_set("ILI9341", ESP_LOG_DEBUG);
     //esp_log_level_set("LV", ESP_LOG_DEBUG);
     // esp_log_level_set("MAIN", ESP_LOG_DEBUG);
-    esp_log_level_set("CXIC", ESP_LOG_DEBUG);
+    //esp_log_level_set("CXIC", ESP_LOG_DEBUG);
     // esp_log_level_set("CTRL", ESP_LOG_DEBUG);
     // esp_log_level_set("SNS", ESP_LOG_DEBUG);
     // esp_log_level_set("VLV", ESP_LOG_DEBUG);
     // esp_log_level_set("sntp", ESP_LOG_DEBUG);
     // esp_log_level_set("RLOG", ESP_LOG_DEBUG);
     // esp_log_level_set("NTM", ESP_LOG_DEBUG);
+    esp_log_level_set("mqtt_client", ESP_LOG_DEBUG);
+    esp_log_level_set("HOME", ESP_LOG_DEBUG);
+    esp_log_level_set("MQTT", ESP_LOG_DEBUG);
     vTaskDelay(2000 / portTICK_PERIOD_MS);
 
     lvgl_i2c_locking(i2c_manager_locking());

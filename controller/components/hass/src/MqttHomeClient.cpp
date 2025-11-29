@@ -8,12 +8,16 @@
 #include "esp_err.h"
 #include "esp_log.h"
 
-static const char *TAG = "MQTT_HOME";
+static const char *TAG = "MQTT";
+
+static constexpr const char *vacationTopic = "home/global/on_vacation";
+static constexpr const char *outdoorTempTopic = "home/global/outdoor_temp_c";
+static constexpr const char *airQualityTopic = "home/global/air_quality_index";
 
 static esp_mqtt_topic_t topics[] = {
-    {.filter = "home/global/on_vacation", .qos = 0},
-    {.filter = "home/global/outdoor_temp_c", .qos = 0},
-    {.filter = "home/global/air_quality_index", .qos = 0},
+    {.filter = vacationTopic, .qos = 0},
+    {.filter = outdoorTempTopic, .qos = 0},
+    {.filter = airQualityTopic, .qos = 0},
 };
 
 MqttHomeClient::MqttHomeClient() { mutex_ = xSemaphoreCreateMutex(); }
@@ -39,10 +43,6 @@ bool matchesTopic(const char *receivedTopic, int receivedTopicLen, const char *e
 } // namespace
 
 void MqttHomeClient::onMsg(char *topic, int topicLen, char *data, int dataLen) {
-    static constexpr const char *vacationTopic = "homeassistant/on_vacation";
-    static constexpr const char *outdoorTempTopic = "homeassistant/outdoor_temp_c";
-    static constexpr const char *airQualityTopic = "homeassistant/air_quality_index";
-
     if (matchesTopic(topic, topicLen, vacationTopic)) {
         parseVacationMessage(data, dataLen);
     } else if (matchesTopic(topic, topicLen, outdoorTempTopic)) {
@@ -101,6 +101,7 @@ void MqttHomeClient::parseOutdoorTempMessage(const char *data, int data_len) {
     long epochTime;
 
     if (sscanf(buffer, "%lf %ld", &temp, &epochTime) == 2) {
+        temp -= 100; // Transmitted +100C to avoid negative numbers
         state_.weatherTempC = temp;
         state_.weatherObsTime =
             std::chrono::system_clock::time_point(std::chrono::seconds(epochTime));
