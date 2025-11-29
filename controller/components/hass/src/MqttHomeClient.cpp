@@ -11,9 +11,9 @@
 static const char *TAG = "MQTT_HOME";
 
 static esp_mqtt_topic_t topics[] = {
-    {.filter = "homeassistant/on_vacation", .qos = 0},
-    {.filter = "homeassistant/outdoor_temp_c", .qos = 0},
-    {.filter = "homeassistant/air_quality_index", .qos = 0},
+    {.filter = "home/global/on_vacation", .qos = 0},
+    {.filter = "home/global/outdoor_temp_c", .qos = 0},
+    {.filter = "home/global/air_quality_index", .qos = 0},
 };
 
 MqttHomeClient::MqttHomeClient() { mutex_ = xSemaphoreCreateMutex(); }
