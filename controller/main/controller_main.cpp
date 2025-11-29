@@ -16,8 +16,8 @@
 #include "ControllerApp.h"
 #include "ESPOTAClient.h"
 #include "ESPWifi.h"
-#include "HASSClient.h"
 #include "ModbusController.h"
+#include "MqttHomeClient.h"
 #include "NetworkTaskManager.h"
 #include "Sensors.h"
 #include "UIManager.h"
@@ -63,7 +63,7 @@ static Sensors sensors_;
 static QueueHandle_t uiEvtQueue_;
 static ESPWifi wifi_;
 static AppConfigStore appConfigStore_;
-static HASSClient homeCli_;
+static MqttHomeClient homeCli_;
 static ESPOTAClient *ota_;
 static NetworkTaskManager *netTaskMgr_;
 
@@ -73,11 +73,6 @@ uint64_t otaFn() {
     } else {
         return OTA_INTERVAL_MS;
     }
-}
-
-uint64_t hassFn() {
-    homeCli_.fetch();
-    return HOME_REQUEST_INTERVAL_MS;
 }
 
 void sensorTask(void *sensors) {
@@ -243,7 +238,9 @@ extern "C" void controller_main() {
     remote_logger_init(config.wifi.logName, default_log_host);
     netTaskMgr_ = new NetworkTaskManager(wifi_);
     netTaskMgr_->addTask(otaFn);
-    netTaskMgr_->addTask(hassFn);
+
+    // Start MQTT client
+    homeCli_.start();
 
     if (!sensors_.init()) {
         bootErr("Sensor init error");
