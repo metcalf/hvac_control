@@ -9,6 +9,7 @@ enum class CxRegister {
     TargetACCoolingModeTemp = 142,
     TargetACHeatingModeTemp = 143,
     TargetDomesticHotWaterTemp = 144,
+    ACHeatingAUMode = 145, // 0 = off, 1 = on
     // See page 47-48 of https://www.chiltrix.com/documents/CX34-IOM-3.pdf
     // 40-80 (corresponding to 40%-80%): Minimum electronically commutated water pump speed.
     ECWaterPumpMinimumSpeed = 53,

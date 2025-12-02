@@ -90,8 +90,6 @@ bool do_rx(size_t to_rx) {
         }
     }
 
-    input_state.load_control = true; // TODO: Remove when powerwall is online
-
     if (input_state == last_input_state_) {
         return false;
     }
