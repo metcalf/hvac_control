@@ -258,6 +258,7 @@ bool ControllerApp::pollUIEvent(bool wait) {
         cfgStore_->store(config_);
         wifi_->updateSTA(config_.wifi.ssid, config_.wifi.password);
         wifi_->updateName(config_.wifi.logName);
+        homeCli_->updateName(config_.wifi.logName);
         break;
     case EventType::FanOverride: {
         fanOverrideSpeed_ = uiEvent.payload.fanOverride.speed;
@@ -1010,6 +1011,9 @@ void ControllerApp::task(bool firstTime) {
 
     logState(freshAirState, sensorData, ventDemand, fanCoolDemand, heatDemand, coolDemand,
              setpoints, hvacState, speed);
+
+    homeCli_->updateClimateState(config_.systemOn, sensorData.tempC, setpoints.coolTempC,
+                                 setpoints.heatTempC);
 
     if (pollUIEvent(true)) {
         // If we found something in the queue, clear the queue before proceeeding with

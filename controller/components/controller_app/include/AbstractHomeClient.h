@@ -22,6 +22,10 @@ class AbstractHomeClient {
 
     virtual HomeState state() = 0;
 
+    virtual void updateClimateState(bool systemOn, double inTempC, double highTempC,
+                                    double lowTempC) {};
+    virtual void updateName(const char *name) {};
+
   protected:
     HomeState state_{.err = Error::NotRun};
 };

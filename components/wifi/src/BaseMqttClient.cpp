@@ -19,17 +19,7 @@ esp_err_t BaseMqttClient::_handleMQTTEvent(esp_mqtt_event_id_t eventId,
     switch (eventId) {
     case MQTT_EVENT_CONNECTED: {
         ESP_LOGD(TAG, "connected, subscribing to topics");
-        Subscriptions subs = getSubscriptions();
-        if (subs.numTopics > 0) {
-            int res = esp_mqtt_client_subscribe_multiple(client_, subs.topics, subs.numTopics);
-            if (res < 0) {
-                ESP_LOGE(TAG, "Error subscribing to topics (%d)", res);
-            } else {
-                ESP_LOGD(TAG, "Subscribed to %d topics", subs.numTopics);
-            }
-        } else {
-            ESP_LOGD(TAG, "No topics to subscribe to");
-        }
+        onConnected();
         break;
     }
     case MQTT_EVENT_DATA:
@@ -41,14 +31,12 @@ esp_err_t BaseMqttClient::_handleMQTTEvent(esp_mqtt_event_id_t eventId,
         ESP_LOGD(TAG, "MQTT_EVENT_ERROR, code=%d", event->error_handle->error_type);
         onErr(*event->error_handle);
         break;
-    case MQTT_EVENT_PUBLISHED:
-    case MQTT_EVENT_SUBSCRIBED:
-    case MQTT_EVENT_UNSUBSCRIBED:
-    case MQTT_EVENT_DISCONNECTED:
-        ESP_LOGD(TAG, "MQTT event id=%d", eventId);
+    case MQTT_USER_EVENT:
+        ESP_LOGD(TAG, "MQTT_USER_EVENT");
+        onUserEvent();
         break;
     default:
-        ESP_LOGW(TAG, "Unhandled MQTT event id=%d", eventId);
+        ESP_LOGD(TAG, "Unhandled MQTT event id=%d", eventId);
         break;
     }
 
@@ -56,6 +44,7 @@ esp_err_t BaseMqttClient::_handleMQTTEvent(esp_mqtt_event_id_t eventId,
 }
 
 void BaseMqttClient::start() {
+    // TODO: Add outbox size limit
     esp_mqtt_client_config_t mqtt_cfg = {};
     mqtt_cfg.broker.address.uri = default_mqtt_uri;
     mqtt_cfg.broker.verification.certificate = (const char *)server_root_pem;

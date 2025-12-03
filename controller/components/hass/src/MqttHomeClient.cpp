@@ -5,6 +5,8 @@
 #include <cstring>
 #include <inttypes.h>
 
+#include "ControllerDomain.h"
+#include "MQTTHomeClient.h"
 #include "esp_err.h"
 #include "esp_log.h"
 
@@ -20,9 +22,48 @@ static esp_mqtt_topic_t topics[] = {
     {.filter = airQualityTopic, .qos = 0},
 };
 
+static const char *discoveryTmpl = R"({
+  "device": {
+    "ids": "%s",
+  },
+  "o": {
+    "name": "hvac_control"
+  },
+  "cmps": {
+    "hvac_control_climate": {
+      "p": "climate",
+      "unique_id": "%s_climate",
+      "modes": ["off", "auto"],
+      "precision": 1.0,
+      "temperature_unit": "F",
+      "temp_step": "1",
+      "min_temp": 50,
+      "max_temp": 99,
+      "current_temperature_topic": "%s",
+      "mode_state_topic": "%s",
+      "temperature_high_state_topic": "%s",
+      "temperature_low_state_topic": "%s",
+      "optimistic": false
+    }
+  }
+})";
+
 MqttHomeClient::MqttHomeClient() { mutex_ = xSemaphoreCreateMutex(); }
 
 MqttHomeClient::~MqttHomeClient() { vSemaphoreDelete(mutex_); }
+
+const char *MqttHomeClient::climateModeToS(ClimateMode mode) {
+    switch (mode) {
+    case ClimateMode::Unset:
+        return "unset";
+    case ClimateMode::Off:
+        return "off";
+    case ClimateMode::Auto:
+        return "auto";
+    }
+
+    __builtin_unreachable();
+}
 
 AbstractHomeClient::HomeState MqttHomeClient::state() {
     xSemaphoreTake(mutex_, portMAX_DELAY);
@@ -31,8 +72,50 @@ AbstractHomeClient::HomeState MqttHomeClient::state() {
     return r;
 }
 
-BaseMqttClient::Subscriptions MqttHomeClient::getSubscriptions() {
-    return {.topics = topics, .numTopics = std::size(topics)};
+void MqttHomeClient::updateClimateState(bool systemOn, double inTempC, double highTempC,
+                                        double lowTempC) {
+    // Since enqueue can block and we don't want to overflow the outbox,
+    // we set flags here and submit a user event to handle the actual publishing in the event loop.
+    ClimateMode mode = systemOn ? ClimateMode::Auto : ClimateMode::Off;
+
+    xSemaphoreTake(mutex_, portMAX_DELAY);
+    if (lastClimateMode_ != mode) {
+        lastClimateMode_ = mode;
+        updatedFields_ |= updatedFieldMask(UpdatedFields::ClimateMode);
+    }
+    if (lastInTempC_ != inTempC) {
+        lastInTempC_ = inTempC;
+        updatedFields_ |= updatedFieldMask(UpdatedFields::InTemp);
+    }
+    if (lastHighTempC_ != highTempC) {
+        lastHighTempC_ = highTempC;
+        updatedFields_ |= updatedFieldMask(UpdatedFields::HighTemp);
+    }
+    if (lastLowTempC_ != lowTempC) {
+        lastLowTempC_ = lowTempC;
+        updatedFields_ |= updatedFieldMask(UpdatedFields::LowTemp);
+    }
+    xSemaphoreGive(mutex_);
+
+    esp_mqtt_dispatch_custom_event(client_, nullptr);
+}
+
+void MqttHomeClient::updateName(const char *name) {
+    // NB: We don't actually hold the mutex_ everywhere we read *topic_ since this should be
+    // called very rarely so a race probably isn't a major risk. A separate topicMutex_ would
+    // be a more correct solution.
+    xSemaphoreTake(mutex_, portMAX_DELAY);
+    snprintf(currentTempTopic_, sizeof(currentTempTopic_), "home/%s/in_temp_f/state", name);
+    snprintf(modeStateTopic_, sizeof(modeStateTopic_), "home/%s/mode/state", name);
+    snprintf(highTempTopic_, sizeof(highTempTopic_), "home/%s/high_temp_f/state", name);
+    snprintf(lowTempTopic_, sizeof(lowTempTopic_), "home/%s/low_temp_f/state", name);
+
+    snprintf(discoveryTopic_, sizeof(discoveryTopic_), "homeassistant/climate/%s/config", name);
+    snprintf(discoveryStr_, sizeof(discoveryStr_), discoveryTmpl, name, name, currentTempTopic_,
+             modeStateTopic_, highTempTopic_, lowTempTopic_);
+    xSemaphoreGive(mutex_);
+
+    publishDiscoveryMessage();
 }
 
 namespace {
@@ -59,6 +142,90 @@ void MqttHomeClient::onErr(esp_mqtt_error_codes_t err) {
     xSemaphoreTake(mutex_, portMAX_DELAY);
     state_.err = Error::FetchError;
     xSemaphoreGive(mutex_);
+}
+
+void MqttHomeClient::onConnected() {
+    int res = esp_mqtt_client_subscribe_multiple(client_, topics, std::size(topics));
+    if (res < 0) {
+        ESP_LOGE(TAG, "Error subscribing to topics (%d)", res);
+    } else {
+        ESP_LOGD(TAG, "Subscribed to %d topics", std::size(topics));
+    }
+
+    publishDiscoveryMessage();
+
+    // Publish values via a user message to avoid duplication
+    xSemaphoreTake(mutex_, portMAX_DELAY);
+    if (lastClimateMode_ != ClimateMode::Unset) {
+        updatedFields_ |= updatedFieldMask(UpdatedFields::ClimateMode);
+    }
+    if (!std::isnan(lastInTempC_)) {
+        updatedFields_ |= updatedFieldMask(UpdatedFields::InTemp);
+    }
+    if (!std::isnan(lastHighTempC_)) {
+        updatedFields_ |= updatedFieldMask(UpdatedFields::HighTemp);
+    }
+    if (!std::isnan(lastLowTempC_)) {
+        updatedFields_ |= updatedFieldMask(UpdatedFields::LowTemp);
+    }
+    xSemaphoreGive(mutex_);
+    esp_mqtt_dispatch_custom_event(client_, nullptr);
+}
+
+void MqttHomeClient::onUserEvent() {
+    xSemaphoreTake(mutex_, portMAX_DELAY);
+    uint8_t fields = updatedFields_;
+    ClimateMode mode = lastClimateMode_;
+    double inTempC = lastInTempC_;
+    double highTempC = lastHighTempC_;
+    double lowTempC = lastLowTempC_;
+    xSemaphoreGive(mutex_);
+
+    if (fields & updatedFieldMask(UpdatedFields::ClimateMode)) {
+        if (publishClimateMode(mode) >= 0) {
+            xSemaphoreTake(mutex_, portMAX_DELAY);
+            updatedFields_ &= ~updatedFieldMask(UpdatedFields::ClimateMode);
+            xSemaphoreGive(mutex_);
+        }
+    }
+    if (fields & updatedFieldMask(UpdatedFields::InTemp)) {
+        if (publishTempC(currentTempTopic_, ABS_C_TO_F(inTempC)) >= 0) {
+            xSemaphoreTake(mutex_, portMAX_DELAY);
+            updatedFields_ &= ~updatedFieldMask(UpdatedFields::InTemp);
+            xSemaphoreGive(mutex_);
+        }
+    }
+    if (fields & updatedFieldMask(UpdatedFields::HighTemp)) {
+        if (publishTempC(highTempTopic_, ABS_C_TO_F(highTempC)) >= 0) {
+            xSemaphoreTake(mutex_, portMAX_DELAY);
+            updatedFields_ &= ~updatedFieldMask(UpdatedFields::HighTemp);
+            xSemaphoreGive(mutex_);
+        }
+    }
+    if (fields & updatedFieldMask(UpdatedFields::LowTemp)) {
+        if (publishTempC(lowTempTopic_, ABS_C_TO_F(lowTempC)) >= 0) {
+            xSemaphoreTake(mutex_, portMAX_DELAY);
+            updatedFields_ &= ~updatedFieldMask(UpdatedFields::LowTemp);
+            xSemaphoreGive(mutex_);
+        }
+    }
+}
+
+int MqttHomeClient::publishDiscoveryMessage() {
+    ESP_LOGD(TAG, "Publishing discovery message to topic %s: %s", discoveryTopic_, discoveryStr_);
+    return esp_mqtt_client_publish(client_, discoveryTopic_, discoveryStr_, strlen(discoveryStr_),
+                                   1, true);
+}
+
+int MqttHomeClient::publishClimateMode(ClimateMode mode) {
+    const char *modeStr = climateModeToS(mode);
+    return esp_mqtt_client_publish(client_, modeStateTopic_, modeStr, strlen(modeStr), 0, false);
+}
+
+int MqttHomeClient::publishTempC(char *topic, double tempC) {
+    char buf[8];
+    int len = snprintf(buf, sizeof(buf), "%.1f", tempC);
+    return esp_mqtt_client_publish(client_, topic, buf, len, 0, false);
 }
 
 void MqttHomeClient::parseVacationMessage(const char *data, int data_len) {
