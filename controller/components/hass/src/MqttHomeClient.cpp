@@ -110,7 +110,7 @@ void MqttHomeClient::updateName(const char *name) {
     snprintf(highTempTopic_, sizeof(highTempTopic_), "home/%s/high_temp_f/state", name);
     snprintf(lowTempTopic_, sizeof(lowTempTopic_), "home/%s/low_temp_f/state", name);
 
-    snprintf(discoveryTopic_, sizeof(discoveryTopic_), "homeassistant/climate/%s/config", name);
+    snprintf(discoveryTopic_, sizeof(discoveryTopic_), "homeassistant/device/%s/config", name);
     snprintf(discoveryStr_, sizeof(discoveryStr_), discoveryTmpl, name, name, currentTempTopic_,
              modeStateTopic_, highTempTopic_, lowTempTopic_);
     xSemaphoreGive(mutex_);
@@ -190,21 +190,23 @@ void MqttHomeClient::onUserEvent() {
         }
     }
     if (fields & updatedFieldMask(UpdatedFields::InTemp)) {
-        if (publishTempC(currentTempTopic_, ABS_C_TO_F(inTempC)) >= 0) {
+        // Don't retain the current temperature since it goes stale quickly
+        // and is updated frequently.
+        if (publishTempC(currentTempTopic_, inTempC, false) >= 0) {
             xSemaphoreTake(mutex_, portMAX_DELAY);
             updatedFields_ &= ~updatedFieldMask(UpdatedFields::InTemp);
             xSemaphoreGive(mutex_);
         }
     }
     if (fields & updatedFieldMask(UpdatedFields::HighTemp)) {
-        if (publishTempC(highTempTopic_, ABS_C_TO_F(highTempC)) >= 0) {
+        if (publishTempC(highTempTopic_, highTempC, true) >= 0) {
             xSemaphoreTake(mutex_, portMAX_DELAY);
             updatedFields_ &= ~updatedFieldMask(UpdatedFields::HighTemp);
             xSemaphoreGive(mutex_);
         }
     }
     if (fields & updatedFieldMask(UpdatedFields::LowTemp)) {
-        if (publishTempC(lowTempTopic_, ABS_C_TO_F(lowTempC)) >= 0) {
+        if (publishTempC(lowTempTopic_, lowTempC, true) >= 0) {
             xSemaphoreTake(mutex_, portMAX_DELAY);
             updatedFields_ &= ~updatedFieldMask(UpdatedFields::LowTemp);
             xSemaphoreGive(mutex_);
@@ -220,13 +222,13 @@ int MqttHomeClient::publishDiscoveryMessage() {
 
 int MqttHomeClient::publishClimateMode(ClimateMode mode) {
     const char *modeStr = climateModeToS(mode);
-    return esp_mqtt_client_publish(client_, modeStateTopic_, modeStr, strlen(modeStr), 0, false);
+    return esp_mqtt_client_publish(client_, modeStateTopic_, modeStr, strlen(modeStr), 0, true);
 }
 
-int MqttHomeClient::publishTempC(char *topic, double tempC) {
+int MqttHomeClient::publishTempC(char *topic, double tempC, bool retain) {
     char buf[8];
-    int len = snprintf(buf, sizeof(buf), "%.1f", tempC);
-    return esp_mqtt_client_publish(client_, topic, buf, len, 0, false);
+    int len = snprintf(buf, sizeof(buf), "%.1f", ABS_C_TO_F(tempC));
+    return esp_mqtt_client_publish(client_, topic, buf, len, 0, retain);
 }
 
 void MqttHomeClient::parseVacationMessage(const char *data, int data_len) {

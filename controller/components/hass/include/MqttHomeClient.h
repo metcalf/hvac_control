@@ -3,9 +3,9 @@
 #include "AbstractHomeClient.h"
 #include "BaseMqttClient.h"
 
-#include <cmath>
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
+#include <cmath>
 
 class MqttHomeClient : public BaseMqttClient, public AbstractHomeClient {
   public:
@@ -44,7 +44,7 @@ class MqttHomeClient : public BaseMqttClient, public AbstractHomeClient {
 
     int publishDiscoveryMessage();
     int publishClimateMode(ClimateMode mode);
-    int publishTempC(char *topic, double tempC);
+    int publishTempC(char *topic, double tempC, bool retain);
 
     void parseVacationMessage(const char *data, int data_len);
     void parseOutdoorTempMessage(const char *data, int data_len);
