@@ -63,7 +63,7 @@ static Sensors sensors_;
 static QueueHandle_t uiEvtQueue_;
 static ESPWifi wifi_;
 static AppConfigStore appConfigStore_;
-static MqttHomeClient homeCli_;
+static MqttHomeClient *homeCli_;
 static ESPOTAClient *ota_;
 static NetworkTaskManager *netTaskMgr_;
 
@@ -221,8 +221,10 @@ extern "C" void controller_main() {
     modbusController_ = new ModbusController();
     valveCtrl_.init();
 
+    homeCli_ = new MqttHomeClient(config.wifi.logName, uiEvtCb);
+
     app_ = new ControllerApp(config, uiManager_, modbusController_, &sensors_, &valveCtrl_, &wifi_,
-                             &appConfigStore_, &homeCli_, ota_, uiEvtRcv, esp_restart);
+                             &appConfigStore_, homeCli_, ota_, uiEvtRcv, esp_restart);
     xTaskCreate(uiTask, "uiTask", UI_TASK_STACK_SIZE, uiManager_, UI_TASK_PRIO, NULL);
 
     setenv("TZ", POSIX_TZ_STR, 1);
@@ -240,7 +242,7 @@ extern "C" void controller_main() {
     netTaskMgr_->addTask(otaFn);
 
     // Start MQTT client
-    homeCli_.start();
+    homeCli_->start();
 
     if (!sensors_.init()) {
         bootErr("Sensor init error");

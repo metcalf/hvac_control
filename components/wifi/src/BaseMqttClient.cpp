@@ -43,12 +43,11 @@ esp_err_t BaseMqttClient::_handleMQTTEvent(esp_mqtt_event_id_t eventId,
 }
 
 void BaseMqttClient::start() {
-    // TODO: Add outbox size limit
-    esp_mqtt_client_config_t mqtt_cfg = {};
-    mqtt_cfg.broker.address.uri = default_mqtt_uri;
-    mqtt_cfg.broker.verification.certificate = (const char *)server_root_pem;
+    config_.broker.address.uri = default_mqtt_uri;
+    config_.broker.verification.certificate = (const char *)server_root_pem;
+    config_.outbox.limit = 16384;
 
-    client_ = esp_mqtt_client_init(&mqtt_cfg);
+    client_ = esp_mqtt_client_init(&config_);
     /* The last argument may be used to pass data to the event handler, in this example mqtt_event_handler */
     esp_mqtt_client_register_event(client_, MQTT_EVENT_ANY, mqtt_event_handler, this);
     esp_mqtt_client_start(client_);

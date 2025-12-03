@@ -505,6 +505,7 @@ void ControllerApp::setSystemPower(bool on) {
         tempOverrideUntilScheduleIdx_ = -1;
         clearMessage(MsgID::TempOverride);
     }
+    uiManager_->setSystemPower(on);
 }
 
 bool ControllerApp::allowHVACChange(bool cool, bool on) {
@@ -829,6 +830,13 @@ Setpoints ControllerApp::getCurrentSetpoints(double currTempC) {
 }
 
 void ControllerApp::setTempOverride(AbstractUIManager::TempOverride to) {
+    if (std::isnan(to.heatC)) {
+        to.heatC = lastSetpoints_.heatTempC;
+    }
+    if (std::isnan(to.coolC)) {
+        to.coolC = lastSetpoints_.coolTempC;
+    }
+
     tempOverride_ = to;
     int idx = getScheduleIdx(1);
     if (idx == -1) {
@@ -997,11 +1005,11 @@ void ControllerApp::task(bool firstTime) {
     //                                                    (steadyNow() - lastOutdoorTempUpdate_) >
     //                                                        OUTDOOR_TEMP_UPDATE_INTERVAL));
 
-    FanSpeed speed = computeFanSpeed(ventDemand, fanCoolDemand, wantOutdoorTemp);
-    setFanSpeed(speed);
+    FanSpeed fanSpeed = computeFanSpeed(ventDemand, fanCoolDemand, wantOutdoorTemp);
+    setFanSpeed(fanSpeed);
 
     updateACMode(coolDemand, setpoints.coolTempC, sensorData.tempC, outdoorTempC());
-    HVACState hvacState = setHVAC(heatDemand, coolDemand, speed);
+    HVACState hvacState = setHVAC(heatDemand, coolDemand, fanSpeed);
 
     checkModbusErrors();
 
@@ -1010,10 +1018,10 @@ void ControllerApp::task(bool firstTime) {
     }
 
     logState(freshAirState, sensorData, ventDemand, fanCoolDemand, heatDemand, coolDemand,
-             setpoints, hvacState, speed);
+             setpoints, hvacState, fanSpeed);
 
-    homeCli_->updateClimateState(config_.systemOn, sensorData.tempC, setpoints.coolTempC,
-                                 setpoints.heatTempC);
+    homeCli_->updateClimateState(config_.systemOn, hvacState, fanSpeed, sensorData.tempC,
+                                 setpoints.coolTempC, setpoints.heatTempC);
 
     if (pollUIEvent(true)) {
         // If we found something in the queue, clear the queue before proceeeding with

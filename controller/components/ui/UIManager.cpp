@@ -208,15 +208,9 @@ void UIManager::eAllowAC() {
     objSetVisibility(true, ui_stop_ac_button);
 }
 
-void UIManager::eSystemOff() {
-    sendPowerEvent(false);
-    setSystemPowerInternal(false);
-}
+void UIManager::eSystemOff() { sendPowerEvent(false); }
 
-void UIManager::eSystemOn() {
-    sendPowerEvent(true);
-    setSystemPowerInternal(true);
-}
+void UIManager::eSystemOn() { sendPowerEvent(true); }
 
 void UIManager::eTargetCO2() {
     co2Target_ = 800 + lv_roller_get_selected(ui_co2_target) * 50;

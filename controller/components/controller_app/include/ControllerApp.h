@@ -65,7 +65,6 @@ class ControllerApp {
 
         updateEquipment(config_.equipment);
         setSystemPower(config_.systemOn);
-        homeCli_->updateName(config_.wifi.logName);
     }
     ~ControllerApp() {
         delete ventAlgo_;

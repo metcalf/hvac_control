@@ -17,6 +17,7 @@ class BaseMqttClient {
     virtual void onUserEvent() {};
 
     esp_mqtt_client_handle_t client_ = nullptr;
+    esp_mqtt_client_config_t config_{};
 
   private:
 };
