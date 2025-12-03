@@ -17,11 +17,10 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
 esp_err_t BaseMqttClient::_handleMQTTEvent(esp_mqtt_event_id_t eventId,
                                            esp_mqtt_event_handle_t event) {
     switch (eventId) {
-    case MQTT_EVENT_CONNECTED: {
+    case MQTT_EVENT_CONNECTED:
         ESP_LOGD(TAG, "connected, subscribing to topics");
         onConnected();
         break;
-    }
     case MQTT_EVENT_DATA:
         ESP_LOGD(TAG, "MQTT_EVENT_DATA, topic=%.*s, data=%.*s", event->topic_len, event->topic,
                  event->data_len, event->data);
@@ -36,7 +35,7 @@ esp_err_t BaseMqttClient::_handleMQTTEvent(esp_mqtt_event_id_t eventId,
         onUserEvent();
         break;
     default:
-        ESP_LOGD(TAG, "Unhandled MQTT event id=%d", eventId);
+        ESP_LOGD(TAG, "Unhandled event id=%d", eventId);
         break;
     }
 

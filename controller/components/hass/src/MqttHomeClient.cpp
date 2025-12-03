@@ -24,7 +24,7 @@ static esp_mqtt_topic_t topics[] = {
 
 static const char *discoveryTmpl = R"({
   "device": {
-    "ids": "%s",
+    "ids": "%s"
   },
   "o": {
     "name": "hvac_control"
@@ -169,6 +169,7 @@ void MqttHomeClient::onConnected() {
         updatedFields_ |= updatedFieldMask(UpdatedFields::LowTemp);
     }
     xSemaphoreGive(mutex_);
+
     esp_mqtt_dispatch_custom_event(client_, nullptr);
 }
 
