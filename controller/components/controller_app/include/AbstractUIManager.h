@@ -33,6 +33,7 @@ class AbstractUIManager {
         SetTempOffsets,
         SetEquipment,
         SetWifi,
+        SetContinuousFanSpeed,
         FanOverride,
         TempOverride,
         ACOverride,
@@ -50,6 +51,7 @@ class AbstractUIManager {
         TempOffsets tempOffsets;
         ControllerDomain::Config::Equipment equipment;
         ControllerDomain::Config::Wifi wifi;
+        uint8_t continuousFanSpeed;
         ACOverride acOverride;
         uint8_t msgID;
     };

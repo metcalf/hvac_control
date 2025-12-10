@@ -116,6 +116,7 @@ class UIManager : public AbstractUIManager {
 
     uint16_t co2Target_;
     uint8_t maxHeatDeg_, minCoolDeg_, currHeatDeg_ = 0, currCoolDeg_ = 0;
+    uint8_t continuousFanSpeed_;
     double currInTempC_, currOutTempC_, inTempOffsetC_, outTempOffsetC_;
     ControllerDomain::Config::Schedule currSchedules_[NUM_SCHEDULE_TIMES];
     ControllerDomain::Config::Equipment equipment_;

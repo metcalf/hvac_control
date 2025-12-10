@@ -102,7 +102,16 @@ class ControllerApp {
         HVACChangeLimit,
         _Last,
     };
-    enum class FanSpeedReason { Unknown, Off, Override, Cool, Vent, PollOutdoorTemp, MakeupAir };
+    enum class FanSpeedReason {
+        Unknown,
+        Off,
+        Override,
+        Cool,
+        Vent,
+        PollOutdoorTemp,
+        MakeupAir,
+        Continuous
+    };
     enum class SetpointReason {
         Unknown,
         Normal,
@@ -204,6 +213,8 @@ class ControllerApp {
             return "poll_temp";
         case FanSpeedReason::MakeupAir:
             return "makeup_air";
+        case FanSpeedReason::Continuous:
+            return "continuous";
         }
 
         __builtin_unreachable();

@@ -288,14 +288,23 @@ void UIManager::eSaveEquipmentSettings() {
     equipment_.coolType = Config::HVACType(lv_dropdown_get_selected(ui_cool_type));
     equipment_.hasMakeupDemand = lv_obj_has_state(ui_makeup_air_switch, LV_STATE_CHECKED);
 
+    // Convert dropdown selection to continuousFanSpeed (0-255)
+    uint16_t fanSpeedPct = lv_dropdown_get_selected(continuousFanDropdown_) * 10;
+    continuousFanSpeed_ = (uint8_t)((fanSpeedPct * 255 + (100 / 2)) / 100);
+
     updateUIForEquipment();
 
-    Event evt{
+    Event equipmentEvt{
         EventType::SetEquipment,
         EventPayload{.equipment = equipment_},
     };
+    sendEvent(equipmentEvt);
 
-    sendEvent(evt);
+    Event fanSpeedEvt{
+        EventType::SetContinuousFanSpeed,
+        EventPayload{.continuousFanSpeed = continuousFanSpeed_},
+    };
+    sendEvent(fanSpeedEvt);
 
     _ui_screen_change(&ui_Settings, LV_SCR_LOAD_ANIM_NONE, 0, 0, &ui_Settings_screen_init);
 }
@@ -380,6 +389,14 @@ void UIManager::eEquipmentSettingsLoadStart() {
     } else {
         lv_obj_clear_state(ui_makeup_air_switch, LV_STATE_CHECKED);
     }
+
+    // Convert continuousFanSpeed (0-255) to dropdown selection (0-10)
+    uint16_t fanSpeedPct = (uint16_t)std::round(continuousFanSpeed_ / 255.0 * 100);
+    uint16_t dropdownIndex = (fanSpeedPct + 5) / 10; // Round to nearest 10%
+    if (dropdownIndex > 10) {
+        dropdownIndex = 10; // Cap at 100%
+    }
+    lv_dropdown_set_selected(continuousFanDropdown_, dropdownIndex);
 }
 
 void UIManager::eTempLimitsLoadStart() {
@@ -545,6 +562,7 @@ UIManager::UIManager(ControllerDomain::Config config, size_t nMsgIds, eventCb_t 
     co2Target_ = config.co2Target;
     equipment_ = config.equipment;
     wifi_ = config.wifi;
+    continuousFanSpeed_ = config.continuousFanSpeed;
 
     ui_init();
     initExtraWidgets();

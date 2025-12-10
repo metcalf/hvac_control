@@ -155,6 +155,11 @@ FanSpeed ControllerApp::computeFanSpeed(double ventDemand, double coolDemand,
             fanSpeedReason_ = FanSpeedReason::PollOutdoorTemp;
         }
 
+        if (fanSpeed < config_.continuousFanSpeed && !vacationOn_) {
+            fanSpeed = std::max(MIN_FAN_SPEED_VALUE, config_.continuousFanSpeed);
+            fanSpeedReason_ = FanSpeedReason::Continuous;
+        }
+
         if (fanOverrideUntil_ > std::chrono::steady_clock::time_point{}) {
             clearMessage(MsgID::FanOverride);
             fanOverrideUntil_ = {};
@@ -259,6 +264,11 @@ bool ControllerApp::pollUIEvent(bool wait) {
         wifi_->updateSTA(config_.wifi.ssid, config_.wifi.password);
         wifi_->updateName(config_.wifi.logName);
         homeCli_->updateName(config_.wifi.logName);
+        break;
+    case EventType::SetContinuousFanSpeed:
+        ESP_LOGI(TAG, "SetContinuousFanSpeed: %u", uiEvent.payload.continuousFanSpeed);
+        config_.continuousFanSpeed = uiEvent.payload.continuousFanSpeed;
+        cfgStore_->store(config_);
         break;
     case EventType::FanOverride: {
         fanOverrideSpeed_ = uiEvent.payload.fanOverride.speed;
