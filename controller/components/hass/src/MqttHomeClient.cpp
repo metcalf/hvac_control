@@ -58,7 +58,8 @@ static const char *discoveryTmpl = R"({
   }
 })";
 
-MqttHomeClient::MqttHomeClient(const char *name, AbstractUIManager::eventCb_t eventCb) {
+MqttHomeClient::MqttHomeClient(const char *name, AbstractUIManager::eventCb_t eventCb)
+    : eventCb_(eventCb) {
     mutex_ = xSemaphoreCreateMutex();
     updateTopics(name);
 }

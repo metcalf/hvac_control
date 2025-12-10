@@ -830,11 +830,19 @@ Setpoints ControllerApp::getCurrentSetpoints(double currTempC) {
 }
 
 void ControllerApp::setTempOverride(AbstractUIManager::TempOverride to) {
+    // If a value is NaN, use the last setpoint for that mode. We update
+    // lastSetpoints_ in here since Home Assistant sends the heat/cool
+    // overrides in rapid succession so we could accidentally clobber an override
+    // if the main event loop doesn't run between the two.
     if (std::isnan(to.heatC)) {
         to.heatC = lastSetpoints_.heatTempC;
+    } else {
+        lastSetpoints_.heatTempC = to.heatC;
     }
     if (std::isnan(to.coolC)) {
         to.coolC = lastSetpoints_.coolTempC;
+    } else {
+        lastSetpoints_.coolTempC = to.coolC;
     }
 
     tempOverride_ = to;
