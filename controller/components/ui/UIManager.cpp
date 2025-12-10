@@ -494,6 +494,33 @@ void UIManager::initExtraWidgets() {
     lv_label_set_text(restartLabel, "RESTART");
     lv_obj_set_style_text_font(restartLabel, &lv_font_montserrat_18,
                                LV_PART_MAIN | LV_STATE_DEFAULT);
+
+    // Continuous fan ventilation settings
+    lv_obj_t *contFanContainer = lv_obj_create(ui_equipment_settings_container);
+    lv_obj_remove_style_all(contFanContainer);
+    lv_obj_set_width(contFanContainer, 300);
+    lv_obj_set_height(contFanContainer, 45);
+    lv_obj_set_align(contFanContainer, LV_ALIGN_CENTER);
+    lv_obj_clear_flag(contFanContainer, LV_OBJ_FLAG_SCROLLABLE); /// Flags
+
+    lv_obj_t *contFanLabel = lv_label_create(contFanContainer);
+    lv_obj_set_width(contFanLabel, 130);
+    lv_obj_set_height(contFanLabel, LV_SIZE_CONTENT); /// 1
+    lv_obj_set_align(contFanLabel, LV_ALIGN_LEFT_MID);
+    lv_label_set_text(contFanLabel, "CONT. VENT");
+    lv_obj_set_style_text_align(contFanLabel, LV_TEXT_ALIGN_RIGHT, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_font(contFanLabel, &lv_font_montserrat_18,
+                               LV_PART_MAIN | LV_STATE_DEFAULT);
+
+    continuousFanDropdown_ = lv_dropdown_create(contFanContainer);
+    lv_dropdown_set_options(continuousFanDropdown_,
+                            "OFF\n10%\n20%\n30%\n40%\n50%\n60%\n70%\n80%\n90%\n100%");
+    lv_obj_set_width(continuousFanDropdown_, 150);
+    lv_obj_set_height(continuousFanDropdown_, LV_SIZE_CONTENT); /// 1
+    lv_obj_set_x(continuousFanDropdown_, 150);
+    lv_obj_set_y(continuousFanDropdown_, 0);
+    lv_obj_set_align(continuousFanDropdown_, LV_ALIGN_LEFT_MID);
+    lv_obj_add_flag(continuousFanDropdown_, LV_OBJ_FLAG_SCROLL_ON_FOCUS); /// Flags
 }
 
 void UIManager::sendEvent(Event &evt) {

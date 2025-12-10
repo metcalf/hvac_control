@@ -25,7 +25,7 @@
 #include "remote_logger.h"
 #include "rtc-rx8111.h"
 
-#define INIT_ERR_RESTART_DELAY_TICKS pdMS_TO_TICKS(10 * 1000)
+#define INIT_ERR_RESTART_DELAY_TICKS pdMS_TO_TICKS(60 * 1000)
 
 #define UI_TASK_PRIO ESP_TASKD_EVENT_PRIO
 #define SENSOR_TASK_PRIO ESP_TASK_MAIN_PRIO
@@ -204,16 +204,20 @@ extern "C" void controller_main() {
     esp_err_t err;
 
     // Initialize NVS
-    esp_err_t ret = nvs_flash_init();
-    if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
+    err = nvs_flash_init();
+    if (err == ESP_ERR_NVS_NO_FREE_PAGES || err == ESP_ERR_NVS_NEW_VERSION_FOUND) {
         ESP_ERROR_CHECK(nvs_flash_erase());
-        ret = nvs_flash_init();
+        err = nvs_flash_init();
     }
-    ESP_ERROR_CHECK(ret);
+    ESP_ERROR_CHECK(err);
 
     uiEvtQueue_ = xQueueCreate(10, sizeof(UIManager::Event));
 
-    Config config = appConfigStore_.load();
+    Config config;
+    err = appConfigStore_.load(&config);
+    if (err != ESP_OK) {
+        bootErr("Failed to load config: %d", err);
+    }
     ota_ = new ESPOTAClient("controller", otaMsgCb, UI_MAX_MSG_LEN);
     uiManager_ = new UIManager(config, ControllerApp::nMsgIds(), uiEvtCb);
     UIManager::setEventsInst(uiManager_);

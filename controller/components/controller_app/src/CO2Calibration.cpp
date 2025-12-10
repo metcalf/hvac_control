@@ -2,6 +2,9 @@
 
 #include <cassert>
 #include <chrono>
+#include "esp_log.h"
+
+static const char* TAG = "CO2Cal";
 
 // Note that these constants effectively represent a range from N -> N-1 months because at
 // the very beginning of the month we'll only have one datapoint.
@@ -92,6 +95,10 @@ int16_t CO2Calibration::getCurrentOffset() {
 
 void CO2Calibration::loadState() {
     if (state_.lastMonthYearWritten == 0) {
-        state_ = store_->load();
+        esp_err_t err = store_->load(&state_);
+        if (err != ESP_OK) {
+            ESP_LOGE(TAG, "Failed to load CO2 calibration state: error %d", err);
+            // Keep the default initialized state_ if load fails
+        }
     }
 }

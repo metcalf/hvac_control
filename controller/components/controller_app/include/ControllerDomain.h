@@ -10,7 +10,7 @@
 #define REL_C_TO_F(t) (t * 9.0 / 5.0)
 #define ABS_C_TO_F(t) (REL_C_TO_F(t) + 32)
 
-#define CONTROLLER_CONFIG_VERSION 1
+#define CONTROLLER_CONFIG_VERSION 2
 
 // Maximum age of outdoor temp to display in the UI before treating it as stale
 #define OUTDOOR_TEMP_MAX_AGE std::chrono::minutes(40)
@@ -89,6 +89,35 @@ struct Config {
     Wifi wifi;
 
     Schedule schedules[NUM_SCHEDULE_TIMES]; // Must be in order starting from midnight
+    uint16_t co2Target;
+    double maxHeatC, minCoolC;
+    double inTempOffsetC, outTempOffsetC;
+    bool systemOn;
+    uint8_t continuousFanSpeed;
+};
+
+struct ConfigV1 {
+    struct Schedule {
+        double heatC, coolC;
+        uint8_t startHr, startMin;
+
+        int16_t startMinOfDay() { return startHr * 60 + startMin; }
+    };
+    enum class HVACType { None, Fancoil, Valve };
+    struct Equipment {
+        HVACType heatType, coolType;
+        bool hasMakeupDemand;
+    };
+    struct Wifi {
+        char ssid[33];
+        char password[65];
+        char logName[25];
+    };
+
+    Equipment equipment;
+    Wifi wifi;
+
+    Schedule schedules[NUM_SCHEDULE_TIMES];
     uint16_t co2Target;
     double maxHeatC, minCoolC;
     double inTempOffsetC, outTempOffsetC;

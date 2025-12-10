@@ -15,10 +15,13 @@ class NVSConfigStore : public AbstractConfigStore<T> {
     ~NVSConfigStore() override {};
 
     void store(T &config) override;
-    T load() override;
+    esp_err_t load(T *config) override;
 
   protected:
     virtual T defaultConfig() { return T{}; };
+    virtual esp_err_t migrateConfig(T *config, uint16_t fromVersion, const void *oldConfigData, size_t oldConfigSize) {
+        return ESP_ERR_NOT_SUPPORTED;
+    };
 
   private:
     constexpr static const char *TAG = "CFG";
@@ -44,31 +47,75 @@ inline void NVSConfigStore<T>::store(T &config) {
 }
 
 template <typename T>
-inline T NVSConfigStore<T>::load() {
-    nvs_handle_t handle;
+inline esp_err_t NVSConfigStore<T>::load(T *config) {
+    if (!config) {
+        return ESP_ERR_INVALID_ARG;
+    }
 
-    ESP_ERROR_CHECK(nvs_open(nvsNamespace_, NVS_READWRITE, &handle));
+    nvs_handle_t handle;
+    esp_err_t err = nvs_open(nvsNamespace_, NVS_READWRITE, &handle);
+    if (err != ESP_OK) {
+        return err;
+    }
 
     uint16_t version = 0;
-    esp_err_t err = nvs_get_u16(handle, "version", &version);
+    err = nvs_get_u16(handle, "version", &version);
     if (err == ESP_ERR_NVS_NOT_FOUND) {
         ESP_LOGI(TAG, "%s: No config stored", nvsNamespace_);
-        return defaultConfig();
+        nvs_close(handle);
+        return ESP_ERR_NVS_NOT_FOUND;
     }
-    ESP_ERROR_CHECK(err);
+    if (err != ESP_OK) {
+        nvs_close(handle);
+        return err;
+    }
+
     if (version != version_) {
-        ESP_LOGI(TAG, "%s: Stored config is v%d, want %d", nvsNamespace_, version, version_);
-        return defaultConfig();
+        ESP_LOGI(TAG, "%s: Stored config is v%d, want %d - attempting migration", nvsNamespace_,
+                 version, version_);
+
+        // Try to read the old config blob
+        size_t oldConfigSize = 0;
+        esp_err_t sizeErr = nvs_get_blob(handle, "config", NULL, &oldConfigSize);
+        if (sizeErr == ESP_OK && oldConfigSize > 0) {
+            void *oldConfigData = malloc(oldConfigSize);
+            if (oldConfigData) {
+                esp_err_t readErr = nvs_get_blob(handle, "config", oldConfigData, &oldConfigSize);
+                if (readErr == ESP_OK) {
+                    esp_err_t migrateErr = migrateConfig(config, version, oldConfigData, oldConfigSize);
+                    free(oldConfigData);
+                    nvs_close(handle);
+                    
+                    if (migrateErr == ESP_OK) {
+                        // Store the migrated config with new version
+                        store(*config);
+                        return ESP_OK;
+                    } else {
+                        ESP_LOGE(TAG, "%s: Migration failed: %d", nvsNamespace_, migrateErr);
+                        return migrateErr;
+                    }
+                }
+                free(oldConfigData);
+            }
+        }
+        nvs_close(handle);
+        ESP_LOGE(TAG, "%s: Failed to migrate config from v%d to v%d", nvsNamespace_, version,
+                 version_);
+        return ESP_ERR_NOT_SUPPORTED;
     }
     versionWritten_ = true; // Confirmed that the correct version was already written
 
-    T config;
-    size_t size;
-    nvs_get_blob(handle, "config", &config, &size);
+    size_t size = sizeof(T);
+    err = nvs_get_blob(handle, "config", config, &size);
+    nvs_close(handle);
+
+    if (err != ESP_OK) {
+        return err;
+    }
     if (size != sizeof(T)) {
         ESP_LOGE(TAG, "%s: Invalid config length read: %u != %u", nvsNamespace_, sizeof(T), size);
-        return defaultConfig();
+        return ESP_ERR_INVALID_SIZE;
     }
 
-    return config;
+    return ESP_OK;
 }

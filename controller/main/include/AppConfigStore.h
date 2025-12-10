@@ -10,11 +10,9 @@
 
 class AppConfigStore : public NVSConfigStore<ControllerDomain::Config> {
   public:
-    AppConfigStore() : NVSConfigStore(CONTROLLER_CONFIG_VERSION, APP_CONFIG_NAMESPACE){};
+    AppConfigStore() : NVSConfigStore(CONTROLLER_CONFIG_VERSION, APP_CONFIG_NAMESPACE) {};
 
-  protected:
     using Config = ControllerDomain::Config;
-
     Config defaultConfig() override {
         Config cfg{
             .equipment =
@@ -50,6 +48,7 @@ class AppConfigStore : public NVSConfigStore<ControllerDomain::Config> {
             .inTempOffsetC = 0,
             .outTempOffsetC = 0,
             .systemOn = true,
+            .continuousFanSpeed = 0,
         };
 
         // snprintf to ensure null termination
@@ -57,5 +56,46 @@ class AppConfigStore : public NVSConfigStore<ControllerDomain::Config> {
         snprintf(cfg.wifi.password, sizeof(cfg.wifi.password), "%s", default_wifi_pswd);
 
         return cfg;
+    }
+
+  protected:
+    esp_err_t migrateConfig(Config *config, uint16_t fromVersion, const void *oldConfigData,
+                            size_t oldConfigSize) override {
+        if (!config) {
+            return ESP_ERR_INVALID_ARG;
+        }
+
+        // Migrate from v1 to v2
+        if (fromVersion == 1) {
+            if (oldConfigSize != sizeof(ControllerDomain::ConfigV1)) {
+                return ESP_ERR_INVALID_SIZE;
+            }
+
+            const ControllerDomain::ConfigV1 *oldConfig =
+                static_cast<const ControllerDomain::ConfigV1 *>(oldConfigData);
+
+            // Copy all fields from v1 to v2
+            config->equipment.heatType = (Config::HVACType)oldConfig->equipment.heatType;
+            config->equipment.coolType = (Config::HVACType)oldConfig->equipment.coolType;
+            config->equipment.hasMakeupDemand = oldConfig->equipment.hasMakeupDemand;
+
+            memcpy(config->wifi.ssid, oldConfig->wifi.ssid, sizeof(config->wifi.ssid));
+            memcpy(config->wifi.password, oldConfig->wifi.password, sizeof(config->wifi.password));
+            memcpy(config->wifi.logName, oldConfig->wifi.logName, sizeof(config->wifi.logName));
+            memcpy(config->schedules, oldConfig->schedules, sizeof(oldConfig->schedules));
+            config->co2Target = oldConfig->co2Target;
+            config->maxHeatC = oldConfig->maxHeatC;
+            config->minCoolC = oldConfig->minCoolC;
+            config->inTempOffsetC = oldConfig->inTempOffsetC;
+            config->outTempOffsetC = oldConfig->outTempOffsetC;
+            config->systemOn = oldConfig->systemOn;
+
+            // Set default value for new field
+            config->continuousFanSpeed = 0;
+
+            return ESP_OK;
+        }
+
+        return ESP_ERR_NOT_SUPPORTED; // Unsupported version
     }
 };

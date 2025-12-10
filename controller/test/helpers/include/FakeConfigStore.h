@@ -5,7 +5,7 @@
 template <typename T>
 class FakeConfigStore : public AbstractConfigStore<T> {
     void store(T &config) override;
-    T load() override;
+    esp_err_t load(T *config) override;
 
   private:
     T cfg_{};
@@ -17,6 +17,10 @@ inline void FakeConfigStore<T>::store(T &config) {
 }
 
 template <typename T>
-inline T FakeConfigStore<T>::load() {
-    return cfg_;
+inline esp_err_t FakeConfigStore<T>::load(T *config) {
+    if (!config) {
+        return ESP_ERR_INVALID_ARG;
+    }
+    *config = cfg_;
+    return ESP_OK;
 }
