@@ -16,4 +16,7 @@ class ModbusClient {
     esp_err_t getMakeupDemand(bool *demand);
     esp_err_t setFancoil(const ControllerDomain::FancoilRequest req);
     esp_err_t configureFancoil();
+
+    esp_err_t getExhaustControlButton(bool *pressed);
+    esp_err_t setExhaustFan(bool on);
 };

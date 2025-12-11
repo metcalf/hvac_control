@@ -24,11 +24,14 @@ enum class CID {
     FreshAirModelId,
     FreshAirSpeed,
     MakeupDemandState,
+    ExhaustControlButton,
+    ExhaustFan,
 };
 
 enum class SlaveID {
     FreshAir = 0x11,
     MakeupDemand = 0x22,
+    Exhaust = 0x23,
 };
 
 struct RegisterDef {
@@ -44,6 +47,8 @@ RegisterDef registers_[] = {
     {CID::FreshAirModelId, "FreshAirModelId", SlaveID::FreshAir, MB_PARAM_INPUT, 0x0A, 1},
     {CID::FreshAirSpeed, "FreshAirSpeed", SlaveID::FreshAir, MB_PARAM_HOLDING, 0x10, 1},
     {CID::MakeupDemandState, "MakeupDemandState", SlaveID::MakeupDemand, MB_PARAM_INPUT, 0x00, 1},
+    {CID::ExhaustControlButton, "ExhaustControlButton", SlaveID::Exhaust, MB_PARAM_INPUT, 0x00, 1},
+    {CID::ExhaustFan, "ExhaustFan", SlaveID::Exhaust, MB_PARAM_HOLDING, 0x10, 1},
 };
 
 const uint16_t numLocalRegisters_ = std::size(registers_);
@@ -302,4 +307,20 @@ esp_err_t ModbusClient::configureFancoil() {
     }
 
     return ESP_OK;
+}
+
+esp_err_t ModbusClient::getExhaustControlButton(bool *pressed) {
+    uint16_t data = 0;
+    esp_err_t err = getParam(CID::ExhaustControlButton, (uint8_t *)&data);
+
+    if (err == ESP_OK) {
+        *pressed = data;
+    }
+
+    return err;
+}
+
+esp_err_t ModbusClient::setExhaustFan(bool on) {
+    uint16_t v = on ? 1 : 0;
+    return setParam(CID::ExhaustFan, (uint8_t *)&v);
 }

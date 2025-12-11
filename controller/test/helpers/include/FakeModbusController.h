@@ -8,6 +8,7 @@ class FakeModbusController : public AbstractModbusController {
   public:
     void setHasFancoil(bool has) override { hasFancoil_ = has; }
     void setHasMakeupDemand(bool has) override { hasMakeupDemand_ = has; };
+    void setHasExhaustCtrl(bool has) override { hasExhaustCtrl_ = has; };
 
     ControllerDomain::FreshAirModel getFreshAirModelId() override { return freshAirModel_; };
     esp_err_t getFancoilState(ControllerDomain::FancoilState *state,
@@ -41,6 +42,14 @@ class FakeModbusController : public AbstractModbusController {
         *time = lastMakeupDemand_;
         return ESP_OK;
     }
+    esp_err_t getExhaustControlButton(bool *pressed) override {
+        if (!hasExhaustCtrl_) {
+            *pressed = false;
+        } else {
+            *pressed = exhaustControlButton_;
+        }
+        return ESP_OK;
+    }
 
     esp_err_t lastSetFancoilErr() override {
         if (!hasFancoil_) {
@@ -52,6 +61,7 @@ class FakeModbusController : public AbstractModbusController {
 
     void setFreshAirSpeed(ControllerDomain::FanSpeed speed) override { fanSpeed_ = speed; }
     void setFancoil(ControllerDomain::FancoilRequest req) override { req_ = req; }
+    void setExhaustFan(bool on) override { exhaustFan_ = on; }
 
     // TEST METHODS
     void setFreshAirState(ControllerDomain::FreshAirState state,
@@ -73,10 +83,12 @@ class FakeModbusController : public AbstractModbusController {
         makeupDemand_ = demand;
         lastMakeupDemand_ = t;
     }
+    void setExhaustControlButton(bool pressed) { exhaustControlButton_ = pressed; }
     void getFreshAirModelId(ControllerDomain::FreshAirModel m) { freshAirModel_ = m; };
 
     ControllerDomain::FanSpeed getFreshAirSpeed() { return fanSpeed_; }
     ControllerDomain::FancoilRequest getFancoilRequest() { return req_; }
+    bool getExhaustFan() { return exhaustFan_; }
 
   private:
     ControllerDomain::FancoilState fancoilState_;
@@ -86,4 +98,6 @@ class FakeModbusController : public AbstractModbusController {
     ControllerDomain::FancoilRequest req_;
     ControllerDomain::FreshAirModel freshAirModel_ = ControllerDomain::FreshAirModel::SP;
     bool makeupDemand_;
+    bool exhaustControlButton_;
+    bool exhaustFan_;
 };

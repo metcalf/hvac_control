@@ -29,6 +29,7 @@ class ModbusController : public AbstractModbusController {
 
     void setHasFancoil(bool has) override;
     void setHasMakeupDemand(bool has) override;
+    void setHasExhaustCtrl(bool has) override;
     esp_err_t getFancoilState(ControllerDomain::FancoilState *state,
                               std::chrono::steady_clock::time_point *time) override;
     ControllerDomain::FreshAirModel getFreshAirModelId() override;
@@ -37,11 +38,13 @@ class ModbusController : public AbstractModbusController {
     esp_err_t getLastFreshAirSpeed(ControllerDomain::FanSpeed *speed,
                                    std::chrono::steady_clock::time_point *time) override;
     esp_err_t getMakeupDemand(bool *demand, std::chrono::steady_clock::time_point *time) override;
+    esp_err_t getExhaustControlButton(bool *pressed) override;
 
     esp_err_t lastSetFancoilErr() override;
 
     void setFreshAirSpeed(ControllerDomain::FanSpeed speed) override;
     void setFancoil(ControllerDomain::FancoilRequest req) override;
+    void setExhaustFan(bool on) override;
 
   private:
     using FanSpeed = ControllerDomain::FanSpeed;
@@ -53,7 +56,7 @@ class ModbusController : public AbstractModbusController {
     using Setpoints = ControllerDomain::Setpoints;
     using FancoilRequest = ControllerDomain::FancoilRequest;
 
-    enum class RequestType { SetFreshAirSpeed, SetFancoil };
+    enum class RequestType { SetFreshAirSpeed, SetFancoil, SetExhaustFan };
 
     ModbusClient client_;
     EventGroupHandle_t requests_;
@@ -61,15 +64,17 @@ class ModbusController : public AbstractModbusController {
 
     FancoilRequest requestFancoil_;
     FanSpeed requestFreshAirSpeed_;
+    bool requestExhaustFan_;
     FancoilState fancoilState_;
 
     uint16_t freshAirModelId_ = 0;
     FreshAirState freshAirState_ = {};
     FanSpeed freshAirSpeed_;
     bool makeupDemand_ = false;
+    bool exhaustControlButton_ = false;
 
     esp_err_t freshAirStateErr_ = ESP_OK, freshAirSpeedErr_ = ESP_OK, makeupDemandErr_ = ESP_OK,
-              setFancoilErr_ = ESP_OK, fancoilStateErr_ = ESP_OK;
+              setFancoilErr_ = ESP_OK, fancoilStateErr_ = ESP_OK, exhaustControlButtonErr_ = ESP_OK;
 
     bool fancoilConfigured_ = false;
 
@@ -81,4 +86,6 @@ class ModbusController : public AbstractModbusController {
     void doGetFreshAir();
     void doSetFancoil();
     void doGetFancoil();
+    void doSetExhaustFan();
+    void doGetExhaustControlButton();
 };

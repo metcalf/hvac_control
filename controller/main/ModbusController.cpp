@@ -19,6 +19,13 @@ void ModbusController::setHasMakeupDemand(bool has) {
     xSemaphoreGive(mutex_);
 }
 
+void ModbusController::setHasExhaustCtrl(bool has) {
+    xSemaphoreTake(mutex_, portMAX_DELAY);
+    hasExhaustCtrl_ = has;
+    exhaustControlButtonErr_ = ESP_OK;
+    xSemaphoreGive(mutex_);
+}
+
 void ModbusController::doMakeup() {
     bool makeupDemand;
 
@@ -122,6 +129,9 @@ void ModbusController::task() {
         if (bits & requestBits(RequestType::SetFancoil) && hasFancoil_) {
             doSetFancoil();
         }
+        if (bits & requestBits(RequestType::SetExhaustFan) && hasExhaustCtrl_) {
+            doSetExhaustFan();
+        }
 
         // We fetch updated data on every turn through the loop even though this happens
         // both at the poll interval and on every set* request. Extra queries are harmless
@@ -134,6 +144,10 @@ void ModbusController::task() {
 
         if (hasFancoil_) {
             doGetFancoil();
+        }
+
+        if (hasExhaustCtrl_) {
+            doGetExhaustControlButton();
         }
     }
 }
@@ -235,4 +249,51 @@ esp_err_t ModbusController::lastSetFancoilErr() {
     esp_err_t err = setFancoilErr_;
     xSemaphoreGive(mutex_);
     return err;
+}
+
+void ModbusController::doSetExhaustFan() {
+    xSemaphoreTake(mutex_, portMAX_DELAY);
+    const bool on = requestExhaustFan_;
+    xSemaphoreGive(mutex_);
+
+    client_.setExhaustFan(on);
+}
+
+void ModbusController::doGetExhaustControlButton() {
+    bool pressed;
+    esp_err_t err = client_.getExhaustControlButton(&pressed);
+
+    xSemaphoreTake(mutex_, portMAX_DELAY);
+    exhaustControlButtonErr_ = err;
+    if (exhaustControlButtonErr_ == ESP_OK) {
+        // Latch the pressed state, we clear on read to match the device behavior.
+        exhaustControlButton_ |= pressed;
+    }
+    xSemaphoreGive(mutex_);
+}
+
+esp_err_t ModbusController::getExhaustControlButton(bool *pressed) {
+    if (!hasExhaustCtrl_) {
+        *pressed = false;
+        return ESP_OK;
+    }
+
+    xSemaphoreTake(mutex_, portMAX_DELAY);
+    esp_err_t err = exhaustControlButtonErr_;
+    if (err == ESP_OK) {
+        *pressed = exhaustControlButton_;
+        // Clear the latched state after reading, mimicking remote device behavior
+        exhaustControlButton_ = false;
+    }
+    xSemaphoreGive(mutex_);
+
+    return err;
+}
+
+void ModbusController::setExhaustFan(bool on) {
+    xSemaphoreTake(mutex_, portMAX_DELAY);
+    requestExhaustFan_ = on;
+    xSemaphoreGive(mutex_);
+
+    makeRequest(RequestType::SetExhaustFan);
 }
