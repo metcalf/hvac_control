@@ -4,6 +4,8 @@
 
 #include "AbstractModbusController.h"
 
+#include "esp_log.h"
+
 class FakeModbusController : public AbstractModbusController {
   public:
     void setHasFancoil(bool has) override { hasFancoil_ = has; }
@@ -47,6 +49,7 @@ class FakeModbusController : public AbstractModbusController {
             *pressed = false;
         } else {
             *pressed = exhaustControlButton_;
+            exhaustControlButton_ = false;
         }
         return ESP_OK;
     }

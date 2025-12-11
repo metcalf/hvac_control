@@ -23,6 +23,8 @@
 // Keep HVAC on in the same mode for at least this time to avoid excessive valve wear
 // and detect potential control system issues.
 #define MIN_HVAC_ON_INTERVAL std::chrono::minutes(5)
+// How long to run exhaust fan when button is pressed (minutes)
+#define EXHAUST_BUTTON_ON_TIME std::chrono::minutes(10)
 
 // Turn A/C on if we have cooling demand and the coil temp is below this
 #define COIL_COLD_TEMP_C ABS_F_TO_C(60.0)
@@ -40,6 +42,10 @@
 #define AC_ON_DEMAND_THRESHOLD 0.3
 // Turn off A/C when demand drops below this.
 #define AC_OFF_DEMAND_THRESHOLD 0.2
+// If fan is above this speed, turn on exhaust fan for extra cooling/pressure balance
+#define FAN_SPEED_EXHAUST_ON_THRESHOLD (ControllerDomain::FanSpeed)170
+// Turn exhaust fan off when fan speed drops below this (hysteresis)
+#define FAN_SPEED_EXHAUST_OFF_THRESHOLD (ControllerDomain::FanSpeed)140
 
 class ControllerApp {
   public:
@@ -65,6 +71,9 @@ class ControllerApp {
 
         updateEquipment(config_.equipment);
         setSystemPower(config_.systemOn);
+
+        // Ensure exhaust fan is off at startup to avoid getting stuck on after resets
+        modbusController_->setExhaustFan(false);
     }
     ~ControllerApp() {
         delete ventAlgo_;
@@ -97,9 +106,11 @@ class ControllerApp {
         GetMakeupDemandErr,
         SetFancoilErr,
         HomeClientErr,
+        ExhaustErr,
         OTA,
         Vacation,
         HVACChangeLimit,
+        ManualExhaustCall,
         _Last,
     };
     enum class FanSpeedReason {
@@ -184,12 +195,16 @@ class ControllerApp {
             return "SetFancoilErr";
         case MsgID::HomeClientErr:
             return "HomeClientErr";
+        case MsgID::ExhaustErr:
+            return "ExhaustErr";
         case MsgID::OTA:
             return "OTA";
         case MsgID::Vacation:
             return "Vacation";
         case MsgID::HVACChangeLimit:
             return "HVACChangeLimit";
+        case MsgID::ManualExhaustCall:
+            return "ManualExhaustCall";
         case MsgID::_Last:
             return "";
         }
@@ -243,7 +258,9 @@ class ControllerApp {
     void updateACMode(const double coolDemand, const double coolSetpointC, const double inTempC,
                       const double outTempC);
     FanSpeed computeFanSpeed(double ventDemand, double coolDemand, bool wantOutdoorTemp);
-    void setFanSpeed(FanSpeed);
+    void setFanSpeed(ControllerDomain::FanSpeed);
+    void setExhaustFan(FanSpeed fanSpeed);
+    void handleExhaustControlButton();
     bool pollUIEvent(bool wait);
     void handleCancelMessage(MsgID id);
     HVACState setHVAC(const double heatDemand, const double coolDemand, const FanSpeed fanSpeed);
@@ -262,7 +279,8 @@ class ControllerApp {
                   const ControllerDomain::SensorData &sensorData, double ventDemand,
                   double fanCoolDemand, double heatDemand, double coolDemand,
                   const ControllerDomain::Setpoints &setpoints,
-                  const ControllerDomain::HVACState hvacState, const FanSpeed fanSpeed);
+                  const ControllerDomain::HVACState hvacState, const FanSpeed fanSpeed,
+                  const bool exhaustOn);
     void checkWifiState();
     double outdoorTempC() const;
     AbstractDemandAlgorithm *getAlgoForEquipment(ControllerDomain::Config::HVACType type,
@@ -302,10 +320,11 @@ class ControllerApp {
     std::chrono::steady_clock::time_point lastOutdoorTempUpdate_;
 
     bool fanIsOn_ = false;
+    bool exhaustFanOn_ = false;
     FanSpeed fanOverrideSpeed_;
     uint32_t stoppedPressurePa_ = 0;
     std::chrono::steady_clock::time_point fanOverrideUntil_{}, fanLastStarted_{}, fanLastStopped_{},
-        fanMaxSpeedStarted_{};
+        fanMaxSpeedStarted_{}, exhaustOnUntil_{};
 
     std::chrono::steady_clock::time_point lastStatusLog_{};
     FanSpeedReason lastLoggedFanSpeedReason_ = FanSpeedReason::Unknown;

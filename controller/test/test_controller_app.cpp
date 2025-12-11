@@ -644,6 +644,72 @@ TEST_F(ControllerAppTest, AllowHVACChangeLimit) {
     EXPECT_EQ(FancoilSpeed::Off, fcReq.speed);
 }
 
+TEST_F(ControllerAppTest, ExhaustOnWithSupplyFan) {
+    // Enable exhaust control
+    auto cfg = default_test_config();
+    cfg.equipment.hasExhaustCtrl = true;
+    app_->setConfig(cfg);
+
+    sensors_.setLatest({.tempC = 20.0, .co2 = 456});
+
+    // Initially exhaust fan should be off
+    app_->task();
+    EXPECT_FALSE(modbusController_.getExhaustFan());
+
+    // NB: GT/LT expectations are just to ensure the test assumptions
+    // are still valid if we change other thresholds later.
+
+    // Fan cooling turns exhaust on
+    setOutdoorTempC(22);
+    sensors_.setLatest({.tempC = 24.0, .co2 = 500});
+    app_->task();
+    EXPECT_TRUE(modbusController_.getExhaustFan());
+    EXPECT_GT(modbusController_.getFreshAirSpeed(), FAN_SPEED_EXHAUST_ON_THRESHOLD);
+
+    // Lowering below on setpoint does not turn exhaust off
+    sensors_.setLatest({.tempC = 23.3, .co2 = 500});
+    app_->task();
+    EXPECT_TRUE(modbusController_.getExhaustFan());
+    EXPECT_LT(modbusController_.getFreshAirSpeed(), FAN_SPEED_EXHAUST_ON_THRESHOLD);
+
+    // Lowering below off threshold turns off
+    sensors_.setLatest({.tempC = 23.0, .co2 = 500});
+    app_->task();
+    EXPECT_FALSE(modbusController_.getExhaustFan());
+    EXPECT_GT(modbusController_.getFreshAirSpeed(), 0);
+}
+
+TEST_F(ControllerAppTest, ExhaustFanButtonRunsTimed) {
+    // Enable exhaust control
+    auto cfg = default_test_config();
+    cfg.equipment.hasExhaustCtrl = true;
+    app_->setConfig(cfg);
+
+    sensors_.setLatest({.tempC = 20.0, .co2 = 456});
+
+    // Initially fans should be off
+    app_->task();
+    EXPECT_FALSE(modbusController_.getExhaustFan());
+    EXPECT_EQ(0, modbusController_.getFreshAirSpeed());
+
+    // Simulate button press
+    modbusController_.setExhaustControlButton(true);
+
+    // Task should detect button press and turn on exhaust fan for 30 minutes
+    app_->task();
+    EXPECT_TRUE(modbusController_.getExhaustFan());
+
+    // Advance time less than EXHAUST_BUTTON_ON_TIME - fan should still be on
+    app_->steadyNow_ += (EXHAUST_BUTTON_ON_TIME - std::chrono::minutes(1));
+    app_->task();
+    EXPECT_TRUE(modbusController_.getExhaustFan());
+
+    // Advance time by 2 more minutes (total 31 minutes) - fan should turn off
+    app_->steadyNow_ += std::chrono::minutes(2);
+    app_->task();
+    EXPECT_FALSE(modbusController_.getExhaustFan());
+}
+
 // Indoor and outdoor temp offsets?
 // Separate tests for PID algorithm?
 // static pressure measurement

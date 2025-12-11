@@ -37,8 +37,6 @@
 // Treat demands higher than this as "on"
 #define ON_DEMAND_THRESHOLD 0.01
 
-// If fan is above this speed, turn on exhaust fan for extra cooling
-#define FAN_SPEED_EXHAUST_THRESHOLD (FanSpeed)180
 // Fan speed for makeup air
 #define MAKEUP_FAN_SPEED (FanSpeed)160
 #define FAN_ON_THRESHOLD (FanSpeed)40
@@ -64,9 +62,10 @@ void ControllerApp::updateEquipment(ControllerDomain::Config::Equipment equipmen
         delete coolAlgo_;
         coolAlgo_ = getAlgoForEquipment(equipment.coolType, false);
     }
-    modbusController_->setHasMakeupDemand(config_.equipment.hasMakeupDemand);
-    modbusController_->setHasFancoil(config_.equipment.heatType == Config::HVACType::Fancoil ||
-                                     config_.equipment.coolType == Config::HVACType::Fancoil);
+    modbusController_->setHasMakeupDemand(equipment.hasMakeupDemand);
+    modbusController_->setHasFancoil(equipment.heatType == Config::HVACType::Fancoil ||
+                                     equipment.coolType == Config::HVACType::Fancoil);
+    modbusController_->setHasExhaustCtrl(equipment.hasExhaustCtrl);
 }
 
 void ControllerApp::updateACMode(const double coolDemand, const double coolSetpointC,
@@ -194,6 +193,48 @@ void ControllerApp::setFanSpeed(FanSpeed speed) {
     uiManager_->setCurrentFanSpeed(speed);
     modbusController_->setFreshAirSpeed(speed);
     fanIsOn_ = speed > 0;
+}
+
+void ControllerApp::setExhaustFan(FanSpeed fanSpeed) {
+    std::chrono::steady_clock::time_point now = steadyNow();
+
+    if (now < exhaustOnUntil_) {
+        // Show cancellable message
+        setMessageF(
+            MsgID::ManualExhaustCall, true, "Exhaust fan on for %d minutes",
+            std::chrono::duration_cast<std::chrono::minutes>(exhaustOnUntil_ - now).count());
+
+        // Manual control active - force exhaust fan on
+        exhaustFanOn_ = true;
+    } else {
+        clearMessage(MsgID::ManualExhaustCall);
+
+        // Automatic control based on fan speed with hysteresis
+        if (!exhaustFanOn_ && fanSpeed >= FAN_SPEED_EXHAUST_ON_THRESHOLD) {
+            // Turn exhaust fan on when speed reaches threshold
+            exhaustFanOn_ = true;
+        } else if (exhaustFanOn_ && fanSpeed < FAN_SPEED_EXHAUST_OFF_THRESHOLD) {
+            // Turn exhaust fan off when speed drops below hysteresis threshold
+            exhaustFanOn_ = false;
+        }
+    }
+
+    modbusController_->setExhaustFan(exhaustFanOn_);
+}
+
+void ControllerApp::handleExhaustControlButton() {
+    bool pressed;
+    esp_err_t err = modbusController_->getExhaustControlButton(&pressed);
+
+    if (err != ESP_OK) {
+        setErrMessageF(MsgID::ExhaustErr, false, "Exhaust button error: %d", err);
+        return;
+    }
+
+    if (pressed) {
+        // Start/update manual exhaust control timer
+        exhaustOnUntil_ = steadyNow() + EXHAUST_BUTTON_ON_TIME;
+    }
 }
 
 bool ControllerApp::pollUIEvent(bool wait) {
@@ -370,6 +411,10 @@ void ControllerApp::handleCancelMessage(MsgID id) {
     case MsgID::HVACChangeLimit:
         resetHVACChangeLimit();
         break;
+    case MsgID::ManualExhaustCall:
+        // Cancel manual exhaust timer
+        exhaustOnUntil_ = {};
+        break;
     default:
         ESP_LOGE(TAG, "Unexpected message cancellation for: %d", static_cast<int>(id));
     }
@@ -428,24 +473,7 @@ ControllerDomain::HVACState ControllerApp::setHVAC(const double heatDemand, cons
             modbusController_->setFancoil(FancoilRequest{speed, cool});
             lastHvacSpeed_ = speed;
 
-            // HACK: in the PBR we abuse the valve outputs to control other things
-            bool heatVlv = false, coolVlv = false;
-
-            // If demand is high in heating mode, turn on the heat valve to trigger
-            // supplemental kickspace heaters in the bathroom.
-            if (speed == FancoilSpeed::High && !cool) {
-                heatVlv = true;
-            }
-
-            // If the fan speed is above a threshold, turn on the cool valve to trigger
-            // the bath fan to run to assist with fan cooling. We check that there's
-            // cooling demand just to limit the risk of problematic behavior in some
-            // future configuration of the system if I forget about this hack.
-            if (cool && fanSpeed > FAN_SPEED_EXHAUST_THRESHOLD) {
-                coolVlv = true;
-            }
-
-            valveCtrl_->set(heatVlv, coolVlv);
+            valveCtrl_->set(false, false);
         }
 
         break;
@@ -594,7 +622,8 @@ void ControllerApp::logState(const ControllerDomain::FreshAirState &freshAirStat
                              const ControllerDomain::SensorData &sensorData, double ventDemand,
                              double fanCoolDemand, double heatDemand, double coolDemand,
                              const ControllerDomain::Setpoints &setpoints,
-                             const ControllerDomain::HVACState hvacState, const FanSpeed fanSpeed) {
+                             const ControllerDomain::HVACState hvacState, const FanSpeed fanSpeed,
+                             const bool exhaustOn) {
     esp_log_level_t statusLevel;
     auto now = steadyNow();
     if (now - lastStatusLog_ > STATUS_LOG_INTERVAL) {
@@ -641,7 +670,7 @@ void ControllerApp::logState(const ControllerDomain::FreshAirState &freshAirStat
         // DemandRequest
         " vent_d=%.2f fancool_d=%.2f heat_d=%.2f cool_d=%.2f"
         // HVACState
-        " hvac=%s speed=%s ac=%s coil_c=%d",
+        " hvac=%s speed=%s ac=%s coil_c=%d exhaust=%d",
         // Sensors
         sensorData.tempC, sensorData.rawOnBoardTempC, sensorData.rawOffBoardTempC, outdoorTempC(),
         sensorData.humidity, sensorData.pressurePa, sensorData.co2,
@@ -651,7 +680,8 @@ void ControllerApp::logState(const ControllerDomain::FreshAirState &freshAirStat
         ventDemand, fanCoolDemand, heatDemand, coolDemand,
         // HVACState
         ControllerDomain::hvacStateToS(hvacState),
-        ControllerDomain::fancoilSpeedToS(lastHvacSpeed_), acModeToS(acMode_), coilTempC);
+        ControllerDomain::fancoilSpeedToS(lastHvacSpeed_), acModeToS(acMode_), coilTempC,
+        exhaustOn ? 1 : 0);
 }
 
 void ControllerApp::checkWifiState() {
@@ -1028,6 +1058,9 @@ void ControllerApp::task(bool firstTime) {
     FanSpeed fanSpeed = computeFanSpeed(ventDemand, fanCoolDemand, wantOutdoorTemp);
     setFanSpeed(fanSpeed);
 
+    handleExhaustControlButton();
+    setExhaustFan(fanSpeed);
+
     updateACMode(coolDemand, setpoints.coolTempC, sensorData.tempC, outdoorTempC());
     HVACState hvacState = setHVAC(heatDemand, coolDemand, fanSpeed);
 
@@ -1038,7 +1071,7 @@ void ControllerApp::task(bool firstTime) {
     }
 
     logState(freshAirState, sensorData, ventDemand, fanCoolDemand, heatDemand, coolDemand,
-             setpoints, hvacState, fanSpeed);
+             setpoints, hvacState, fanSpeed, exhaustFanOn_);
 
     homeCli_->updateClimateState(config_.systemOn, hvacState, fanSpeed, sensorData.tempC,
                                  setpoints.coolTempC, setpoints.heatTempC);
