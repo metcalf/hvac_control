@@ -25,6 +25,11 @@ uint16_t getTick() {
     ATOMIC_BLOCK(ATOMIC_FORCEON) { return tick_; }
 }
 
+// !!!!! IMPORTANT NOTE !!!!!
+// The fancoils we're using have native Modbus support so we never actually
+// used and tested this IR code so it almost certainly does not work as-is.
+// Leaving it in place because the overall system is working and I don't want
+// to touch anything I don't have to.
 uint8_t setFancoil(bool cool_mode, uint8_t speed) {
     USART_DEBUG_SEND(cool_mode ? 'c' : 'h');
     USART_DEBUG_SEND(speed + 0x30);

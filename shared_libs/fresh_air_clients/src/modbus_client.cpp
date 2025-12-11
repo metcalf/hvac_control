@@ -14,9 +14,9 @@ void modbus_client_init(UCHAR slave_id, ULONG baud, LastData *lastData, uint16_t
     speed_ptr_ = speed;
 
     eMBErrorCode mbStatus = eMBInit(MB_RTU, slave_id, 0, baud, MB_PAR_NONE);
-    assert(eMBErrorCode == MB_ENOERR);
+    assert(mbStatus == MB_ENOERR);
     mbStatus = eMBEnable();
-    assert(eMBErrorCode == MB_ENOERR);
+    assert(mbStatus == MB_ENOERR);
 }
 
 int modbus_poll() { return eMBPoll(); }

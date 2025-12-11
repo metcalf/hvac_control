@@ -54,6 +54,9 @@
     },
     {
       "path": "manual_testing/temp_board_tester"
+    },
+    {
+      "path": "exhaust_ctrl"
     }
   ],
   "settings": {
