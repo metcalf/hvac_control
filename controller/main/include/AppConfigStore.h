@@ -20,6 +20,7 @@ class AppConfigStore : public NVSConfigStore<ControllerDomain::Config> {
                     .heatType = Config::HVACType::Fancoil,
                     .coolType = Config::HVACType::Fancoil,
                     .hasMakeupDemand = false,
+                    .hasExhaustCtrl = false,
                 },
             .wifi =
                 {
@@ -65,6 +66,37 @@ class AppConfigStore : public NVSConfigStore<ControllerDomain::Config> {
             return ESP_ERR_INVALID_ARG;
         }
 
+        // Migrate from v2 to v3
+        if (fromVersion == 2) {
+            if (oldConfigSize != sizeof(ControllerDomain::ConfigV2)) {
+                return ESP_ERR_INVALID_SIZE;
+            }
+
+            const ControllerDomain::ConfigV2 *oldConfig =
+                static_cast<const ControllerDomain::ConfigV2 *>(oldConfigData);
+
+            // Copy all fields from v2 to v3
+            config->equipment.heatType = (Config::HVACType)oldConfig->equipment.heatType;
+            config->equipment.coolType = (Config::HVACType)oldConfig->equipment.coolType;
+            config->equipment.hasMakeupDemand = oldConfig->equipment.hasMakeupDemand;
+            // Set default value for new field
+            config->equipment.hasExhaustCtrl = false;
+
+            memcpy(config->wifi.ssid, oldConfig->wifi.ssid, sizeof(config->wifi.ssid));
+            memcpy(config->wifi.password, oldConfig->wifi.password, sizeof(config->wifi.password));
+            memcpy(config->wifi.logName, oldConfig->wifi.logName, sizeof(config->wifi.logName));
+            memcpy(config->schedules, oldConfig->schedules, sizeof(oldConfig->schedules));
+            config->co2Target = oldConfig->co2Target;
+            config->maxHeatC = oldConfig->maxHeatC;
+            config->minCoolC = oldConfig->minCoolC;
+            config->inTempOffsetC = oldConfig->inTempOffsetC;
+            config->outTempOffsetC = oldConfig->outTempOffsetC;
+            config->systemOn = oldConfig->systemOn;
+            config->continuousFanSpeed = oldConfig->continuousFanSpeed;
+
+            return ESP_OK;
+        }
+
         // Migrate from v1 to v2
         if (fromVersion == 1) {
             if (oldConfigSize != sizeof(ControllerDomain::ConfigV1)) {
@@ -78,6 +110,8 @@ class AppConfigStore : public NVSConfigStore<ControllerDomain::Config> {
             config->equipment.heatType = (Config::HVACType)oldConfig->equipment.heatType;
             config->equipment.coolType = (Config::HVACType)oldConfig->equipment.coolType;
             config->equipment.hasMakeupDemand = oldConfig->equipment.hasMakeupDemand;
+            // Set default values for new fields
+            config->equipment.hasExhaustCtrl = false;
 
             memcpy(config->wifi.ssid, oldConfig->wifi.ssid, sizeof(config->wifi.ssid));
             memcpy(config->wifi.password, oldConfig->wifi.password, sizeof(config->wifi.password));
@@ -90,7 +124,7 @@ class AppConfigStore : public NVSConfigStore<ControllerDomain::Config> {
             config->outTempOffsetC = oldConfig->outTempOffsetC;
             config->systemOn = oldConfig->systemOn;
 
-            // Set default value for new field
+            // Set default values for new fields
             config->continuousFanSpeed = 0;
 
             return ESP_OK;

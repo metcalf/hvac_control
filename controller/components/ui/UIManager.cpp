@@ -287,6 +287,7 @@ void UIManager::eSaveEquipmentSettings() {
     equipment_.heatType = Config::HVACType(lv_dropdown_get_selected(ui_heat_type));
     equipment_.coolType = Config::HVACType(lv_dropdown_get_selected(ui_cool_type));
     equipment_.hasMakeupDemand = lv_obj_has_state(ui_makeup_air_switch, LV_STATE_CHECKED);
+    equipment_.hasExhaustCtrl = lv_obj_has_state(exhaustCheckbox_, LV_STATE_CHECKED);
 
     // Convert dropdown selection to continuousFanSpeed (0-255)
     uint16_t fanSpeedPct = lv_dropdown_get_selected(continuousFanDropdown_) * 10;
@@ -388,6 +389,11 @@ void UIManager::eEquipmentSettingsLoadStart() {
         lv_obj_add_state(ui_makeup_air_switch, LV_STATE_CHECKED);
     } else {
         lv_obj_clear_state(ui_makeup_air_switch, LV_STATE_CHECKED);
+    }
+    if (equipment_.hasExhaustCtrl) {
+        lv_obj_add_state(exhaustCheckbox_, LV_STATE_CHECKED);
+    } else {
+        lv_obj_clear_state(exhaustCheckbox_, LV_STATE_CHECKED);
     }
 
     // Convert continuousFanSpeed (0-255) to dropdown selection (0-10)
@@ -511,6 +517,30 @@ void UIManager::initExtraWidgets() {
     lv_label_set_text(restartLabel, "RESTART");
     lv_obj_set_style_text_font(restartLabel, &lv_font_montserrat_18,
                                LV_PART_MAIN | LV_STATE_DEFAULT);
+
+    // Exhaust control settings
+    lv_obj_t *exhaustContainer = lv_obj_create(ui_equipment_settings_container);
+    lv_obj_remove_style_all(exhaustContainer);
+    lv_obj_set_width(exhaustContainer, 300);
+    lv_obj_set_height(exhaustContainer, 50);
+    lv_obj_set_align(exhaustContainer, LV_ALIGN_CENTER);
+    lv_obj_clear_flag(exhaustContainer, LV_OBJ_FLAG_SCROLLABLE); /// Flags
+
+    lv_obj_t *exhaustLabel = lv_label_create(exhaustContainer);
+    lv_obj_set_width(exhaustLabel, 130);
+    lv_obj_set_height(exhaustLabel, LV_SIZE_CONTENT); /// 1
+    lv_obj_set_align(exhaustLabel, LV_ALIGN_LEFT_MID);
+    lv_label_set_text(exhaustLabel, "EXHAUST");
+    lv_obj_set_style_text_align(exhaustLabel, LV_TEXT_ALIGN_RIGHT, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_font(exhaustLabel, &lv_font_montserrat_18,
+                               LV_PART_MAIN | LV_STATE_DEFAULT);
+
+    exhaustCheckbox_ = lv_switch_create(exhaustContainer);
+    lv_obj_set_width(exhaustCheckbox_, 50);
+    lv_obj_set_height(exhaustCheckbox_, 25);
+    lv_obj_set_x(exhaustCheckbox_, 150);
+    lv_obj_set_y(exhaustCheckbox_, 0);
+    lv_obj_set_align(exhaustCheckbox_, LV_ALIGN_LEFT_MID);
 
     // Continuous fan ventilation settings
     lv_obj_t *contFanContainer = lv_obj_create(ui_equipment_settings_container);

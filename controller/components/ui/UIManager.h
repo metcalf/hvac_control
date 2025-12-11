@@ -104,7 +104,7 @@ class UIManager : public AbstractUIManager {
 
     inline static UIManager *eventsInst_;
 
-    lv_obj_t *firmwareVersionLabel_, *restartButton_, *continuousFanDropdown_;
+    lv_obj_t *firmwareVersionLabel_, *restartButton_, *continuousFanDropdown_, *exhaustCheckbox_;
 
     SemaphoreHandle_t mutex_;
     MessageManager *msgMgr_;
