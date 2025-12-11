@@ -155,7 +155,9 @@ FanSpeed ControllerApp::computeFanSpeed(double ventDemand, double coolDemand,
             fanSpeedReason_ = FanSpeedReason::PollOutdoorTemp;
         }
 
-        if (fanSpeed < config_.continuousFanSpeed && !vacationOn_) {
+        // Run fan at continuous speed during the daytime and not on vacation
+        // We skip the nighttime to bring in less cold air.
+        if (fanSpeed < config_.continuousFanSpeed && !vacationOn_ && getScheduleIdx(0) == 0) {
             fanSpeed = std::max(MIN_FAN_SPEED_VALUE, config_.continuousFanSpeed);
             fanSpeedReason_ = FanSpeedReason::Continuous;
         }
