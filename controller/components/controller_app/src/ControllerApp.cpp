@@ -665,7 +665,7 @@ void ControllerApp::logState(const ControllerDomain::FreshAirState &freshAirStat
         "ctrl:"
         // Sensors
         " in_t=%0.2f raw_in_t_onbrd=%0.2f raw_in_t_offbrd=%0.2f out_t=%0.2f h=%0.1f p=%" PRIu32
-        " co2=%u"
+        " co2=%u co2_off=%d"
         // Setpoints
         " set_h=%.2f set_c=%.2f set_co2=%u set_r=%s"
         // DemandRequest
@@ -674,7 +674,7 @@ void ControllerApp::logState(const ControllerDomain::FreshAirState &freshAirStat
         " hvac=%s speed=%s ac=%s coil_c=%d exhaust=%d",
         // Sensors
         sensorData.tempC, sensorData.rawOnBoardTempC, sensorData.rawOffBoardTempC, outdoorTempC(),
-        sensorData.humidity, sensorData.pressurePa, sensorData.co2,
+        sensorData.humidity, sensorData.pressurePa, sensorData.co2, sensors_->getCO2Offset(),
         // Setpoints
         setpoints.heatTempC, setpoints.coolTempC, setpoints.co2, setpointReasonToS(setpointReason_),
         // Demands

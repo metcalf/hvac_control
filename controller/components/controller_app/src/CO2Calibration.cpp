@@ -75,6 +75,7 @@ int16_t CO2Calibration::update(uint16_t ppm, uint8_t month, uint16_t year) {
 
     if (changed) {
         store_->store(state_);
+        logState("Stored");
     }
 
     return offset;
@@ -99,6 +100,17 @@ void CO2Calibration::loadState() {
         if (err != ESP_OK) {
             ESP_LOGE(TAG, "Failed to load CO2 calibration state: error %d", err);
             // Keep the default initialized state_ if load fails
+        } else {
+            logState("Loaded");
         }
     }
+}
+
+void CO2Calibration::logState(const char* action) {
+    ESP_LOGI(TAG, "%s state: lastWritten=%04d-%02d lastOffset=%04d months=%04d|%04d|%04d|%04d|%04d|%04d|%04d|%04d|%04d|%04d|%04d|%04d",
+             action,
+             state_.lastMonthYearWritten / 12 + 1900, state_.lastMonthYearWritten % 12 + 1, state_.lastValidOffsetPpm,
+             state_.monthMinimums[0], state_.monthMinimums[1], state_.monthMinimums[2], state_.monthMinimums[3],
+             state_.monthMinimums[4], state_.monthMinimums[5], state_.monthMinimums[6], state_.monthMinimums[7],
+             state_.monthMinimums[8], state_.monthMinimums[9], state_.monthMinimums[10], state_.monthMinimums[11]);
 }

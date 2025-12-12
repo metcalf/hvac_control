@@ -30,4 +30,5 @@ class CO2Calibration {
     AbstractConfigStore<State> *store_;
 
     void loadState();
+    void logState(const char* action);
 };
