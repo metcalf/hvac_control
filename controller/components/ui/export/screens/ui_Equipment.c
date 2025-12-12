@@ -37,7 +37,6 @@ lv_obj_set_y( ui_equipment_settings_container, -6 );
 lv_obj_set_align( ui_equipment_settings_container, LV_ALIGN_CENTER );
 lv_obj_set_flex_flow(ui_equipment_settings_container,LV_FLEX_FLOW_COLUMN);
 lv_obj_set_flex_align(ui_equipment_settings_container, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER);
-lv_obj_clear_flag( ui_equipment_settings_container, LV_OBJ_FLAG_SCROLLABLE );    /// Flags
 
 ui_heat_type_container = lv_obj_create(ui_equipment_settings_container);
 lv_obj_remove_style_all(ui_heat_type_container);

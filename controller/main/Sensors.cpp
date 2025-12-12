@@ -157,6 +157,13 @@ SensorData Sensors::getLatest() {
     return data;
 }
 
+int16_t Sensors::getCO2Offset() {
+    xSemaphoreTake(mutex_, portMAX_DELAY);
+    int16_t offset = co2Calibration_->getCurrentOffset();
+    xSemaphoreGive(mutex_);
+    return offset;
+}
+
 int8_t Sensors::initStsTemperature(uint8_t address) {
     int8_t err = sts3x_probe(address);
     if (err != 0) {

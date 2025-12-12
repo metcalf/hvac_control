@@ -230,6 +230,7 @@ void ControllerApp::handleExhaustControlButton() {
         setErrMessageF(MsgID::ExhaustErr, false, "Exhaust button error: %d", err);
         return;
     }
+    clearMessage(MsgID::ExhaustErr);
 
     if (pressed) {
         // Start/update manual exhaust control timer

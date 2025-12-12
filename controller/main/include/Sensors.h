@@ -21,6 +21,7 @@ class Sensors : public AbstractSensors {
     bool init();
     bool poll();
     SensorData getLatest() override;
+    int16_t getCO2Offset() override;
 
   private:
     SensorData lastData_ = {};
