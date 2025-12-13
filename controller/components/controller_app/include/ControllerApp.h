@@ -24,7 +24,7 @@
 // and detect potential control system issues.
 #define MIN_HVAC_ON_INTERVAL std::chrono::minutes(5)
 // How long to run exhaust fan when button is pressed (minutes)
-#define EXHAUST_BUTTON_ON_TIME std::chrono::minutes(10)
+#define EXHAUST_BUTTON_ON_TIME std::chrono::minutes(20)
 
 // Turn A/C on if we have cooling demand and the coil temp is below this
 #define COIL_COLD_TEMP_C ABS_F_TO_C(60.0)
