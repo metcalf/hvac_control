@@ -12,12 +12,16 @@
 #define MB_BAUD 9600
 #define OUTPUT_PIN_NUM PIN5_bm
 #define INPUT_PIN_NUM PIN0_bm
-#define TICK_PERIOD_MS 100
+#define TICK_PERIOD_MS 5
+#define INPUT_DEBOUNCE_MS 20 // Require input high for 20ms before counting as on
+#define INPUT_DEBOUNCE_TICKS (INPUT_DEBOUNCE_MS / TICK_PERIOD_MS) // 4 ticks
 #define INPUT_READ_TIME_MS (1000 * 60) // Clear input state if no ON seen in 60 seconds
 #define INPUT_READ_TIME_TICKS (INPUT_READ_TIME_MS / TICK_PERIOD_MS) // Must be less than 2^16
 
 volatile uint16_t tick_;
-uint16_t input_last_on_;
+uint16_t input_state_last_on_tick_;
+uint16_t input_first_on_tick_;
+bool input_is_on_;
 
 bool input_state_;
 
@@ -44,15 +48,15 @@ int main(void) {
 
     CPU_CCP = CCP_IOREG_gc; /* Enable writing to protected register MCLKCTRLB */
     // NB: Update F_CLK_PER in platformio.ini if this changes
-    CLKCTRL.MCLKCTRLB = CLKCTRL_PEN_bm | CLKCTRL_PDIV_32X_gc; // Divide main clock by 32 = 625khz
+    CLKCTRL.MCLKCTRLB = CLKCTRL_PEN_bm | CLKCTRL_PDIV_16X_gc; // Divide main clock by 16 = 1.25mhz
 
     USART_DEBUG_INIT();
     USART_DEBUG_SEND('a');
 
     // Use TCB0 as tick counter
     TCB0.INTCTRL = TCB_CAPT_bm;
-    TCB0.CCMP = F_CLK_PER / 10; // Run at 10hz for tick counting
-    TCB0.CTRLA = TCB_ENABLE_bm; // TODO: configure this frequency and set tick rate
+    TCB0.CCMP = F_CLK_PER / 200; // Run at 200hz for tick counting
+    TCB0.CTRLA = TCB_ENABLE_bm;  // TODO: configure this frequency and set tick rate
 
     // Enable pullup resistor on input PC0 and invert value
     PORTC.PIN0CTRL |= (PORT_PULLUPEN_bm | PORT_INVEN_bm);
@@ -76,18 +80,29 @@ int main(void) {
         }
 
         if (VPORTC.IN & INPUT_PIN_NUM) {
-            // Any ON value read indicates an ON state
-            if (!input_state_) {
-                USART_DEBUG_SEND('+');
+            // Track when input first went high
+            if (!input_is_on_) {
+                input_first_on_tick_ = now;
+                input_is_on_ = true;
             }
-            input_state_ = 1;
-            input_last_on_ = now;
-        } else if ((now - input_last_on_) > INPUT_READ_TIME_TICKS) {
-            if (input_state_) {
-                USART_DEBUG_SEND('-');
+            // Only set state to ON after input has been high for required ticks
+            if ((now - input_first_on_tick_) >= INPUT_DEBOUNCE_TICKS) {
+                if (!input_state_) {
+                    USART_DEBUG_SEND('+');
+                }
+                input_state_ = 1;
+                input_state_last_on_tick_ = now;
             }
-            // If we haven't read an ON value in INPUT_READ_TIME_TICKS, it's off
-            input_state_ = 0;
+        } else {
+            // Input is low, reset tracking
+            input_is_on_ = false;
+            if ((now - input_state_last_on_tick_) > INPUT_READ_TIME_TICKS) {
+                if (input_state_) {
+                    USART_DEBUG_SEND('-');
+                }
+                // If we haven't read an ON value in INPUT_READ_TIME_TICKS, it's off
+                input_state_ = 0;
+            }
         }
     }
 }
