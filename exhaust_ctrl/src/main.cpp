@@ -62,7 +62,6 @@ int main(void) {
     PORTC.PIN0CTRL |= (PORT_PULLUPEN_bm | PORT_INVEN_bm);
     // Output on PB5
     VPORTB.DIR |= PIN5_bm;
-    PORTB.PIN5CTRL |= PORT_INVEN_bm;
 
     modbus_client_init(SLAVE_ID, MB_BAUD, readInput, setOutput);
 
