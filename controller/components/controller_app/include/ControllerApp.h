@@ -23,8 +23,9 @@
 // Keep HVAC on in the same mode for at least this time to avoid excessive valve wear
 // and detect potential control system issues.
 #define MIN_HVAC_ON_INTERVAL std::chrono::minutes(5)
-// How long to run exhaust fan when button is pressed (minutes)
-#define EXHAUST_BUTTON_ON_TIME std::chrono::minutes(20)
+// The exhaust fan has a built-in timer so we just hold the output
+// for a short time to make sure the fan registers it.
+#define EXHAUST_BUTTON_ON_TIME std::chrono::seconds(6)
 
 // Turn A/C on if we have cooling demand and the coil temp is below this
 #define COIL_COLD_TEMP_C ABS_F_TO_C(60.0)
@@ -45,6 +46,7 @@
 // If fan is above this speed, turn on exhaust fan for extra cooling/pressure balance
 #define FAN_SPEED_EXHAUST_ON_THRESHOLD (ControllerDomain::FanSpeed)170
 // Turn exhaust fan off when fan speed drops below this (hysteresis)
+// Note that the fan has a built-in 20m timer after we turn off the relay
 #define FAN_SPEED_EXHAUST_OFF_THRESHOLD (ControllerDomain::FanSpeed)140
 
 class ControllerApp {
@@ -110,7 +112,6 @@ class ControllerApp {
         OTA,
         Vacation,
         HVACChangeLimit,
-        ManualExhaustCall,
         _Last,
     };
     enum class FanSpeedReason {
@@ -203,8 +204,6 @@ class ControllerApp {
             return "Vacation";
         case MsgID::HVACChangeLimit:
             return "HVACChangeLimit";
-        case MsgID::ManualExhaustCall:
-            return "ManualExhaustCall";
         case MsgID::_Last:
             return "";
         }

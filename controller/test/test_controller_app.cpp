@@ -700,12 +700,12 @@ TEST_F(ControllerAppTest, ExhaustFanButtonRunsTimed) {
     EXPECT_TRUE(modbusController_.getExhaustFan());
 
     // Advance time less than EXHAUST_BUTTON_ON_TIME - fan should still be on
-    app_->steadyNow_ += (EXHAUST_BUTTON_ON_TIME - std::chrono::minutes(1));
+    app_->steadyNow_ += std::chrono::seconds(1);
     app_->task();
     EXPECT_TRUE(modbusController_.getExhaustFan());
 
     // Advance time by 2 more minutes (total 31 minutes) - fan should turn off
-    app_->steadyNow_ += std::chrono::minutes(2);
+    app_->steadyNow_ += EXHAUST_BUTTON_ON_TIME;
     app_->task();
     EXPECT_FALSE(modbusController_.getExhaustFan());
 }

@@ -199,16 +199,9 @@ void ControllerApp::setExhaustFan(FanSpeed fanSpeed) {
     std::chrono::steady_clock::time_point now = steadyNow();
 
     if (now < exhaustOnUntil_) {
-        // Show cancellable message
-        setMessageF(
-            MsgID::ManualExhaustCall, true, "Exhaust fan on for %d minutes",
-            std::chrono::duration_cast<std::chrono::minutes>(exhaustOnUntil_ - now).count());
-
         // Manual control active - force exhaust fan on
         exhaustFanOn_ = true;
     } else {
-        clearMessage(MsgID::ManualExhaustCall);
-
         // Automatic control based on fan speed with hysteresis
         if (!exhaustFanOn_ && fanSpeed >= FAN_SPEED_EXHAUST_ON_THRESHOLD) {
             // Turn exhaust fan on when speed reaches threshold
@@ -411,10 +404,6 @@ void ControllerApp::handleCancelMessage(MsgID id) {
         //}
     case MsgID::HVACChangeLimit:
         resetHVACChangeLimit();
-        break;
-    case MsgID::ManualExhaustCall:
-        // Cancel manual exhaust timer
-        exhaustOnUntil_ = {};
         break;
     default:
         ESP_LOGE(TAG, "Unexpected message cancellation for: %d", static_cast<int>(id));
