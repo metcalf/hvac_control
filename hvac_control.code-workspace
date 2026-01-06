@@ -171,6 +171,7 @@
     },
     "search.exclude": {
       "**/build": true
-    }
+    },
+    "python.terminal.activateEnvironment": false
   }
 }
