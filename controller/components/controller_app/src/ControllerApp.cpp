@@ -39,8 +39,6 @@
 
 // Fan speed for makeup air
 #define MAKEUP_FAN_SPEED (FanSpeed)160
-#define FAN_ON_THRESHOLD (FanSpeed)40
-#define MIN_FAN_SPEED_VALUE (FanSpeed)10
 #define MIN_FAN_RUNNING_RPM 900
 
 static const char *TAG = "CTRL";
@@ -133,16 +131,8 @@ FanSpeed ControllerApp::computeFanSpeed(double ventDemand, double coolDemand,
         }
         fanSpeed = UINT8_MAX * demand;
 
-        if (fanIsOn_) {
-            // Turn off hysteresis--maintain minimum speed until demand goes to zero
-            if (fanSpeed > 0 && fanSpeed < MIN_FAN_SPEED_VALUE) {
-                fanSpeed = MIN_FAN_SPEED_VALUE;
-            }
-        } else {
-            // Turn on hysteresis--delay turn on to reduce short cycling
-            if (fanSpeed < FAN_ON_THRESHOLD) {
-                fanSpeed = 0;
-            }
+        if (fanSpeed > 0 && fanSpeed < MIN_FAN_SPEED_VALUE) {
+            fanSpeed = MIN_FAN_SPEED_VALUE;
         }
 
         if ((modbusController_->getFreshAirModelId() == ControllerDomain::FreshAirModel::SP) &&
@@ -165,6 +155,16 @@ FanSpeed ControllerApp::computeFanSpeed(double ventDemand, double coolDemand,
             clearMessage(MsgID::FanOverride);
             fanOverrideUntil_ = {};
         }
+    }
+
+    // Keep fan running at minimum speed until minimum on-time elapses.
+    // Skipped when an override is active so the override speed takes precedence.
+    if (fanIsOn_ && fanSpeed == 0 &&
+        fanSpeedReason_ != FanSpeedReason::Override &&
+        fanLastStarted_ != std::chrono::steady_clock::time_point{} &&
+        now - fanLastStarted_ < MIN_FAN_ON_TIME) {
+        fanSpeed = MIN_FAN_SPEED_VALUE;
+        fanSpeedReason_ = FanSpeedReason::MinOnTime;
     }
 
     std::chrono::steady_clock::time_point mdTime;

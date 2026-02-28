@@ -23,6 +23,10 @@
 // Keep HVAC on in the same mode for at least this time to avoid excessive valve wear
 // and detect potential control system issues.
 #define MIN_HVAC_ON_INTERVAL std::chrono::minutes(5)
+// Minimum fan speed value (below this, the fan won't reliably start)
+#define MIN_FAN_SPEED_VALUE (ControllerDomain::FanSpeed)10
+// Minimum time to keep the fan running after it turns on to reduce short cycling
+#define MIN_FAN_ON_TIME std::chrono::minutes(15)
 // The exhaust fan has a built-in timer so we just hold the output
 // for a short time to make sure the fan registers it.
 #define EXHAUST_BUTTON_ON_TIME std::chrono::seconds(6)
@@ -122,7 +126,8 @@ class ControllerApp {
         Vent,
         PollOutdoorTemp,
         MakeupAir,
-        Continuous
+        Continuous,
+        MinOnTime,
     };
     enum class SetpointReason {
         Unknown,
@@ -229,6 +234,8 @@ class ControllerApp {
             return "makeup_air";
         case FanSpeedReason::Continuous:
             return "continuous";
+        case FanSpeedReason::MinOnTime:
+            return "min_on_time";
         }
 
         __builtin_unreachable();

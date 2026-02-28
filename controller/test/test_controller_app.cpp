@@ -71,6 +71,8 @@ class ControllerAppTest : public testing::Test {
             &cfgStore_, &homeCli_, &otaCli_, std::bind(&ControllerAppTest::uiEvtRcv, this, _1, _2),
             std::bind(&ControllerAppTest::restartCb, this));
 
+        modbusController_.currentTime_ = &app_->steadyNow_;
+
         setRealNow(std::tm{
             .tm_hour = 2,
             .tm_mday = 1,
@@ -199,9 +201,15 @@ TEST_F(ControllerAppTest, UsesFanCoolingWhenOutdoorTempAllows) {
     EXPECT_EQ(255, modbusController_.getFreshAirSpeed());
     EXPECT_EQ(FanSpeedReason::Cool, app_->fanSpeedReason());
 
-    // If the outdoor temp gets too high, the fan should turn off
+    // If the outdoor temp gets too high, demand drops but min-on-time keeps the fan running
     setOutdoorTempC(30);
-    EXPECT_CALL(uiManager_, setOutTempC(30));
+    EXPECT_CALL(uiManager_, setOutTempC(30)).Times(testing::AtLeast(1));
+    app_->task();
+    EXPECT_EQ(MIN_FAN_SPEED_VALUE, modbusController_.getFreshAirSpeed());
+    EXPECT_EQ(FanSpeedReason::MinOnTime, app_->fanSpeedReason());
+
+    // After min-on-time elapses, fan turns off
+    app_->steadyNow_ += MIN_FAN_ON_TIME;
     app_->task();
     EXPECT_EQ(0, modbusController_.getFreshAirSpeed());
     EXPECT_EQ(FanSpeedReason::Off, app_->fanSpeedReason());
@@ -429,13 +437,19 @@ TEST_F(ControllerAppTest, FanSpeedOverrideIndefinite) {
     EXPECT_EQ(100, modbusController_.getFreshAirSpeed());
     EXPECT_EQ(FanSpeedReason::Override, app_->fanSpeedReason());
 
-    // Cancel override
+    // Cancel override -- min-on-time still applies since the fan ran
     evt = AbstractUIManager::Event{
         AbstractUIManager::EventType::MsgCancel,
         {.msgID = static_cast<uint8_t>(ControllerApp::MsgID::FanOverride)},
     };
     evt_ = &evt;
     app_->task();
+    app_->task();
+    EXPECT_EQ(MIN_FAN_SPEED_VALUE, modbusController_.getFreshAirSpeed());
+    EXPECT_EQ(FanSpeedReason::MinOnTime, app_->fanSpeedReason());
+
+    // After min-on-time elapses, fan turns off
+    app_->steadyNow_ += MIN_FAN_ON_TIME;
     app_->task();
     EXPECT_EQ(0, modbusController_.getFreshAirSpeed());
     EXPECT_EQ(FanSpeedReason::Off, app_->fanSpeedReason());
@@ -461,8 +475,14 @@ TEST_F(ControllerAppTest, TempOverride) {
     EXPECT_EQ(FancoilSpeed::High, fcReq.speed);
     EXPECT_EQ(SetpointReason::Override, app_->setpointReason());
 
-    // Override expires
+    // Override expires; demand drops but min-on-time keeps fan running briefly
     app_->realNow_ += std::chrono::hours(10);
+    app_->task();
+    EXPECT_EQ(MIN_FAN_SPEED_VALUE, modbusController_.getFreshAirSpeed());
+    EXPECT_EQ(FanSpeedReason::MinOnTime, app_->fanSpeedReason());
+
+    // After min-on-time elapses, fan turns off
+    app_->steadyNow_ += MIN_FAN_ON_TIME;
     app_->task();
     EXPECT_EQ(0, modbusController_.getFreshAirSpeed());
     EXPECT_EQ(FanSpeedReason::Off, app_->fanSpeedReason());

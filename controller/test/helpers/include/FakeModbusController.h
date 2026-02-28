@@ -62,7 +62,17 @@ class FakeModbusController : public AbstractModbusController {
         }
     }
 
-    void setFreshAirSpeed(ControllerDomain::FanSpeed speed) override { fanSpeed_ = speed; }
+    void setFreshAirSpeed(ControllerDomain::FanSpeed speed) override {
+        fanSpeed_ = speed;
+        if (currentTime_) {
+            freshAirState_.fanRpm = speed > 0 ? 1200 + (uint16_t)speed * 1100 / 255 : 0;
+            lastFreshAirState_ = *currentTime_;
+        }
+    }
+
+    // Set this to a pointer to the test's steady clock so that setFreshAirSpeed
+    // automatically simulates fanRpm feedback.
+    std::chrono::steady_clock::time_point *currentTime_ = nullptr;
     void setFancoil(ControllerDomain::FancoilRequest req) override { req_ = req; }
     void setExhaustFan(bool on) override { exhaustFan_ = on; }
 
