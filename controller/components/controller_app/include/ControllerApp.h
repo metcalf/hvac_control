@@ -68,7 +68,7 @@ class ControllerApp {
           fancoilPBRCoolHandler_(fancoilPBRCoolCutoffs_, std::size(fancoilPBRCoolCutoffs_)),
           fancoilPBRHeatHandler_(fancoilPBRHeatCutoffs_, std::size(fancoilPBRHeatCutoffs_)) {
         ventAlgo_ = new LinearVentAlgorithm();
-        fanCoolAlgo_ = new PIDAlgorithm(false, REL_F_TO_C(4.0));
+        fanCoolAlgo_ = new PIDAlgorithm(false, REL_F_TO_C(3.0), 0.7);
         fanCoolLimitAlgo_ = new FanCoolLimitAlgorithm(fanCoolAlgo_);
 
         updateEquipment(config_.equipment);

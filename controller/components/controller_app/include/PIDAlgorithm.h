@@ -6,10 +6,10 @@
 
 class PIDAlgorithm : public AbstractDemandAlgorithm {
   public:
-    PIDAlgorithm(bool isHeater, double pRangeC = REL_F_TO_C(2.0),
+    PIDAlgorithm(bool isHeater, double pRangeC = REL_F_TO_C(2.0), double maxIDemand = 0.5,
                  double tiSecs = 30 * 60,
                  std::chrono::seconds maxInterval = std::chrono::minutes(10))
-        : isHeater_(isHeater), pRangeC_(pRangeC), tiSecs_(tiSecs),
+        : isHeater_(isHeater), pRangeC_(pRangeC), maxIDemand_(maxIDemand), tiSecs_(tiSecs),
           maxInterval_(maxInterval) {};
 
     double update(const ControllerDomain::SensorData &sensorData,
@@ -18,7 +18,7 @@ class PIDAlgorithm : public AbstractDemandAlgorithm {
 
   private:
     const bool isHeater_;
-    const double pRangeC_, tiSecs_, maxIDemand_ = 0.5;
+    const double pRangeC_, maxIDemand_, tiSecs_;
     double i_ = 0, lastSetpointC_ = std::nan("");
     std::chrono::steady_clock::time_point lastTime_;
     const std::chrono::seconds maxInterval_;

@@ -318,12 +318,12 @@ TEST_F(ControllerAppTest, IncreasesFanSpeedOverTime) {
     setOutdoorTempC(15);
 
     app_->task();
-    EXPECT_LT(modbusController_.getFreshAirSpeed(), 150);
+    EXPECT_LT(modbusController_.getFreshAirSpeed(), 160);
     EXPECT_EQ(FanSpeedReason::Cool, app_->fanSpeedReason());
 
     app_->steadyNow_ += std::chrono::minutes(60);
     app_->task();
-    EXPECT_GT(modbusController_.getFreshAirSpeed(), 150);
+    EXPECT_GT(modbusController_.getFreshAirSpeed(), 160);
     EXPECT_EQ(FanSpeedReason::Cool, app_->fanSpeedReason());
 }
 
@@ -536,14 +536,14 @@ TEST_F(ControllerAppTest, Precooling) {
     setOutdoorTempC(20);
     app_->task();
     EXPECT_GT(modbusController_.getFreshAirSpeed(), 20);
-    EXPECT_LT(modbusController_.getFreshAirSpeed(), 60);
+    EXPECT_LT(modbusController_.getFreshAirSpeed(), 100);
     EXPECT_EQ(FanSpeedReason::Cool, app_->fanSpeedReason());
     EXPECT_EQ(SetpointReason::Normal, app_->setpointReason());
     auto fcReq = modbusController_.getFancoilRequest();
     EXPECT_EQ(FancoilSpeed::Off, fcReq.speed);
 
     // Start fan precooling
-    app_->realNow_ += std::chrono::hours(4);
+    app_->realNow_ += std::chrono::hours(2);
     setOutdoorTempC(20);
     app_->task();
     EXPECT_GT(modbusController_.getFreshAirSpeed(), 100);
@@ -565,7 +565,7 @@ TEST_F(ControllerAppTest, Precooling) {
     EXPECT_EQ(FancoilSpeed::High, fcReq.speed);
 
     // Becomes normal cooling when the schedule rolls over
-    app_->realNow_ += std::chrono::hours(1);
+    app_->realNow_ += std::chrono::hours(3);
     setOutdoorTempC(20);
     app_->task();
     EXPECT_EQ(255, modbusController_.getFreshAirSpeed());
