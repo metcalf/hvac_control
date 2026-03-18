@@ -596,6 +596,34 @@ TEST_F(ControllerAppTest, Precooling) {
     EXPECT_EQ(FancoilSpeed::High, fcReq.speed);
 }
 
+TEST_F(ControllerAppTest, PrecoolingOnHotDay) {
+    sensors_.setLatest({.tempC = 24, .humidity = 2.0, .co2 = 456});
+    setRealNow(std::tm{
+        .tm_hour = 12,
+        .tm_min = 1,
+        .tm_mday = 1,
+        .tm_year = 2024,
+        .tm_isdst = -1,
+    });
+
+    // No precooling with low outdoor temp
+    setOutdoorTempC(20);
+    app_->task();
+    EXPECT_EQ(FanSpeedReason::Off, app_->fanSpeedReason());
+    EXPECT_EQ(SetpointReason::Normal, app_->setpointReason());
+    auto fcReq = modbusController_.getFancoilRequest();
+    EXPECT_EQ(FancoilSpeed::Off, fcReq.speed);
+
+    // Precool with high outdoor temp
+    setOutdoorTempC(28);
+    app_->task();
+    EXPECT_EQ(FanSpeedReason::Off, app_->fanSpeedReason());
+    EXPECT_EQ(SetpointReason::Precooling, app_->setpointReason());
+    fcReq = modbusController_.getFancoilRequest();
+    EXPECT_TRUE(fcReq.cool);
+    EXPECT_EQ(FancoilSpeed::High, fcReq.speed);
+}
+
 TEST_F(ControllerAppTest, VacationSetpoints) {
     AbstractHomeClient::HomeState homeState = {
         .vacationOn = true,

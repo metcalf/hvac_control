@@ -159,8 +159,7 @@ FanSpeed ControllerApp::computeFanSpeed(double ventDemand, double coolDemand,
 
     // Keep fan running at minimum speed until minimum on-time elapses.
     // Skipped when an override is active so the override speed takes precedence.
-    if (fanIsOn_ && fanSpeed == 0 &&
-        fanSpeedReason_ != FanSpeedReason::Override &&
+    if (fanIsOn_ && fanSpeed == 0 && fanSpeedReason_ != FanSpeedReason::Override &&
         fanLastStarted_ != std::chrono::steady_clock::time_point{} &&
         now - fanLastStarted_ < MIN_FAN_ON_TIME) {
         fanSpeed = MIN_FAN_SPEED_VALUE;
@@ -840,17 +839,22 @@ Setpoints ControllerApp::getCurrentSetpoints(double currTempC) {
     if (config_.systemOn && setpoints.coolTempC > nextSchedule.coolC &&
         currTempC > nextSchedule.coolC) {
         int minsUntilNext = (nextSchedule.startMinOfDay() - localMinOfDay()) % (60 * 24);
-        if (minsUntilNext <= PRECOOL_MINS) {
-            double precoolC = nextSchedule.coolC + minsUntilNext * PRECOOL_DEG_PER_MIN;
-            if (precoolC < setpoints.coolTempC) {
-                setpointReason_ = SetpointReason::Precooling;
-                setpoints.coolTempC = precoolC;
-                setMessageF(MsgID::Precooling, false, "Cooling to %d by %02d:%02d%s",
-                            static_cast<int>(ABS_C_TO_F(nextSchedule.coolC) + 0.5),
-                            SCHEDULE_TIME_STR_ARGS(nextSchedule));
+        double outdoorTempDelta = outdoorTempC() - setpoints.coolTempC;
+        double precoolC = setpoints.coolTempC;
+        if (outdoorTempDelta > AC_ON_OUT_TEMP_THRESHOLD_C) {
+            precoolC = nextSchedule.coolC;
+        } else if (minsUntilNext <= PRECOOL_MINS) {
+            precoolC = nextSchedule.coolC + minsUntilNext * PRECOOL_DEG_PER_MIN;
+        }
 
-                return setpoints;
-            }
+        if (precoolC < setpoints.coolTempC) {
+            setpointReason_ = SetpointReason::Precooling;
+            setpoints.coolTempC = precoolC;
+            setMessageF(MsgID::Precooling, false, "Cooling to %d by %02d:%02d%s",
+                        static_cast<int>(ABS_C_TO_F(nextSchedule.coolC) + 0.5),
+                        SCHEDULE_TIME_STR_ARGS(nextSchedule));
+
+            return setpoints;
         }
     }
 
