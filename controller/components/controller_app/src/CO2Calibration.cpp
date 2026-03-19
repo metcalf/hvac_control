@@ -1,10 +1,10 @@
 #include "CO2Calibration.h"
 
+#include "esp_log.h"
 #include <cassert>
 #include <chrono>
-#include "esp_log.h"
 
-static const char* TAG = "CO2Cal";
+static const char *TAG = "CO2Cal";
 
 // Note that these constants effectively represent a range from N -> N-1 months because at
 // the very beginning of the month we'll only have one datapoint.
@@ -16,11 +16,6 @@ static const char* TAG = "CO2Cal";
 
 int16_t CO2Calibration::update(uint16_t ppm, uint8_t month, uint16_t year) {
     loadState();
-
-    // If ppm is absurdly low, assume it's some kind of error and don't update state
-    if (ppm < 200) {
-        return getCurrentOffset();
-    }
 
     bool changed = false;
     uint16_t monthYear = year * 12 + month;
@@ -106,11 +101,14 @@ void CO2Calibration::loadState() {
     }
 }
 
-void CO2Calibration::logState(const char* action) {
-    ESP_LOGI(TAG, "%s state: lastWritten=%04d-%02d lastOffset=%04d months=%04d|%04d|%04d|%04d|%04d|%04d|%04d|%04d|%04d|%04d|%04d|%04d",
-             action,
-             state_.lastMonthYearWritten / 12 + 1900, state_.lastMonthYearWritten % 12 + 1, state_.lastValidOffsetPpm,
-             state_.monthMinimums[0], state_.monthMinimums[1], state_.monthMinimums[2], state_.monthMinimums[3],
-             state_.monthMinimums[4], state_.monthMinimums[5], state_.monthMinimums[6], state_.monthMinimums[7],
-             state_.monthMinimums[8], state_.monthMinimums[9], state_.monthMinimums[10], state_.monthMinimums[11]);
+void CO2Calibration::logState(const char *action) {
+    ESP_LOGI(TAG,
+             "%s state: lastWritten=%04d-%02d lastOffset=%04d "
+             "months=%04d|%04d|%04d|%04d|%04d|%04d|%04d|%04d|%04d|%04d|%04d|%04d",
+             action, state_.lastMonthYearWritten / 12 + 1900, state_.lastMonthYearWritten % 12 + 1,
+             state_.lastValidOffsetPpm, state_.monthMinimums[0], state_.monthMinimums[1],
+             state_.monthMinimums[2], state_.monthMinimums[3], state_.monthMinimums[4],
+             state_.monthMinimums[5], state_.monthMinimums[6], state_.monthMinimums[7],
+             state_.monthMinimums[8], state_.monthMinimums[9], state_.monthMinimums[10],
+             state_.monthMinimums[11]);
 }
