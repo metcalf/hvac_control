@@ -14,6 +14,7 @@
 #include "ESPOTAClient.h"
 #include "ESPOutIO.h"
 #include "ESPWifi.h"
+#include "MqttZCHomeClient.h"
 #include "NetworkTaskManager.h"
 #include "OutCtrl.h"
 #include "ValveStateManager.h"
@@ -40,6 +41,7 @@ static const char *TAG = "MAIN";
 
 static ZCApp *zcApp_;
 static ZCUIManager *uiManager_;
+static MqttZCHomeClient *homeCli_;
 static ESPWifi wifi_;
 static QueueHandle_t uiEvtQueue_;
 static ESPOutIO outIO_;
@@ -154,11 +156,12 @@ extern "C" void zc_main() {
     uiEvtQueue_ = xQueueCreate(10, sizeof(ZCUIManager::Event));
     ZCDomain::SystemState state{};
     uiManager_ = new ZCUIManager(state, static_cast<size_t>(ZCDomain::MsgID::_Last), uiEvtCb);
+    homeCli_ = new MqttZCHomeClient();
     ota_ = new ESPOTAClient("zone_controller", otaMsgCb, UI_MAX_MSG_LEN);
     uiManager_->setFirmwareVersion(ota_->currentVersion());
     outCtrl_ = new OutCtrl(valveStateManager_, *uiManager_);
-    zcApp_ = new ZCApp(uiManager_, uiEvtRcv, &outIO_, outCtrl_, &mbClient_, &valveStateManager_,
-                       zone_io_get_state);
+    zcApp_ = new ZCApp(uiManager_, homeCli_, uiEvtRcv, &outIO_, outCtrl_, &mbClient_,
+                       &valveStateManager_, zone_io_get_state);
 
     initNetwork();
 

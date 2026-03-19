@@ -7,6 +7,8 @@ file(GLOB TEST_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/../components/modbus_client/src/*.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/../../components/esp_local_test_helpers/src/*.cpp
 )
+# Exclude ESP-IDF-specific implementations that can't compile in the test environment
+list(FILTER TEST_SOURCES EXCLUDE REGEX "MqttZCHomeClient\\.cpp$")
 
 
 cmake_minimum_required(VERSION 3.14)

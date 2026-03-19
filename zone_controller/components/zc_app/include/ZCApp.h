@@ -1,5 +1,6 @@
 #pragma once
 
+#include "AbstractZCHomeClient.h"
 #include "AbstractZCUIManager.h"
 #include "BaseModbusClient.h"
 #include "BaseOutIO.h"
@@ -20,11 +21,12 @@ class ZCApp {
     typedef std::function<InputState()> getZioState_t;
     typedef std::function<bool(AbstractZCUIManager::Event *, uint16_t)> uiEvtRcv_t;
 
-    ZCApp(AbstractZCUIManager *uiManager, const uiEvtRcv_t &uiEvtRcv, BaseOutIO *outIO,
-          OutCtrl *outCtrl, BaseModbusClient *mbClient, ValveStateManager *valveStateManager,
-          const getZioState_t &getZioState)
-        : uiManager_(uiManager), uiEvtRcv_(uiEvtRcv), outIO_(outIO), outCtrl_(outCtrl),
-          mbClient_(mbClient), valveStateManager_(valveStateManager), getZioState_(getZioState) {};
+    ZCApp(AbstractZCUIManager *uiManager, AbstractZCHomeClient *homeCli, const uiEvtRcv_t &uiEvtRcv,
+          BaseOutIO *outIO, OutCtrl *outCtrl, BaseModbusClient *mbClient,
+          ValveStateManager *valveStateManager, const getZioState_t &getZioState)
+        : uiManager_(uiManager), homeCli_(homeCli), uiEvtRcv_(uiEvtRcv), outIO_(outIO),
+          outCtrl_(outCtrl), mbClient_(mbClient), valveStateManager_(valveStateManager),
+          getZioState_(getZioState) {};
     virtual ~ZCApp() = default;
 
     void task();
@@ -42,6 +44,7 @@ class ZCApp {
     using MsgID = ZCDomain::MsgID;
 
     AbstractZCUIManager *uiManager_;
+    AbstractZCHomeClient *homeCli_;
     uiEvtRcv_t uiEvtRcv_;
     BaseOutIO *outIO_;
     OutCtrl *outCtrl_;

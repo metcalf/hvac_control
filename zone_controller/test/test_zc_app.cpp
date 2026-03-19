@@ -5,6 +5,7 @@
 #include "FakeModbusClient.h"
 #include "FakeOutIO.h"
 #include "FakeUIManager.h"
+#include "FakeZCHomeClient.h"
 
 class TestZCApp : public ZCApp {
   public:
@@ -34,7 +35,7 @@ class ZCAppTest : public testing::Test {
   protected:
     void SetUp() override {
         using namespace std::placeholders;
-        app_ = new TestZCApp(&uiManager_, std::bind(&ZCAppTest::uiEvtRcv, this, _1, _2), &outIO_,
+        app_ = new TestZCApp(&uiManager_, &homeClient_, std::bind(&ZCAppTest::uiEvtRcv, this, _1, _2), &outIO_,
                              &outCtrl_, &mbClient_, &valveStateManager_,
                              std::bind(&ZCAppTest::getInputState, this));
     }
@@ -48,6 +49,7 @@ class ZCAppTest : public testing::Test {
     FakeOutIO outIO_;
     FakeModbusClient mbClient_;
     FakeUIManager uiManager_;
+    FakeZCHomeClient homeClient_;
 
     ValveStateManager valveStateManager_;
     OutCtrl outCtrl_{valveStateManager_, uiManager_};
