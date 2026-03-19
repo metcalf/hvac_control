@@ -33,8 +33,8 @@
 #define UI_TASK_STACK_SIZE 8192
 
 #define INIT_ERR_RESTART_DELAY_TICKS pdMS_TO_TICKS(10 * 1000)
-#define OTA_INTERVAL_MS (15 * 60 * 1000)
-#define OTA_FETCH_ERR_INTERVAL_MS (60 * 1000)
+#define OTA_INTERVAL_MS (1 * 60 * 1000)
+#define OTA_FETCH_ERR_INTERVAL_MS (30 * 1000)
 #define HEAP_LOG_INTERVAL std::chrono::minutes(15)
 
 static const char *TAG = "MAIN";
