@@ -12,6 +12,7 @@ sdkconfig
 build/
 logs/
 output.tsv
+.cache
 
 # Prerequisites
 *.d

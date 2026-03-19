@@ -53,3 +53,27 @@ esp_err_t BaseModbusClient::getCxAcOutletWaterTemp(double *temp) {
 esp_err_t BaseModbusClient::getCxCompressorFrequency(uint16_t *freq) {
     return getParam(CxRegister::CompressorFrequency, freq);
 }
+
+esp_err_t BaseModbusClient::getCxInputACCurrent(double *current) {
+    esp_err_t err = ESP_OK;
+    uint16_t data;
+
+    err = getParam(CxRegister::InputACCurrent, &data);
+    if (err == ESP_OK) {
+        *current = (double)data / 10.0;
+    }
+
+    return err;
+}
+
+esp_err_t BaseModbusClient::getCxAmbientTemp(double *temp) {
+    esp_err_t err = ESP_OK;
+    uint16_t data;
+
+    err = getParam(CxRegister::AmbientTemp, &data);
+    if (err == ESP_OK) {
+        *temp = (double)data / 10.0;
+    }
+
+    return err;
+}

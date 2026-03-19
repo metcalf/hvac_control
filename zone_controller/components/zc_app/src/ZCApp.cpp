@@ -99,16 +99,22 @@ void ZCApp::logSystemState(SystemState state) {
 
     double hpOutT = -1;
     uint16_t hpHz = UINT16_MAX;
+    double hpACCurrent = -1;
+    double hpAmbientT = -1;
     CxOpMode cxOpMode = CxOpMode::Unknown;
     mbClient_->getCxOpMode(&cxOpMode);
     mbClient_->getCxAcOutletWaterTemp(&hpOutT);
     mbClient_->getCxCompressorFrequency(&hpHz);
+    mbClient_->getCxInputACCurrent(&hpACCurrent);
+    mbClient_->getCxAmbientTemp(&hpAmbientT);
 
     wrote =
         snprintf(buffer + pos, sizeof(buffer) - pos,
-                 " zone_pump=%d fc_pump=%d hp_mode=%s cx_mode=%s hp_out_t=%0.1f hp_hz=%d",
+                 " zone_pump=%d fc_pump=%d hp_mode=%s cx_mode=%s hp_out_t=%0.1f hp_hz=%d"
+                 " hp_ac_i=%0.1f hp_amb_t=%0.1f",
                  state.zonePump, state.fcPump, ZCDomain::stringForHeatPumpMode(state.heatPumpMode),
-                 BaseModbusClient::cxOpModeToString(cxOpMode), hpOutT, hpHz);
+                 BaseModbusClient::cxOpModeToString(cxOpMode), hpOutT, hpHz,
+                 hpACCurrent, hpAmbientT);
     CHECK_STRING_ERROR_AND_ADVANCE(wrote, pos)
 
     ESP_LOGW(TAG, "%s", buffer);

@@ -22,6 +22,8 @@ class BaseModbusClient {
     esp_err_t getCxOpMode(CxOpMode *op_mode);
     esp_err_t getCxAcOutletWaterTemp(double *temp);
     esp_err_t getCxCompressorFrequency(uint16_t *freq);
+    esp_err_t getCxInputACCurrent(double *current);
+    esp_err_t getCxAmbientTemp(double *temp);
 
     static char *cxOpModeToString(CxOpMode mode) {
         switch (mode) {

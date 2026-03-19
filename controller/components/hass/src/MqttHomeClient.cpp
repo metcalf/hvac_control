@@ -6,13 +6,11 @@
 #include <inttypes.h>
 
 #include "ControllerDomain.h"
-#include "MQTTHomeClient.h"
 #include "esp_err.h"
 #include "esp_log.h"
 
 static const char *TAG = "MQTT";
 
-// TODO: Consider rounding temperature to tenths to reduce update frequency
 static const char *discoveryTmpl = R"({
   "device": {
     "ids": "%s"
