@@ -12,7 +12,7 @@ static const char *TAG = "CO2Cal";
 #define REQUIRE_MONTHS 5 // Require at least this many valid months of data to perform a calibration
 
 // This changes over time but slowly enough that the inaccuracy shouldn't matter much
-#define BASELINE_PPM 421
+#define BASELINE_PPM 435
 
 int16_t CO2Calibration::update(uint16_t ppm, uint8_t month, uint16_t year) {
     loadState();
