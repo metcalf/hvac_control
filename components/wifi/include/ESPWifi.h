@@ -4,6 +4,7 @@
 
 #include "AbstractWifi.h"
 
+#include "esp_netif.h"
 #include "esp_wifi.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
@@ -37,7 +38,9 @@ class ESPWifi : public AbstractWifi {
     int retryNum_;
     wifi_config_t config_;
     char msg_[32] = "";
+    char hostname_[64] = "";
     int reason_ = 0;
+    esp_netif_t *netif_ = nullptr;
     SemaphoreHandle_t mutex_;
 
     void doRetry(int reason = 0);
