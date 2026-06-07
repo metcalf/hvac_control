@@ -21,6 +21,11 @@ class ESPWifi : public AbstractWifi {
     void disconnect();
     void retry();
 
+    // Force a re-association from the Connected state. The resulting
+    // DISCONNECTED event drives the normal reconnect path. Used by the
+    // connectivity watchdog when associated but L3 connectivity is dead.
+    void reconnect();
+
     // Log wifi/IP diagnostics (state, RSSI, IP, DNS, disconnect counters,
     // heap) for debugging connectivity issues. Call periodically from the app's
     // existing logging loop.

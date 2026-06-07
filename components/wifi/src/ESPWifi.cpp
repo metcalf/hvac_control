@@ -85,6 +85,11 @@ void ESPWifi::disconnect() {
     setState(State::Inactive, "");
 }
 
+void ESPWifi::reconnect() {
+    ESP_LOGW(TAG, "forcing reconnect");
+    esp_wifi_disconnect();
+}
+
 void ESPWifi::retry() {
     xSemaphoreTake(mutex_, portMAX_DELAY);
     State state = state_;

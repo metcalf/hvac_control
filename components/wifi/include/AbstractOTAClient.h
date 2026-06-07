@@ -5,7 +5,8 @@ class AbstractOTAClient {
     enum class Error {
         OK,
         NoUpdateAvailable,
-        FetchError,
+        FetchError,   // Couldn't reach the server (DNS/TCP/TLS failure).
+        HttpError,    // Reached the server but it returned a non-200 status.
         UpgradeFailed,
     };
 

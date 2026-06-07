@@ -66,11 +66,17 @@ static MqttHomeClient *homeCli_;
 static ESPOTAClient *ota_;
 static NetworkTaskManager *netTaskMgr_;
 
-uint64_t otaFn() {
-    if (ota_->update() == AbstractOTAClient::Error::FetchError) {
-        return OTA_FETCH_ERR_INTERVAL_MS;
-    } else {
-        return OTA_INTERVAL_MS;
+NetworkTaskManager::TaskResult otaFn() {
+    switch (ota_->update()) {
+    case AbstractOTAClient::Error::FetchError:
+        // Couldn't reach the server: a real connectivity failure.
+        return {OTA_FETCH_ERR_INTERVAL_MS, false};
+    case AbstractOTAClient::Error::HttpError:
+        // Server responded with a non-200 (e.g. OTA disabled via 403). The
+        // network is fine, so don't count it against the connectivity watchdog.
+        return {OTA_FETCH_ERR_INTERVAL_MS, true};
+    default:
+        return {OTA_INTERVAL_MS, true};
     }
 }
 

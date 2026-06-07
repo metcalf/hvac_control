@@ -54,7 +54,7 @@ AbstractOTAClient::Error ESPOTAClient::update() {
     }
     if (status != 200) {
         setErrMessageF("OTA version err: %d", status);
-        return Error::FetchError;
+        return Error::HttpError;
     }
 
     outputBuffer_[outputBufferPos_] = '\0';

@@ -1,6 +1,7 @@
 #include "NetworkTaskManager.h"
 
 #include "esp_log.h"
+#include "esp_system.h"
 #include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -9,6 +10,11 @@
 
 #define WIFI_POLL_INTERVAL_TICKS pdMS_TO_TICKS(1000)
 #define WIFI_RETRY_INTERVAL_TICKS pdMS_TO_TICKS(60 * 1000)
+
+// Connectivity watchdog thresholds. Comfortably above the OTA poll interval
+// (60s healthy / 30s on error) so normal gaps between successes never trip it.
+#define WIFI_WATCHDOG_RECONNECT_MS (5 * 60 * 1000)
+#define WIFI_WATCHDOG_RESTART_MS (30 * 60 * 1000)
 
 static const char *TAG = "NTM";
 
@@ -56,8 +62,40 @@ void NetworkTaskManager::poll() {
     uint64_t now_ms = esp_timer_get_time() / 1000;
     for (Task &task : tasks_) {
         if (task.dueMs <= now_ms) {
-            task.dueMs = now_ms + task.fn();
+            TaskResult result = task.fn();
+            task.dueMs = now_ms + result.delayMs;
+            if (result.networkSucceeded) {
+                lastNetSuccessMs_ = now_ms;
+                forcedReconnect_ = false;
+            }
         }
+    }
+
+    checkConnectivityWatchdog(now_ms);
+}
+
+void NetworkTaskManager::checkConnectivityWatchdog(uint64_t now_ms) {
+    // Only meaningful when the driver thinks we're connected; otherwise the
+    // reconnect logic in poll()/ESPWifi already owns recovery.
+    if (wifi_.getState() != AbstractWifi::State::Connected) {
+        return;
+    }
+
+    // Start the clock on the first connected poll so a freshly-booted or
+    // freshly-reconnected device gets a full window for its first success.
+    if (lastNetSuccessMs_ == 0) {
+        lastNetSuccessMs_ = now_ms;
+        return;
+    }
+
+    uint64_t staleMs = now_ms - lastNetSuccessMs_;
+    if (staleMs >= WIFI_WATCHDOG_RESTART_MS) {
+        ESP_LOGE(TAG, "no network success for %llums while connected; restarting", staleMs);
+        esp_restart();
+    } else if (staleMs >= WIFI_WATCHDOG_RECONNECT_MS && !forcedReconnect_) {
+        ESP_LOGW(TAG, "no network success for %llums while connected; forcing reconnect", staleMs);
+        forcedReconnect_ = true;
+        wifi_.reconnect();
     }
 }
 
