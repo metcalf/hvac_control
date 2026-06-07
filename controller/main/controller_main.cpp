@@ -238,7 +238,7 @@ extern "C" void controller_main() {
         bootErr("RTC init error: %d", err);
     }
 
-    wifi_.init();
+    wifi_.init(config.wifi.logName);
     wifi_.connect(config.wifi.ssid, config.wifi.password);
     remote_logger_init(config.wifi.logName, default_log_host);
     netTaskMgr_ = new NetworkTaskManager(wifi_);

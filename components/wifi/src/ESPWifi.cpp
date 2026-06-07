@@ -18,8 +18,7 @@
 
 const static char *TAG = "wifi";
 
-void eventHandler(void *arg, esp_event_base_t eventBase, int32_t eventId,
-                  void *eventData) {
+void eventHandler(void *arg, esp_event_base_t eventBase, int32_t eventId, void *eventData) {
     if (eventBase == WIFI_EVENT) {
         ((ESPWifi *)arg)->onWifiEvent(eventId, eventData);
     } else if (eventBase == IP_EVENT) {
@@ -40,27 +39,25 @@ void ESPWifi::connect(const char *ssid, const char *password) {
 
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
     ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &config_));
-    if (netif_ && hostname_[0] != '\0') {
-        esp_netif_set_hostname(netif_, hostname_);
-    }
     ESP_ERROR_CHECK(esp_wifi_start());
 
     ESP_LOGI(TAG, "wifi_init_sta finished.");
 }
 
-void ESPWifi::init() {
+void ESPWifi::init(const char *name) {
     ESP_ERROR_CHECK(esp_netif_init());
 
     ESP_ERROR_CHECK(esp_event_loop_create_default());
     netif_ = esp_netif_create_default_wifi_sta();
+    updateName(name);
 
     wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
     ESP_ERROR_CHECK(esp_wifi_init(&cfg));
 
-    ESP_ERROR_CHECK(esp_event_handler_instance_register(
-        WIFI_EVENT, ESP_EVENT_ANY_ID, &eventHandler, this, NULL));
-    ESP_ERROR_CHECK(esp_event_handler_instance_register(
-        IP_EVENT, ESP_EVENT_ANY_ID, &eventHandler, this, NULL));
+    ESP_ERROR_CHECK(esp_event_handler_instance_register(WIFI_EVENT, ESP_EVENT_ANY_ID, &eventHandler,
+                                                        this, NULL));
+    ESP_ERROR_CHECK(
+        esp_event_handler_instance_register(IP_EVENT, ESP_EVENT_ANY_ID, &eventHandler, this, NULL));
 
     esp_sntp_setoperatingmode(SNTP_OPMODE_POLL);
     esp_sntp_setservername(0, "pool.ntp.org");

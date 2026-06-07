@@ -15,7 +15,7 @@ class ESPWifi : public AbstractWifi {
     ESPWifi() { mutex_ = xSemaphoreCreateMutex(); }
     ~ESPWifi() { vSemaphoreDelete(mutex_); }
 
-    void init();
+    void init(const char *name);
     void connect(const char *ssid, const char *password);
     void disconnect();
     void retry();
