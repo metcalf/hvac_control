@@ -47,7 +47,7 @@ INSTANTIATE_TEST_SUITE_P(
                  }},
         TestCase{"PositiveOffsetWithLowFirstValue",
                  {
-                     {300, 0, 1, 121},
+                     {300, 0, 1, 135},
                      END,
                  }},
         TestCase{"NegativeOffsetWithEnoughData",
@@ -56,9 +56,9 @@ INSTANTIATE_TEST_SUITE_P(
                      {1000, 1, 1, 0},
                      {1000, 2, 1, 0},
                      {1000, 3, 1, 0},
-                     {1000, 4, 1, -100},
-                     {621, 5, 1, -100},
-                     {1000, 6, 1, -200}, // 521 falls out of window
+                     {1000, 4, 1, -86},
+                     {621, 5, 1, -86},
+                     {1000, 6, 1, -186}, // 521 falls out of window
                      END,
                  }},
         TestCase{"HandlesMissingMonthsCorrectly",
@@ -67,15 +67,15 @@ INSTANTIATE_TEST_SUITE_P(
                      {1000, 1, 1, 0},
                      {1000, 2, 1, 0},
                      {521, 3, 1, 0},
-                     {1000, 5, 1, -100},
+                     {1000, 5, 1, -86},
                      // Skipping ahead a year should clear prior data but we'll hold onto
                      // the last known good calibration until we have enough data again
-                     {621, 1, 2, -100},
-                     {1000, 2, 2, -100},
+                     {621, 1, 2, -86},
+                     {1000, 2, 2, -86},
                      // Skip month 3 to give us some confidence we overwrote the 521
-                     {1000, 4, 2, -100},
-                     {1000, 5, 2, -100},
-                     {1000, 6, 2, -200},
+                     {1000, 4, 2, -86},
+                     {1000, 5, 2, -86},
+                     {1000, 6, 2, -186},
                      END,
                  }},
         TestCase{"HandlesSmallerOffsetCorrectly",
@@ -84,12 +84,12 @@ INSTANTIATE_TEST_SUITE_P(
                      {1000, 1, 1, 0},
                      {1000, 2, 1, 0},
                      {521, 3, 1, 0},
-                     {1000, 5, 1, -100},
+                     {1000, 5, 1, -86},
                      // Skipping ahead a year should clear prior data but we'll hold onto
                      // the last known good calibration until we have enough data again
-                     {1000, 1, 2, -100},
+                     {1000, 1, 2, -86},
                      // Immediately reduce the offset even without enough months of data
-                     {441, 2, 2, -20},
+                     {441, 2, 2, -6},
                      END,
                  }}),
     testing::PrintToStringParamName());
