@@ -107,6 +107,7 @@ void outputTask(void *) {
     bool firstTime = true;
 
     log_heap_stats();
+    wifi_.logDiagnostics();
     std::chrono::steady_clock::time_point last_logged_heap = std::chrono::steady_clock::now();
 
     while (1) {
@@ -115,6 +116,7 @@ void outputTask(void *) {
         std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now();
         if ((now - last_logged_heap) > HEAP_LOG_INTERVAL) {
             log_heap_stats();
+            wifi_.logDiagnostics();
             last_logged_heap = now;
         }
 

@@ -1,9 +1,11 @@
 #include "ESPWifi.h"
 
+#include <cinttypes>
 #include <cstring>
 
 #include "esp_log.h"
 #include "esp_sntp.h"
+#include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/event_groups.h"
 #include "freertos/task.h"
@@ -115,6 +117,8 @@ void ESPWifi::onWifiEvent(int32_t eventId, void *eventData) {
     case WIFI_EVENT_STA_DISCONNECTED: {
         uint8_t reason = ((wifi_event_sta_disconnected_t *)eventData)->reason;
         ESP_LOGI(TAG, "disconnected (%d)", reason);
+        disconnectCount_++;
+        lastDisconnectReason_ = reason;
         if (retryNum_ < MAX_RETRIES) {
             retryNum_++;
             doRetry(reason);
@@ -160,4 +164,58 @@ void ESPWifi::setState(State state, const char *msg, int reason) {
     reason_ = reason;
     state_ = state;
     xSemaphoreGive(mutex_);
+}
+
+static const char *stateName(AbstractWifi::State state) {
+    switch (state) {
+    case AbstractWifi::State::Inactive:
+        return "Inactive";
+    case AbstractWifi::State::Connecting:
+        return "Connecting";
+    case AbstractWifi::State::Connected:
+        return "Connected";
+    case AbstractWifi::State::Err:
+        return "Err";
+    }
+    return "?";
+}
+
+void ESPWifi::logDiagnostics() {
+    // Snapshot the state machine's own view of the connection.
+    xSemaphoreTake(mutex_, portMAX_DELAY);
+    State state = state_;
+    int reason = reason_;
+    char msg[sizeof(msg_)];
+    strncpy(msg, msg_, sizeof(msg));
+    xSemaphoreGive(mutex_);
+
+    int64_t uptimeS = esp_timer_get_time() / 1000000;
+
+    // Link/RF info is only valid while associated.
+    wifi_ap_record_t ap;
+    esp_err_t apErr = esp_wifi_sta_get_ap_info(&ap);
+
+    esp_netif_ip_info_t ip = {};
+    esp_netif_dns_info_t dns = {};
+    if (netif_) {
+        esp_netif_get_ip_info(netif_, &ip);
+        esp_netif_get_dns_info(netif_, ESP_NETIF_DNS_MAIN, &dns);
+    }
+
+    if (apErr == ESP_OK) {
+        ESP_LOGI(TAG,
+                 "diag up=%llds state=%s(%s,%d) disc=%" PRIu32 " lastReason=%d "
+                 "rssi=%d ch=%d ip=" IPSTR " gw=" IPSTR " dns=" IPSTR,
+                 uptimeS, stateName(state), msg, reason, disconnectCount_,
+                 lastDisconnectReason_, ap.rssi, ap.primary, IP2STR(&ip.ip),
+                 IP2STR(&ip.gw), IP2STR(&dns.ip.u_addr.ip4));
+    } else {
+        // Not associated according to the driver. If state still reads
+        // "Connected" here, that's the silent-disconnect we're hunting.
+        ESP_LOGW(TAG,
+                 "diag up=%llds state=%s(%s,%d) disc=%" PRIu32 " lastReason=%d "
+                 "ap_info_err=0x%x ip=" IPSTR,
+                 uptimeS, stateName(state), msg, reason, disconnectCount_,
+                 lastDisconnectReason_, apErr, IP2STR(&ip.ip));
+    }
 }

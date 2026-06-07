@@ -20,6 +20,11 @@ class ESPWifi : public AbstractWifi {
     void disconnect();
     void retry();
 
+    // Log wifi/IP diagnostics (state, RSSI, IP, DNS, disconnect counters,
+    // heap) for debugging connectivity issues. Call periodically from the app's
+    // existing logging loop.
+    void logDiagnostics();
+
     void msg(char *msg, size_t n) override;
     State getState() override {
         xSemaphoreTake(mutex_, portMAX_DELAY);
@@ -42,6 +47,10 @@ class ESPWifi : public AbstractWifi {
     int reason_ = 0;
     esp_netif_t *netif_ = nullptr;
     SemaphoreHandle_t mutex_;
+
+    // Diagnostics counters, updated from event handlers.
+    uint32_t disconnectCount_ = 0;
+    int lastDisconnectReason_ = 0;
 
     void doRetry(int reason = 0);
     void setState(State state, const char *msg, int reason = 0);

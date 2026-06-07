@@ -99,6 +99,7 @@ void mainTask(void *app) {
     bool first = true;
 
     log_heap_stats();
+    wifi_.logDiagnostics();
     std::chrono::steady_clock::time_point last_logged_heap = std::chrono::steady_clock::now();
 
     // Wait a bit of time to get a valid clock before loading
@@ -117,6 +118,7 @@ void mainTask(void *app) {
         std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now();
         if ((now - last_logged_heap) > HEAP_LOG_INTERVAL) {
             log_heap_stats();
+            wifi_.logDiagnostics();
             last_logged_heap = now;
         }
     }
