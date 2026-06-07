@@ -56,6 +56,12 @@ AbstractOTAClient::Error ESPOTAClient::update() {
         setErrMessageF("OTA version err: %d", status);
         return Error::HttpError;
     }
+    if (!outputOk_) {
+        // Reached the server (200) but the body was chunked or too long for
+        // outputBuffer_, so the version string is unusable.
+        setErrMessageF("OTA version response invalid");
+        return Error::HttpError;
+    }
 
     outputBuffer_[outputBufferPos_] = '\0';
     ESP_LOGI(TAG, "latest version: %s", outputBuffer_);

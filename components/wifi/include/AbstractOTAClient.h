@@ -6,7 +6,7 @@ class AbstractOTAClient {
         OK,
         NoUpdateAvailable,
         FetchError,   // Couldn't reach the server (DNS/TCP/TLS failure).
-        HttpError,    // Reached the server but it returned a non-200 status.
+        HttpError,    // Reached the server but the response wasn't a usable 200.
         UpgradeFailed,
     };
 
