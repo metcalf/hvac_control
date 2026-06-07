@@ -14,6 +14,9 @@
 #include "remote_logger.h"
 
 #define MAX_RETRIES 5
+// Linear backoff between reconnect attempts: delay = base * retryNum_, so the
+// 5 retries span ~15s instead of firing back-to-back in milliseconds.
+#define WIFI_RETRY_BASE_DELAY_MS 1000
 #define WIFI_ACTIVE_BIT BIT0
 #define WIFI_CONNECTED_BIT BIT1
 #define WIFI_FAIL_BIT BIT2
@@ -63,9 +66,20 @@ void ESPWifi::init(const char *name) {
 
     esp_sntp_setoperatingmode(SNTP_OPMODE_POLL);
     esp_sntp_setservername(0, "pool.ntp.org");
+
+    esp_timer_create_args_t retryTimerArgs = {
+        .callback = &retryTimerCb,
+        .arg = this,
+        .dispatch_method = ESP_TIMER_TASK,
+        .name = "wifiRetry",
+    };
+    ESP_ERROR_CHECK(esp_timer_create(&retryTimerArgs, &retryTimer_));
 }
 
 void ESPWifi::disconnect() {
+    if (retryTimer_) {
+        esp_timer_stop(retryTimer_); // no-op if not armed
+    }
     ESP_ERROR_CHECK(esp_wifi_stop());
 
     setState(State::Inactive, "");
@@ -80,6 +94,7 @@ void ESPWifi::retry() {
         ESP_LOGW(TAG, "retry it only valid from the Err state");
         return;
     }
+
     retryNum_ = 0;
     doRetry();
 }
@@ -154,9 +169,21 @@ void ESPWifi::onIPEvent(int32_t eventId, void *eventData) {
 }
 
 void ESPWifi::doRetry(int reason) {
-    esp_wifi_connect();
     setState(State::Connecting, "retrying", reason);
+
+    // retryNum_ is 0 when recovering from Err (via retry()); reconnect
+    // immediately in that case, otherwise back off proportionally.
+    uint32_t delayMs = WIFI_RETRY_BASE_DELAY_MS * retryNum_;
+    if (delayMs == 0) {
+        esp_wifi_connect();
+        return;
+    }
+
+    esp_timer_stop(retryTimer_); // ensure not already armed
+    ESP_ERROR_CHECK(esp_timer_start_once(retryTimer_, (uint64_t)delayMs * 1000));
 }
+
+void ESPWifi::retryTimerCb(void * /*arg*/) { esp_wifi_connect(); }
 
 void ESPWifi::setState(State state, const char *msg, int reason) {
     xSemaphoreTake(mutex_, portMAX_DELAY);
@@ -206,16 +233,15 @@ void ESPWifi::logDiagnostics() {
         ESP_LOGI(TAG,
                  "diag up=%llds state=%s(%s,%d) disc=%" PRIu32 " lastReason=%d "
                  "rssi=%d ch=%d ip=" IPSTR " gw=" IPSTR " dns=" IPSTR,
-                 uptimeS, stateName(state), msg, reason, disconnectCount_,
-                 lastDisconnectReason_, ap.rssi, ap.primary, IP2STR(&ip.ip),
-                 IP2STR(&ip.gw), IP2STR(&dns.ip.u_addr.ip4));
+                 uptimeS, stateName(state), msg, reason, disconnectCount_, lastDisconnectReason_,
+                 ap.rssi, ap.primary, IP2STR(&ip.ip), IP2STR(&ip.gw), IP2STR(&dns.ip.u_addr.ip4));
     } else {
         // Not associated according to the driver. If state still reads
         // "Connected" here, that's the silent-disconnect we're hunting.
         ESP_LOGW(TAG,
                  "diag up=%llds state=%s(%s,%d) disc=%" PRIu32 " lastReason=%d "
                  "ap_info_err=0x%x ip=" IPSTR,
-                 uptimeS, stateName(state), msg, reason, disconnectCount_,
-                 lastDisconnectReason_, apErr, IP2STR(&ip.ip));
+                 uptimeS, stateName(state), msg, reason, disconnectCount_, lastDisconnectReason_,
+                 apErr, IP2STR(&ip.ip));
     }
 }

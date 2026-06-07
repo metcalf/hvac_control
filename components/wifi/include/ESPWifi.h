@@ -5,6 +5,7 @@
 #include "AbstractWifi.h"
 
 #include "esp_netif.h"
+#include "esp_timer.h"
 #include "esp_wifi.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
@@ -52,6 +53,11 @@ class ESPWifi : public AbstractWifi {
     uint32_t disconnectCount_ = 0;
     int lastDisconnectReason_ = 0;
 
+    // One-shot timer used to back off between reconnect attempts so we don't
+    // hammer esp_wifi_connect() from the event handler during a brief outage.
+    esp_timer_handle_t retryTimer_ = nullptr;
+
     void doRetry(int reason = 0);
+    static void retryTimerCb(void *arg);
     void setState(State state, const char *msg, int reason = 0);
 };
