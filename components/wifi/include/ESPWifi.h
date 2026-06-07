@@ -5,6 +5,7 @@
 #include "AbstractWifi.h"
 
 #include "esp_netif.h"
+#include "esp_netif_sntp.h"
 #include "esp_timer.h"
 #include "esp_wifi.h"
 #include "freertos/FreeRTOS.h"
@@ -20,6 +21,8 @@ class ESPWifi : public AbstractWifi {
     void connect(const char *ssid, const char *password);
     void disconnect();
     void retry();
+
+    void setSNTPCallback(esp_sntp_time_cb_t cb) { sntpCb_ = cb; }
 
     // Force a re-association from the Connected state. The resulting
     // DISCONNECTED event drives the normal reconnect path. Used by the
@@ -61,6 +64,8 @@ class ESPWifi : public AbstractWifi {
     // One-shot timer used to back off between reconnect attempts so we don't
     // hammer esp_wifi_connect() from the event handler during a brief outage.
     esp_timer_handle_t retryTimer_ = nullptr;
+
+    esp_sntp_time_cb_t sntpCb_ = nullptr;
 
     void doRetry(int reason = 0);
     static void retryTimerCb(void *arg);

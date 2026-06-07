@@ -2,9 +2,8 @@
 
 #include <time.h>
 
-#include "esp_freertos_hooks.h"
 #include "esp_log.h"
-#include "esp_sntp.h"
+#include "esp_netif_sntp.h"
 #include "esp_task.h"
 #include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
@@ -173,7 +172,7 @@ esp_err_t setupRTC() {
         ESP_LOGI(TAG, "RTC doesn't have valid time");
     }
 
-    esp_sntp_set_time_sync_notification_cb(setRTC);
+    wifi_.setSNTPCallback(setRTC);
 
     return ESP_OK;
 }

@@ -4,7 +4,7 @@
 #include <cstring>
 
 #include "esp_log.h"
-#include "esp_sntp.h"
+#include "esp_netif_sntp.h"
 #include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/event_groups.h"
@@ -63,9 +63,6 @@ void ESPWifi::init(const char *name) {
                                                         this, NULL));
     ESP_ERROR_CHECK(
         esp_event_handler_instance_register(IP_EVENT, ESP_EVENT_ANY_ID, &eventHandler, this, NULL));
-
-    esp_sntp_setoperatingmode(SNTP_OPMODE_POLL);
-    esp_sntp_setservername(0, "pool.ntp.org");
 
     esp_timer_create_args_t retryTimerArgs = {
         .callback = &retryTimerCb,
@@ -157,11 +154,11 @@ void ESPWifi::onIPEvent(int32_t eventId, void *eventData) {
         ESP_LOGI(TAG, "got ip:" IPSTR, IP2STR(&event->ip_info.ip));
         retryNum_ = 0;
 
-        // Restart sntp every time we reconnect to reset the polling timeout
-        if (esp_sntp_enabled()) {
-            esp_sntp_stop();
-        }
-        esp_sntp_init();
+        // Restart SNTP every time we reconnect to reset the polling timeout
+        esp_netif_sntp_deinit();
+        esp_sntp_config_t sntpConfig = ESP_NETIF_SNTP_DEFAULT_CONFIG("pool.ntp.org");
+        sntpConfig.sync_cb = sntpCb_;
+        esp_netif_sntp_init(&sntpConfig);
 
         setState(State::Connected, "");
 

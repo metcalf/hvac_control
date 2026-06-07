@@ -28,6 +28,6 @@ extern "C" void app_main() {
 
         last_state = state;
 
-        vTaskDelay(200 / portTICK_RATE_MS);
+        vTaskDelay(200 / portTICK_PERIOD_MS);
     }
 }
