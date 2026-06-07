@@ -19,6 +19,7 @@
 #include "ModbusController.h"
 #include "MqttHomeClient.h"
 #include "NetworkTaskManager.h"
+#include "OtaTask.h"
 #include "Sensors.h"
 #include "UIManager.h"
 #include "ValveCtrl.h"
@@ -45,9 +46,6 @@
 #define CONNECT_WAIT_INTERVAL_TICKS pdMS_TO_TICKS(10 * 1000)
 #define HEAP_LOG_INTERVAL std::chrono::minutes(15)
 
-#define OTA_INTERVAL_MS (1 * 60 * 1000)
-#define OTA_FETCH_ERR_INTERVAL_MS (30 * 1000)
-
 #define POSIX_TZ_STR "PST8PDT,M3.2.0/2:00:00,M11.1.0/2:00:00"
 
 static const char *TAG = "MAIN";
@@ -65,20 +63,6 @@ static AppConfigStore appConfigStore_;
 static MqttHomeClient *homeCli_;
 static ESPOTAClient *ota_;
 static NetworkTaskManager *netTaskMgr_;
-
-NetworkTaskManager::TaskResult otaFn() {
-    switch (ota_->update()) {
-    case AbstractOTAClient::Error::FetchError:
-        // Couldn't reach the server: a real connectivity failure.
-        return {OTA_FETCH_ERR_INTERVAL_MS, false};
-    case AbstractOTAClient::Error::HttpError:
-        // Server responded with a non-200 (e.g. OTA disabled via 403). The
-        // network is fine, so don't count it against the connectivity watchdog.
-        return {OTA_FETCH_ERR_INTERVAL_MS, true};
-    default:
-        return {OTA_INTERVAL_MS, true};
-    }
-}
 
 void sensorTask(void *sensors) {
     while (1) {
@@ -250,7 +234,7 @@ extern "C" void controller_main() {
     wifi_.connect(config.wifi.ssid, config.wifi.password);
     remote_logger_init(config.wifi.logName, default_log_host);
     netTaskMgr_ = new NetworkTaskManager(wifi_);
-    netTaskMgr_->addTask(otaFn);
+    netTaskMgr_->addTask(otaTaskFn, ota_);
 
     // Start MQTT client
     homeCli_->start();

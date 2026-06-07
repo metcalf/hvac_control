@@ -17,7 +17,9 @@ class NetworkTaskManager {
         uint64_t delayMs;
         bool networkSucceeded;
     };
-    typedef TaskResult (*taskFn_t)();
+    // `ctx` is opaque context passed through from addTask, letting a task carry
+    // associated state (e.g. the OTA client) without a per-app wrapper.
+    typedef TaskResult (*taskFn_t)(void *ctx);
 
     NetworkTaskManager(ESPWifi &wifi) : wifi_(wifi) {}
 
@@ -26,12 +28,13 @@ class NetworkTaskManager {
 
     // NB: All tasks must be added before calling `start` or `poll`
     // since this isn't threadsafe.
-    void addTask(taskFn_t taskFn);
+    void addTask(taskFn_t taskFn, void *ctx = nullptr);
 
   private:
     struct Task {
         taskFn_t fn;
         uint64_t dueMs;
+        void *ctx;
     };
 
     // Detects the "associated but no working path" failure: if no task reports

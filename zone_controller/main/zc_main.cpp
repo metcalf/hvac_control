@@ -16,6 +16,7 @@
 #include "ESPWifi.h"
 #include "MqttZCHomeClient.h"
 #include "NetworkTaskManager.h"
+#include "OtaTask.h"
 #include "OutCtrl.h"
 #include "ValveStateManager.h"
 #include "ZCApp.h"
@@ -33,8 +34,6 @@
 #define UI_TASK_STACK_SIZE 8192
 
 #define INIT_ERR_RESTART_DELAY_TICKS pdMS_TO_TICKS(10 * 1000)
-#define OTA_INTERVAL_MS (1 * 60 * 1000)
-#define OTA_FETCH_ERR_INTERVAL_MS (30 * 1000)
 #define HEAP_LOG_INTERVAL std::chrono::minutes(15)
 
 static const char *TAG = "MAIN";
@@ -51,20 +50,6 @@ static ESPOTAClient *ota_;
 static NetworkTaskManager *netTaskMgr_;
 ValveStateManager valveStateManager_;
 OutCtrl *outCtrl_;
-
-NetworkTaskManager::TaskResult otaFn() {
-    switch (ota_->update()) {
-    case AbstractOTAClient::Error::FetchError:
-        // Couldn't reach the server: a real connectivity failure.
-        return {OTA_FETCH_ERR_INTERVAL_MS, false};
-    case AbstractOTAClient::Error::HttpError:
-        // Server responded with a non-200 (e.g. OTA disabled via 403). The
-        // network is fine, so don't count it against the connectivity watchdog.
-        return {OTA_FETCH_ERR_INTERVAL_MS, true};
-    default:
-        return {OTA_INTERVAL_MS, true};
-    }
-}
 
 void inputEvtCb() {
     ZCUIManager::Event evt{ZCUIManager::EventType::InputUpdate, 0};
@@ -146,7 +131,7 @@ void initNetwork() {
     wifi_.connect(default_wifi_ssid, default_wifi_pswd);
 
     netTaskMgr_ = new NetworkTaskManager(wifi_);
-    netTaskMgr_->addTask(otaFn);
+    netTaskMgr_->addTask(otaTaskFn, ota_);
 
     remote_logger_init(DEVICE_NAME, default_log_host);
 }

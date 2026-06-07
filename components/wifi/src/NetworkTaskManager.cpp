@@ -62,7 +62,7 @@ void NetworkTaskManager::poll() {
     uint64_t now_ms = esp_timer_get_time() / 1000;
     for (Task &task : tasks_) {
         if (task.dueMs <= now_ms) {
-            TaskResult result = task.fn();
+            TaskResult result = task.fn(task.ctx);
             task.dueMs = now_ms + result.delayMs;
             if (result.networkSucceeded) {
                 lastNetSuccessMs_ = now_ms;
@@ -103,6 +103,6 @@ void NetworkTaskManager::start(uint32_t stackDepth, uint priority) {
     xTaskCreate(netTaskFn, "netTask", stackDepth, this, priority, NULL);
 }
 
-void NetworkTaskManager::addTask(taskFn_t taskFn) {
-    tasks_.push_back(Task{fn : taskFn, dueMs : 0});
+void NetworkTaskManager::addTask(taskFn_t taskFn, void *ctx) {
+    tasks_.push_back(Task{fn : taskFn, dueMs : 0, ctx : ctx});
 }
