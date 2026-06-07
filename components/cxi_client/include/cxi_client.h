@@ -71,15 +71,15 @@ struct CxiRegDef {
 
 extern std::unordered_map<CxiRegister, CxiRegDef> cx_registers_;
 
-void cxi_client_init(mb_parameter_descriptor_t *deviceParameters, uint startIdx);
+void cxi_client_init(mb_parameter_descriptor_t *deviceParameters, unsigned int startIdx);
 
 esp_err_t cxi_client_get_param(CxiRegister reg, uint16_t *value,
-                               uint retries = CXI_DEFAULT_RETRIES);
+                               unsigned int retries = CXI_DEFAULT_RETRIES);
 esp_err_t cxi_client_get_temp_param(CxiRegister reg, double *value,
-                                    uint retries = CXI_DEFAULT_RETRIES);
-esp_err_t cxi_client_set_param(CxiRegister reg, uint16_t value, uint retries = CXI_DEFAULT_RETRIES);
+                                    unsigned int retries = CXI_DEFAULT_RETRIES);
+esp_err_t cxi_client_set_param(CxiRegister reg, uint16_t value, unsigned int retries = CXI_DEFAULT_RETRIES);
 esp_err_t cxi_client_set_temp_param(CxiRegister reg, double value,
-                                    uint retries = CXI_DEFAULT_RETRIES);
+                                    unsigned int retries = CXI_DEFAULT_RETRIES);
 
 void cxi_client_read_and_print(CxiRegDef def);
 void cxi_client_read_and_print(CxiRegister reg);

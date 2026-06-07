@@ -72,8 +72,8 @@ double parse_temp(uint16_t value) {
     return temp;
 }
 
-void cxi_client_init(mb_parameter_descriptor_t *deviceParameters, uint startIdx) {
-    uint i = startIdx;
+void cxi_client_init(mb_parameter_descriptor_t *deviceParameters, unsigned int startIdx) {
+    unsigned int i = startIdx;
     for (auto &[reg, def] : cxi_registers_) {
         def.idx = i;
         deviceParameters[i] = {
@@ -94,11 +94,11 @@ void cxi_client_init(mb_parameter_descriptor_t *deviceParameters, uint startIdx)
     }
 }
 
-esp_err_t cxi_client_get_param(CxiRegDef def, uint16_t *value, uint retries = 2) {
+esp_err_t cxi_client_get_param(CxiRegDef def, uint16_t *value, unsigned int retries = 2) {
     uint8_t type = 0; // throwaway
     esp_err_t err = ESP_OK;
 
-    for (int i = 0; i <= retries; i++) {
+    for (int i = 0; i <= (int)retries; i++) {
         err = mbc_master_get_parameter(def.idx, (char *)def.name, (uint8_t *)value, &type);
         if (err == ESP_OK) {
 
@@ -118,11 +118,11 @@ esp_err_t cxi_client_get_param(CxiRegDef def, uint16_t *value, uint retries = 2)
     return err;
 }
 
-esp_err_t cxi_client_get_param(CxiRegister reg, uint16_t *value, uint retries) {
+esp_err_t cxi_client_get_param(CxiRegister reg, uint16_t *value, unsigned int retries) {
     return cxi_client_get_param(cxi_registers_.at(reg), value, retries);
 }
 
-esp_err_t cxi_client_get_temp_param(CxiRegister reg, double *value, uint retries) {
+esp_err_t cxi_client_get_temp_param(CxiRegister reg, double *value, unsigned int retries) {
     uint16_t raw;
     esp_err_t err = cxi_client_get_param(reg, &raw, retries);
     if (err == ESP_OK) {
@@ -132,11 +132,11 @@ esp_err_t cxi_client_get_temp_param(CxiRegister reg, double *value, uint retries
     return err;
 }
 
-esp_err_t cxi_client_set_param(CxiRegDef def, uint16_t value, uint retries) {
+esp_err_t cxi_client_set_param(CxiRegDef def, uint16_t value, unsigned int retries) {
     uint8_t type = 0; // throwaway
     esp_err_t err = ESP_OK;
 
-    for (int i = 0; i <= retries; i++) {
+    for (int i = 0; i <= (int)retries; i++) {
         err = mbc_master_set_parameter(def.idx, (char *)def.name, (uint8_t *)&value, &type);
         if (err == ESP_OK) {
             break;
@@ -154,11 +154,11 @@ esp_err_t cxi_client_set_param(CxiRegDef def, uint16_t value, uint retries) {
     return err;
 }
 
-esp_err_t cxi_client_set_param(CxiRegister reg, uint16_t value, uint retries) {
+esp_err_t cxi_client_set_param(CxiRegister reg, uint16_t value, unsigned int retries) {
     return cxi_client_set_param(cxi_registers_.at(reg), value, retries);
 }
 
-esp_err_t cxi_client_set_temp_param(CxiRegister reg, double value, uint retries) {
+esp_err_t cxi_client_set_temp_param(CxiRegister reg, double value, unsigned int retries) {
     uint16_t raw = (uint16_t)(value * 10);
     if (value < 0) {
         raw |= NEGATIVE_TEMP_MASK;
