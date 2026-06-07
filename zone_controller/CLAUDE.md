@@ -2,12 +2,10 @@
 
 ## Building
 
-This is an ESP-IDF project. To build:
+This is an ESP-IDF project (ESP-IDF v5.5.1). To build:
 
 ```bash
-export IDF_PATH=$HOME/esp/v5.1.5/esp-idf
-export PATH=$HOME/.espressif/python_env/idf5.1_py3.13_env/bin:$HOME/esp/v5.1.5/esp-idf/tools:$PATH
-python $HOME/esp/v5.1.5/esp-idf/tools/idf.py build
+bash build.sh build
 ```
 
 ## Testing
@@ -24,4 +22,4 @@ to test_controller_app.cpp.
 Always run both tests and build after making code changes:
 
 1. Run tests: `test/run_tests.sh --gmock_verbose=error`
-2. Run build: `python $HOME/esp/v5.1.5/esp-idf/tools/idf.py build` (with ESP-IDF environment set up as shown above)
+2. Run build: `bash build.sh build`
