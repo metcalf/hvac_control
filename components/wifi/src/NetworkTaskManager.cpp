@@ -14,7 +14,7 @@
 // Connectivity watchdog thresholds. Comfortably above the OTA poll interval
 // (60s healthy / 30s on error) so normal gaps between successes never trip it.
 #define WIFI_WATCHDOG_RECONNECT_MS (5 * 60 * 1000)
-#define WIFI_WATCHDOG_RESTART_MS (30 * 60 * 1000)
+#define WIFI_WATCHDOG_RESTART_MS (15 * 60 * 1000)
 
 static const char *TAG = "NTM";
 
