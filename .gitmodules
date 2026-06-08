@@ -9,9 +9,6 @@
 	path = components/lvgl
 	url = https://github.com/lvgl/lvgl.git
 	branch = release/v8.3
-[submodule "components/lvgl_esp32_drivers"]
-	path = components/lvgl_esp32_drivers
-	url = https://github.com/metcalf/lvgl_esp32_drivers.git
 [submodule "shared_libs/scd40"]
 	path = components/scd40
 	url = git@github.com:metcalf/embedded-i2c-scd4x.git
