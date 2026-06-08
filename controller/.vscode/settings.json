@@ -12,5 +12,13 @@
   "idf.pythonBinPath": "/Users/andrew/.espressif/python_env/idf5.1_py3.13_env/bin/python",
   "idf.toolsPath": "/Users/andrew/.espressif",
   "idf.monitorNoReset": true,
-  "idf.flashType": ""
+  "idf.flashType": "",
+  "idf.currentSetup": "/Users/andrew/.espressif/v5.5.4/esp-idf",
+  "clangd.path": "/Users/andrew/.espressif/tools/esp-clang/esp-19.1.2_20250312/esp-clang/bin/clangd",
+  "clangd.arguments": [
+    "--background-index",
+    "--query-driver=**",
+    "--compile-commands-dir=/Users/andrew/code/hvac_control/controller/build"
+  ],
+  "idf.customTerminalExecutableArgs": ["-l"]
 }
