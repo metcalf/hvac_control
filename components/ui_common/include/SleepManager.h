@@ -1,6 +1,6 @@
 #pragma once
 
-#include "esp_lcd_backlight.h"
+#include "backlight.h"
 #include "lvgl/lvgl.h"
 
 class SleepManager {

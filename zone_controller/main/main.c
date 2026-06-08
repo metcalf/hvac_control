@@ -20,7 +20,15 @@ void app_main() {
     vTaskDelay(2000 / portTICK_PERIOD_MS);
 
     ESP_ERROR_CHECK(i2c_bus_init(GPIO_NUM_10, GPIO_NUM_11, 100000));
-    init_display();
+
+    const display_config_t disp_cfg = {
+        .pin_mosi = 21,
+        .pin_clk = 47,
+        .pin_dc = 13,
+        .pin_rst = 12,
+        .landscape_inverted = true,
+    };
+    init_display(&disp_cfg);
 
     zc_main();
 }

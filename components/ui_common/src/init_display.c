@@ -1,7 +1,5 @@
 #include "init_display.h"
 
-#include "sdkconfig.h"
-
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 
@@ -25,15 +23,11 @@
 
 #define LCD_H_RES 320
 #define LCD_V_RES 240
-// Partial buffer of 40 lines, matching the previous lvgl_esp32_drivers config.
+// Partial buffer of 40 lines.
 #define DISP_BUF_SIZE (LCD_H_RES * 40)
 
 #define LCD_HOST SPI2_HOST
-#define LCD_PIN_MOSI CONFIG_LV_DISP_SPI_MOSI
-#define LCD_PIN_CLK CONFIG_LV_DISP_SPI_CLK
-#define LCD_PIN_DC CONFIG_LV_DISP_PIN_DC
-#define LCD_PIN_RST CONFIG_LV_DISP_PIN_RST
-// CS is tied low in hardware (CONFIG_LV_DISPLAY_USE_SPI_CS is unset).
+// CS is tied low in hardware.
 #define LCD_PIN_CS (-1)
 #define LCD_PIXEL_CLOCK_HZ (40 * 1000 * 1000)
 
@@ -63,11 +57,11 @@ static void disp_flush(lv_disp_drv_t *drv, const lv_area_t *area,
                             area->y2 + 1, color_map);
 }
 
-static void init_panel(void) {
+static void init_panel(const display_config_t *cfg) {
   spi_bus_config_t buscfg = {
-      .mosi_io_num = LCD_PIN_MOSI,
+      .mosi_io_num = cfg->pin_mosi,
       .miso_io_num = -1,
-      .sclk_io_num = LCD_PIN_CLK,
+      .sclk_io_num = cfg->pin_clk,
       .quadwp_io_num = -1,
       .quadhd_io_num = -1,
       .max_transfer_sz = DISP_BUF_SIZE * sizeof(lv_color_t),
@@ -76,7 +70,7 @@ static void init_panel(void) {
 
   esp_lcd_panel_io_handle_t io_handle = NULL;
   esp_lcd_panel_io_spi_config_t io_config = {
-      .dc_gpio_num = LCD_PIN_DC,
+      .dc_gpio_num = cfg->pin_dc,
       .cs_gpio_num = LCD_PIN_CS,
       .pclk_hz = LCD_PIXEL_CLOCK_HZ,
       .lcd_cmd_bits = 8,
@@ -90,7 +84,7 @@ static void init_panel(void) {
       (esp_lcd_spi_bus_handle_t)LCD_HOST, &io_config, &io_handle));
 
   esp_lcd_panel_dev_config_t panel_config = {
-      .reset_gpio_num = LCD_PIN_RST,
+      .reset_gpio_num = cfg->pin_rst,
       .rgb_ele_order = LCD_RGB_ELEMENT_ORDER_BGR,
       .bits_per_pixel = 16,
   };
@@ -100,15 +94,11 @@ static void init_panel(void) {
   ESP_ERROR_CHECK(esp_lcd_panel_reset(panel_handle));
   ESP_ERROR_CHECK(esp_lcd_panel_init(panel_handle));
 
-  // Reproduce the MADCTL orientation previously applied by
-  // lvgl_esp32_drivers' ili9341_set_orientation(): both builds are landscape
-  // (MV set), and the zone_controller is additionally flipped (MX+MY).
+  // Both orientations are landscape (swap_xy); landscape-inverted additionally
+  // mirrors both axes.
   ESP_ERROR_CHECK(esp_lcd_panel_swap_xy(panel_handle, true));
-#if defined(CONFIG_LV_DISPLAY_ORIENTATION_LANDSCAPE_INVERTED)
-  ESP_ERROR_CHECK(esp_lcd_panel_mirror(panel_handle, true, true));
-#else
-  ESP_ERROR_CHECK(esp_lcd_panel_mirror(panel_handle, false, false));
-#endif
+  ESP_ERROR_CHECK(esp_lcd_panel_mirror(panel_handle, cfg->landscape_inverted,
+                                       cfg->landscape_inverted));
   ESP_ERROR_CHECK(esp_lcd_panel_invert_color(panel_handle, false));
   ESP_ERROR_CHECK(esp_lcd_panel_disp_on_off(panel_handle, true));
 }
@@ -127,7 +117,7 @@ static void touch_read_cb(lv_indev_drv_t *drv, lv_indev_data_t *data) {
   }
 }
 
-static void init_touch(void) {
+static void init_touch(const display_config_t *cfg) {
   esp_lcd_panel_io_handle_t tp_io = NULL;
   esp_lcd_panel_io_i2c_config_t tp_io_config =
       ESP_LCD_TOUCH_IO_I2C_FT5x06_CONFIG();
@@ -143,20 +133,14 @@ static void init_touch(void) {
       .y_max = LCD_H_RES,
       .rst_gpio_num = -1,
       .int_gpio_num = -1,
-      // Reproduce the old ft6x36 transform (swap, then invert X for landscape /
-      // invert Y for landscape-inverted). Because the swap is applied last here,
-      // that pre-swap invert becomes mirror_y for landscape and mirror_x for
-      // landscape-inverted.
+      // Old ft6x36 transform was swap, then invert X (landscape) / invert Y
+      // (landscape-inverted). With the swap applied last here, the pre-swap
+      // invert becomes mirror_y (landscape) / mirror_x (landscape-inverted).
       .flags =
           {
               .swap_xy = true,
-#if defined(CONFIG_LV_DISPLAY_ORIENTATION_LANDSCAPE_INVERTED)
-              .mirror_x = true,
-              .mirror_y = false,
-#else
-              .mirror_x = false,
-              .mirror_y = true,
-#endif
+              .mirror_x = cfg->landscape_inverted,
+              .mirror_y = !cfg->landscape_inverted,
           },
   };
   ESP_ERROR_CHECK(esp_lcd_touch_new_i2c_ft5x06(tp_io, &tp_cfg, &tp_handle));
@@ -167,10 +151,10 @@ static void init_touch(void) {
   assert(lv_indev_drv_register(&indev_drv) != NULL);
 }
 
-void init_display(void) {
+void init_display(const display_config_t *cfg) {
   lv_log_register_print_cb(disp_log_cb);
   lv_init();
-  init_panel();
+  init_panel(cfg);
 
   lv_color_t *buf1 =
       heap_caps_malloc(DISP_BUF_SIZE * sizeof(lv_color_t), MALLOC_CAP_DMA);
@@ -188,5 +172,5 @@ void init_display(void) {
   disp_drv.draw_buf = &disp_buf;
   lv_disp_drv_register(&disp_drv);
 
-  init_touch();
+  init_touch(cfg);
 }
