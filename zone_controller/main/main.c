@@ -1,5 +1,5 @@
-#include "i2c_manager.h"
-#include "lvgl_helpers.h"
+#include "driver/gpio.h"
+#include "i2c_bus.h"
 
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -7,8 +7,8 @@
 #include "init_display.h"
 #include "zc_main.h"
 
-// lvgl_esp32_drivers causes compilation problems when included from C++ so I use this
-// little C shim to initialize lvgl before starting the app
+// init_display() / lvgl are initialized from this little C shim because the
+// LVGL headers cause compilation problems when included from C++.
 void app_main() {
     // TODO: Remove this when we're done debugging
     // esp_log_level_set("ILI9341", ESP_LOG_DEBUG);
@@ -19,7 +19,7 @@ void app_main() {
     //esp_log_level_set("ZIO", ESP_LOG_DEBUG);
     vTaskDelay(2000 / portTICK_PERIOD_MS);
 
-    lvgl_i2c_locking(i2c_manager_locking());
+    ESP_ERROR_CHECK(i2c_bus_init(GPIO_NUM_10, GPIO_NUM_11, 100000));
     init_display();
 
     zc_main();

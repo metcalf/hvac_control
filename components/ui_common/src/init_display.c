@@ -16,9 +16,10 @@
 
 #include "lvgl.h"
 
-// Touch is still driven by the lvgl_esp32_drivers fork over i2c_manager. This
-// is migrated to esp_lcd_touch in a follow-up change.
-#include "lvgl_touch/touch_driver.h"
+// Touch (FT6X36) runs on esp_lcd_touch over the shared i2c_master bus. FT6x36
+// is register-compatible with the ft5x06 driver.
+#include "esp_lcd_touch_ft5x06.h"
+#include "i2c_bus.h"
 
 #define TAG "DISP"
 
@@ -40,6 +41,7 @@ static lv_disp_drv_t disp_drv;
 static lv_disp_draw_buf_t disp_buf;
 static lv_indev_drv_t indev_drv;
 static esp_lcd_panel_handle_t panel_handle = NULL;
+static esp_lcd_touch_handle_t tp_handle = NULL;
 
 static void disp_log_cb(const char *buf) { ESP_LOGI("LV", "%s", buf); }
 
@@ -111,10 +113,51 @@ static void init_panel(void) {
   ESP_ERROR_CHECK(esp_lcd_panel_disp_on_off(panel_handle, true));
 }
 
+static void touch_read_cb(lv_indev_drv_t *drv, lv_indev_data_t *data) {
+  uint16_t x = 0, y = 0;
+  uint8_t cnt = 0;
+  esp_lcd_touch_read_data(tp_handle);
+  bool pressed = esp_lcd_touch_get_coordinates(tp_handle, &x, &y, NULL, &cnt, 1);
+  if (pressed && cnt > 0) {
+    data->point.x = x;
+    data->point.y = y;
+    data->state = LV_INDEV_STATE_PR;
+  } else {
+    data->state = LV_INDEV_STATE_REL;
+  }
+}
+
 static void init_touch(void) {
-  touch_driver_init();
+  esp_lcd_panel_io_handle_t tp_io = NULL;
+  esp_lcd_panel_io_i2c_config_t tp_io_config =
+      ESP_LCD_TOUCH_IO_I2C_FT5x06_CONFIG();
+  tp_io_config.scl_speed_hz = 100000;
+  ESP_ERROR_CHECK(
+      esp_lcd_new_panel_io_i2c(i2c_bus_handle(), &tp_io_config, &tp_io));
+
+  esp_lcd_touch_config_t tp_cfg = {
+      .x_max = LCD_H_RES,
+      .y_max = LCD_V_RES,
+      .rst_gpio_num = -1,
+      .int_gpio_num = -1,
+      // Reproduce the lvgl_esp32_drivers ft6x36 coordinate transform: both
+      // builds swap X/Y; landscape mirrors X, landscape-inverted mirrors Y.
+      .flags =
+          {
+              .swap_xy = true,
+#if defined(CONFIG_LV_DISPLAY_ORIENTATION_LANDSCAPE_INVERTED)
+              .mirror_x = false,
+              .mirror_y = true,
+#else
+              .mirror_x = true,
+              .mirror_y = false,
+#endif
+          },
+  };
+  ESP_ERROR_CHECK(esp_lcd_touch_new_i2c_ft5x06(tp_io, &tp_cfg, &tp_handle));
+
   lv_indev_drv_init(&indev_drv);
-  indev_drv.read_cb = touch_driver_read;
+  indev_drv.read_cb = touch_read_cb;
   indev_drv.type = LV_INDEV_TYPE_POINTER;
   assert(lv_indev_drv_register(&indev_drv) != NULL);
 }

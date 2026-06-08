@@ -5,12 +5,15 @@
  */
 
 #include <stdio.h>
+#include "driver/gpio.h"
+#include "i2c_bus.h"
 #include "sts3x.h"
 
 void app_main(void) {
     printf("STS Temperature Board Tester\n");
     printf("=============================\n");
 
+    ESP_ERROR_CHECK(i2c_bus_init(GPIO_NUM_8, GPIO_NUM_9, 100000));
     sensirion_i2c_init();
     printf("I2C initialized\n");
 

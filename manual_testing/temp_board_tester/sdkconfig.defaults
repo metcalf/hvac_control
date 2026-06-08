@@ -1,7 +1,3 @@
 CONFIG_IDF_TARGET="esp32s3"
 
-# I2C Manager configuration for temperature board
-CONFIG_I2C_MANAGER_0_ENABLED=y
-CONFIG_I2C_MANAGER_0_SDA=8
-CONFIG_I2C_MANAGER_0_SCL=9
-CONFIG_I2C_MANAGER_0_FREQ_HZ=100000
+# I2C bus is created by i2c_bus_init() in temp_board_tester_main.c (pins there)
