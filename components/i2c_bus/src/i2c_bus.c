@@ -14,10 +14,10 @@
 
 static i2c_master_bus_handle_t s_bus = NULL;
 static uint32_t s_freq_hz = 100000;
-static SemaphoreHandle_t s_lock = NULL;
+static SemaphoreHandle_t s_mutex = NULL;
 
 // The new driver wants a device handle per address; cache them so we add each
-// device only once. Guarded by s_lock since first-use can race across tasks.
+// device only once. Guarded by s_mutex since first-use can race across tasks.
 static struct {
   uint16_t addr;
   i2c_master_dev_handle_t dev;
@@ -29,8 +29,8 @@ esp_err_t i2c_bus_init(gpio_num_t sda, gpio_num_t scl, uint32_t freq_hz) {
     return ESP_OK;
   }
   s_freq_hz = freq_hz;
-  s_lock = xSemaphoreCreateMutex();
-  if (s_lock == NULL) {
+  s_mutex = xSemaphoreCreateMutex();
+  if (s_mutex == NULL) {
     return ESP_ERR_NO_MEM;
   }
   i2c_master_bus_config_t cfg = {
@@ -46,13 +46,15 @@ esp_err_t i2c_bus_init(gpio_num_t sda, gpio_num_t scl, uint32_t freq_hz) {
 
 i2c_master_bus_handle_t i2c_bus_handle(void) { return s_bus; }
 
+uint32_t i2c_bus_freq_hz(void) { return s_freq_hz; }
+
 // Returns a cached device handle for addr, creating one on first use.
 static esp_err_t get_dev(uint16_t addr, i2c_master_dev_handle_t *out) {
-  xSemaphoreTake(s_lock, portMAX_DELAY);
+  xSemaphoreTake(s_mutex, portMAX_DELAY);
   for (size_t i = 0; i < s_dev_count; i++) {
     if (s_devs[i].addr == addr) {
       *out = s_devs[i].dev;
-      xSemaphoreGive(s_lock);
+      xSemaphoreGive(s_mutex);
       return ESP_OK;
     }
   }
@@ -72,7 +74,7 @@ static esp_err_t get_dev(uint16_t addr, i2c_master_dev_handle_t *out) {
       *out = dev;
     }
   }
-  xSemaphoreGive(s_lock);
+  xSemaphoreGive(s_mutex);
   return err;
 }
 

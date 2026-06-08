@@ -131,26 +131,31 @@ static void init_touch(void) {
   esp_lcd_panel_io_handle_t tp_io = NULL;
   esp_lcd_panel_io_i2c_config_t tp_io_config =
       ESP_LCD_TOUCH_IO_I2C_FT5x06_CONFIG();
-  tp_io_config.scl_speed_hz = 100000;
+  tp_io_config.scl_speed_hz = i2c_bus_freq_hz();
   ESP_ERROR_CHECK(
       esp_lcd_new_panel_io_i2c(i2c_bus_handle(), &tp_io_config, &tp_io));
 
   esp_lcd_touch_config_t tp_cfg = {
-      .x_max = LCD_H_RES,
-      .y_max = LCD_V_RES,
+      // esp_lcd_touch mirrors in the panel's native frame and swaps X/Y *last*,
+      // so x_max/y_max are the FT6x36 native dimensions (pre-swap): native width
+      // = display height, native height = display width.
+      .x_max = LCD_V_RES,
+      .y_max = LCD_H_RES,
       .rst_gpio_num = -1,
       .int_gpio_num = -1,
-      // Reproduce the lvgl_esp32_drivers ft6x36 coordinate transform: both
-      // builds swap X/Y; landscape mirrors X, landscape-inverted mirrors Y.
+      // Reproduce the old ft6x36 transform (swap, then invert X for landscape /
+      // invert Y for landscape-inverted). Because the swap is applied last here,
+      // that pre-swap invert becomes mirror_y for landscape and mirror_x for
+      // landscape-inverted.
       .flags =
           {
               .swap_xy = true,
 #if defined(CONFIG_LV_DISPLAY_ORIENTATION_LANDSCAPE_INVERTED)
-              .mirror_x = false,
-              .mirror_y = true,
-#else
               .mirror_x = true,
               .mirror_y = false,
+#else
+              .mirror_x = false,
+              .mirror_y = true,
 #endif
           },
   };
