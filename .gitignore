@@ -13,6 +13,8 @@ sdkconfig.esp32s3.old
 sdkconfig.old
 sdkconfig
 build/
+# Downloaded IDF component-manager dependencies (reproducible from dependencies.lock)
+managed_components/
 logs/
 output.tsv
 .cache
