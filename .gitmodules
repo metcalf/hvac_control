@@ -12,9 +12,6 @@
 [submodule "components/lvgl_esp32_drivers"]
 	path = components/lvgl_esp32_drivers
 	url = https://github.com/metcalf/lvgl_esp32_drivers.git
-[submodule "components/i2c_manager"]
-	path = components/i2c_manager
-	url = https://github.com/metcalf/i2c_manager.git
 [submodule "shared_libs/scd40"]
 	path = components/scd40
 	url = git@github.com:metcalf/embedded-i2c-scd4x.git

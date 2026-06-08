@@ -3,7 +3,7 @@
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
-#include "i2c_manager.h"
+#include "i2c_bus.h"
 
 #define RTC_ADDR 0x32
 
@@ -127,14 +127,14 @@ static uint8_t bcd2bin(uint8_t val) { return (val & 0x0f) + (val >> 4) * 10; }
 static uint8_t bin2bcd(uint8_t val) { return ((val / 10) << 4) + val % 10; }
 
 static esp_err_t rtc_rx8111_i2c_read(uint32_t reg, uint8_t *buffer, uint16_t size) {
-    return i2c_manager_read(I2C_NUM_0, RTC_ADDR, reg, buffer, size);
+    return i2c_bus_read_reg(RTC_ADDR, reg, buffer, size);
 }
 static esp_err_t rtc_rx8111_i2c_write(uint32_t reg, const uint8_t *buffer, uint16_t size) {
-    return i2c_manager_write(I2C_NUM_0, RTC_ADDR, reg, buffer, size);
+    return i2c_bus_write_reg(RTC_ADDR, reg, buffer, size);
 }
 
 static esp_err_t rtc_rx8111_i2c_write_reg(uint32_t reg, const uint8_t value) {
-    return i2c_manager_write(I2C_NUM_0, RTC_ADDR, reg, &value, 1);
+    return i2c_bus_write_reg(RTC_ADDR, reg, &value, 1);
 }
 
 //----------------------------------------------------------------------

@@ -4,5 +4,5 @@ idf_component_register(
     SRCS ${SOURCES}
     INCLUDE_DIRS "include"
     REQUIRES lvgl lvgl_esp32_drivers
-    PRIV_REQUIRES driver freertos esp_lcd esp_lcd_ili9341
+    PRIV_REQUIRES driver freertos esp_lcd esp_lcd_ili9341 esp_lcd_touch_ft5x06 i2c_bus
 )

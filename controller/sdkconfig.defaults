@@ -47,11 +47,7 @@ CONFIG_FMB_COMM_MODE_TCP_EN=n
 CONFIG_FMB_COMM_MODE_ASCII_EN=n
 CONFIG_FMB_MASTER_TIMEOUT_MS_RESPOND=150
 
-# I2C
-CONFIG_I2C_MANAGER_0_ENABLED=y
-CONFIG_I2C_MANAGER_0_SDA=39
-CONFIG_I2C_MANAGER_0_SCL=36
-CONFIG_I2C_MANAGER_0_FREQ_HZ=100000
+# I2C bus is created by i2c_bus_init() in app_main.c (pins live there now)
 
 # LVGL/graphics
 CONFIG_LV_CONF_SKIP=n
@@ -77,9 +73,11 @@ CONFIG_LV_DISPLAY_USE_SPI_CS=n
 CONFIG_LV_DISP_PIN_DC=13
 CONFIG_LV_DISP_PIN_RST=12
 CONFIG_LV_DISP_BACKLIGHT_OFF=y
-CONFIG_LV_TOUCH_CONTROLLER_FT6X06=y
-CONFIG_LV_FT6X36_SWAPXY=y
-CONFIG_LV_FT6X36_INVERT_X=y
+# Touch is handled by esp_lcd_touch_ft5x06 (see ui_common/init_display.c), not
+# the lvgl_esp32_drivers touch driver. Disabling it here keeps the fork's
+# legacy-I2C code (lvgl_i2c) out of the build so it can't conflict with the new
+# i2c_master driver.
+CONFIG_LV_TOUCH_CONTROLLER_NONE=y
 
 # MQTT
 CONFIG_MQTT_PROTOCOL_311=n
