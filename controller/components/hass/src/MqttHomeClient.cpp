@@ -313,6 +313,7 @@ void MqttHomeClient::updateTopics(const char *name) {
 
     config_.session.last_will.msg = "0";
     config_.session.last_will.topic = availabilityTopic_;
+    config_.session.last_will.retain = true;
 
     topics_[3].filter = modeCmdTopic_;
     topics_[4].filter = highTempCmdTopic_;

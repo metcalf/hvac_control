@@ -37,7 +37,7 @@
 #define HEAP_LOG_INTERVAL std::chrono::minutes(15)
 
 static const char *TAG = "MAIN";
-static const char *DEVICE_NAME = DEVICE_NAME;
+static const char *DEVICE_NAME = "zonectrl";
 
 static ZCApp *zcApp_;
 static ZCUIManager *uiManager_;
@@ -132,6 +132,8 @@ void initNetwork() {
 
     netTaskMgr_ = new NetworkTaskManager(wifi_);
     netTaskMgr_->addTask(otaTaskFn, ota_);
+
+    homeCli_->start();
 
     remote_logger_init(DEVICE_NAME, default_log_host);
 }

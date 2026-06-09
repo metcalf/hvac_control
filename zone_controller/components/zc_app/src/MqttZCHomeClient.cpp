@@ -11,6 +11,13 @@
 
 #define DISCOVERY_TOPIC "homeassistant/device/zone_controller/config"
 #define HP_AMBIENT_TEMP_TOPIC "home/zone_controller/hp_ambient_temp"
+#define AVAILABILITY_TOPIC "home/zone_controller/availability"
+#define AVAILABILITY_BLOCK                                                                         \
+    "\"availability\": [{"                                                                         \
+    "\"topic\": \"" AVAILABILITY_TOPIC "\","                                                       \
+    "\"payload_available\": \"1\","                                                                \
+    "\"payload_not_available\": \"0\""                                                             \
+    "}]"
 
 static const char *TAG = "MQTT";
 
@@ -29,18 +36,24 @@ static const char *discoveryTmpl = R"({
       "device_class": "temperature",
       "state_class": "measurement",
       "unit_of_measurement": "°C",
+      )" AVAILABILITY_BLOCK R"( ,
       "state_topic": )" HP_AMBIENT_TEMP_TOPIC R"(
     }
   }
 })";
 
-MqttZCHomeClient::MqttZCHomeClient() { mutex_ = xSemaphoreCreateMutex(); }
+MqttZCHomeClient::MqttZCHomeClient() {
+    mutex_ = xSemaphoreCreateMutex();
+
+    // Register the last will so the broker marks us unavailable if we drop without
+    // publishing "0" ourselves. config_ is consumed by BaseMqttClient::start(), which
+    // runs after construction, so setting it here takes effect.
+    config_.session.last_will.topic = AVAILABILITY_TOPIC;
+    config_.session.last_will.msg = "0";
+    config_.session.last_will.retain = true;
+}
 
 MqttZCHomeClient::~MqttZCHomeClient() { vSemaphoreDelete(mutex_); }
-
-// TODO: When implementing availability, these go somewhere, not sure where
-// config_.session.last_will.msg = "0";
-// config_.session.last_will.topic = availabilityTopic_;
 
 AbstractZCHomeClient::HomeState MqttZCHomeClient::state() {
     xSemaphoreTake(mutex_, portMAX_DELAY);
@@ -64,6 +77,9 @@ void MqttZCHomeClient::updateState(double hpAmbientTempC) {
     }
     xSemaphoreGive(mutex_);
 
+    if (client_ == nullptr) {
+        return; // client not started yet; state will be published on connect
+    }
     esp_mqtt_dispatch_custom_event(client_, nullptr);
 }
 
@@ -95,8 +111,7 @@ void MqttZCHomeClient::onConnected() {
     if (!std::isnan(lastHpAmbientTempC_)) {
         updatedFields_ |= updatedFieldMask(UpdatedFields::HpAmbientTempC);
     }
-    // TODO: Implement availability
-    //updatedFields_ |= updatedFieldMask(UpdatedFields::Availability);
+    updatedFields_ |= updatedFieldMask(UpdatedFields::Availability);
     updatedFields_ |= updatedFieldMask(UpdatedFields::Discovery);
     xSemaphoreGive(mutex_);
 
@@ -116,14 +131,13 @@ void MqttZCHomeClient::onUserEvent() {
             xSemaphoreGive(mutex_);
         }
     }
-    // TODO: Implement availability
-    // if (fields & updatedFieldMask(UpdatedFields::Availability)) {
-    //     if (esp_mqtt_client_publish(client_, availabilityTopic_, "1", 1, 0, true) >= 0) {
-    //         xSemaphoreTake(mutex_, portMAX_DELAY);
-    //         updatedFields_ &= ~updatedFieldMask(UpdatedFields::Availability);
-    //         xSemaphoreGive(mutex_);
-    //     }
-    // }
+    if (fields & updatedFieldMask(UpdatedFields::Availability)) {
+        if (esp_mqtt_client_publish(client_, AVAILABILITY_TOPIC, "1", 1, 0, true) >= 0) {
+            xSemaphoreTake(mutex_, portMAX_DELAY);
+            updatedFields_ &= ~updatedFieldMask(UpdatedFields::Availability);
+            xSemaphoreGive(mutex_);
+        }
+    }
     if (fields & updatedFieldMask(UpdatedFields::Discovery)) {
         if (publishDiscoveryMessage() >= 0) {
             xSemaphoreTake(mutex_, portMAX_DELAY);
@@ -134,15 +148,15 @@ void MqttZCHomeClient::onUserEvent() {
 }
 
 int MqttZCHomeClient::publishDiscoveryMessage() {
-    ESP_LOGD(TAG, "Publishing discovery message to topic %s: %s", DISCOVERY_TOPIC, discoveryStr_);
-    return esp_mqtt_client_publish(client_, DISCOVERY_TOPIC, discoveryStr_, 0, 0, true);
+    ESP_LOGD(TAG, "Publishing discovery message to topic %s: %s", DISCOVERY_TOPIC, discoveryTmpl);
+    return esp_mqtt_client_publish(client_, DISCOVERY_TOPIC, discoveryTmpl, 0, 0, true);
 }
 
-int MqttZCHomeClient::publishBinarySensor(char *topic, bool state) {
+int MqttZCHomeClient::publishBinarySensor(const char *topic, bool state) {
     return esp_mqtt_client_publish(client_, topic, state ? "ON" : "OFF", 0, 0, true);
 }
 
-int MqttZCHomeClient::publishTempC(char *topic, double tempC) {
+int MqttZCHomeClient::publishTempC(const char *topic, double tempC) {
     char buf[8];
     int len = snprintf(buf, sizeof(buf), "%.1f", tempC);
     return esp_mqtt_client_publish(client_, topic, buf, len, 0, false);

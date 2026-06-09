@@ -28,6 +28,7 @@ class MqttZCHomeClient : public BaseMqttClient, public AbstractZCHomeClient {
     enum class UpdatedFields {
         Discovery,
         HpAmbientTempC,
+        Availability,
     };
 
     uint8_t updatedFields_ = 0;
@@ -35,19 +36,15 @@ class MqttZCHomeClient : public BaseMqttClient, public AbstractZCHomeClient {
 
     static constexpr const char *vacationTopic_ = "home/global/on_vacation";
 
-    char discoveryStr_[2048] = "";
-
     esp_mqtt_topic_t topics_[1] = {
         {.filter = vacationTopic_, .qos = 0},
     };
 
     uint8_t updatedFieldMask(UpdatedFields field) { return 1 << static_cast<uint8_t>(field); }
 
-    void updateTopics(const char *name);
-
     int publishDiscoveryMessage();
-    int publishBinarySensor(char *topic, bool state);
-    int publishTempC(char *topic, double tempC);
+    int publishBinarySensor(const char *topic, bool state);
+    int publishTempC(const char *topic, double tempC);
 
     void parseVacationMessage(const char *data, int dataLen);
 };
