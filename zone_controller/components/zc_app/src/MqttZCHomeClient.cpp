@@ -1,12 +1,5 @@
 #include "MqttZCHomeClient.h"
 
-#include <algorithm>
-#include <chrono>
-#include <cstring>
-#include <inttypes.h>
-
-#include "ZCDomain.h"
-#include "esp_err.h"
 #include "esp_log.h"
 
 #define DISCOVERY_TOPIC "homeassistant/device/zone_controller/config"
@@ -62,13 +55,6 @@ AbstractZCHomeClient::HomeState MqttZCHomeClient::state() {
     return r;
 }
 
-namespace {
-bool matchesTopic(const char *receivedTopic, int receivedTopicLen, const char *expectedTopic) {
-    return receivedTopicLen == strlen(expectedTopic) &&
-           strncmp(receivedTopic, expectedTopic, receivedTopicLen) == 0;
-}
-} // namespace
-
 void MqttZCHomeClient::updateState(double hpAmbientTempC) {
     xSemaphoreTake(mutex_, portMAX_DELAY);
     if (lastHpAmbientTempC_ != hpAmbientTempC) {
@@ -83,12 +69,9 @@ void MqttZCHomeClient::updateState(double hpAmbientTempC) {
     esp_mqtt_dispatch_custom_event(client_, nullptr);
 }
 
-void MqttZCHomeClient::onMsg(char *topic, int topicLen, char *data, int dataLen) {
-    if (matchesTopic(topic, topicLen, vacationTopic_)) {
-        parseVacationMessage(data, dataLen);
-    } else {
-        ESP_LOGW(TAG, "Received message on unknown topic: %.*s", topicLen, topic);
-    }
+void MqttZCHomeClient::onMsg(char *topic, int topicLen, char *, int) {
+    // We don't subscribe to any topics, so any received message is unexpected.
+    ESP_LOGW(TAG, "Received message on unknown topic: %.*s", topicLen, topic);
 }
 
 void MqttZCHomeClient::onErr(esp_mqtt_error_codes_t err) {
@@ -99,13 +82,6 @@ void MqttZCHomeClient::onErr(esp_mqtt_error_codes_t err) {
 }
 
 void MqttZCHomeClient::onConnected() {
-    int res = esp_mqtt_client_subscribe_multiple(client_, topics_, std::size(topics_));
-    if (res < 0) {
-        ESP_LOGE(TAG, "Error subscribing to topics (%d)", res);
-    } else {
-        ESP_LOGD(TAG, "Subscribed to %d topics", std::size(topics_));
-    }
-
     // Publish values via a user message to avoid duplication and consolidate retries
     xSemaphoreTake(mutex_, portMAX_DELAY);
     if (!std::isnan(lastHpAmbientTempC_)) {
@@ -160,26 +136,4 @@ int MqttZCHomeClient::publishTempC(const char *topic, double tempC) {
     char buf[8];
     int len = snprintf(buf, sizeof(buf), "%.1f", tempC);
     return esp_mqtt_client_publish(client_, topic, buf, len, 0, false);
-}
-
-void MqttZCHomeClient::parseVacationMessage(const char *data, int dataLen) {
-    xSemaphoreTake(mutex_, portMAX_DELAY);
-
-    if (dataLen <= 0) {
-        ESP_LOGE(TAG, "Empty vacation message");
-        state_.err = Error::ParseError;
-        xSemaphoreGive(mutex_);
-        return;
-    }
-
-    if (dataLen == 1 && (data[0] == '0' || data[0] == '1')) {
-        state_.vacationOn = (data[0] == '1');
-        state_.err = Error::OK;
-        ESP_LOGI(TAG, "Vacation status updated: %s", state_.vacationOn ? "ON" : "OFF");
-    } else {
-        ESP_LOGE(TAG, "Failed to parse vacation message: %.*s", dataLen, data);
-        state_.err = Error::ParseError;
-    }
-
-    xSemaphoreGive(mutex_);
 }
