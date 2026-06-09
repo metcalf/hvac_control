@@ -5,7 +5,6 @@
 
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
-#include <cmath>
 
 class MqttZCHomeClient : public BaseMqttClient, public AbstractZCHomeClient {
   public:
@@ -14,7 +13,8 @@ class MqttZCHomeClient : public BaseMqttClient, public AbstractZCHomeClient {
 
     HomeState state() override;
 
-    void updateState(double hpAmbientTempC) override;
+    void updateState(const ZCDomain::SystemState &state, CxOpMode cxOpMode, double hpOutletTempC,
+                     uint16_t hpCompressorFreq, double hpACCurrent, double hpAmbientTempC) override;
 
   protected:
     void onMsg(char *topic, int topicLen, char *data, int dataLen) override;
@@ -27,16 +27,24 @@ class MqttZCHomeClient : public BaseMqttClient, public AbstractZCHomeClient {
 
     enum class UpdatedFields {
         Discovery,
-        HpAmbientTempC,
         Availability,
+        State,
     };
 
     uint8_t updatedFields_ = 0;
-    double lastHpAmbientTempC_ = std::nan("");
+
+    // Last reported system state, mirrored to Home Assistant. Guarded by mutex_.
+    bool haveState_ = false;
+    ZCDomain::SystemState lastState_{};
+    CxOpMode lastCxOpMode_ = CxOpMode::Unknown;
+    double lastHpOutletTempC_ = 0;
+    uint16_t lastHpCompressorFreq_ = 0;
+    double lastHpACCurrent_ = 0;
+    double lastHpAmbientTempC_ = 0;
 
     uint8_t updatedFieldMask(UpdatedFields field) { return 1 << static_cast<uint8_t>(field); }
 
     int publishDiscoveryMessage();
-    int publishBinarySensor(const char *topic, bool state);
-    int publishTempC(const char *topic, double tempC);
+    int publishState(const ZCDomain::SystemState &state, CxOpMode cxOpMode, double hpOutletTempC,
+                     uint16_t hpCompressorFreq, double hpACCurrent, double hpAmbientTempC);
 };

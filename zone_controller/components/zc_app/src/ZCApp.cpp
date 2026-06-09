@@ -118,7 +118,7 @@ void ZCApp::logSystemState(SystemState state) {
 
     ESP_LOGW(TAG, "%s", buffer);
 
-    homeCli_->updateState(hpAmbientT);
+    homeCli_->updateState(state, cxOpMode, hpOutT, hpHz, hpACCurrent, hpAmbientT);
 }
 
 void ZCApp::handleCancelMessage(MsgID id) {

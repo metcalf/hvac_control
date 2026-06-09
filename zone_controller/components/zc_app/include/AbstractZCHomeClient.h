@@ -2,6 +2,7 @@
 
 #include <chrono>
 
+#include "BaseModbusClient.h"
 #include "ZCDomain.h"
 
 class AbstractZCHomeClient {
@@ -21,9 +22,11 @@ class AbstractZCHomeClient {
 
     virtual HomeState state() = 0;
 
-    virtual void updateState(double hpAmbientTempC/*,bool systemOn, ZCDomain::SystemState systemState,
-                             double hpAmbientTempC, double hpOutletTempC, double hpACCurrent,
-                             uint8_t hpFreq*/) {};
+    // Reports the full system state for publishing. Mirrors the values logged in
+    // ZCApp::logSystemState.
+    virtual void updateState(const ZCDomain::SystemState &state, CxOpMode cxOpMode,
+                             double hpOutletTempC, uint16_t hpCompressorFreq, double hpACCurrent,
+                             double hpAmbientTempC) {};
 
   protected:
     HomeState state_{.err = Error::NotRun};
