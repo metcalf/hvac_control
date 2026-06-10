@@ -45,7 +45,7 @@
 static const char *TAG = "MQTT";
 
 static const char *discoveryTmpl =
-    R"({"device":{"ids":"zone_controller"},"o":{"name":"hvac_control"},"cmps":{)"     //
+    R"({"device":{"ids":"zone_controller","name":"Zone Controller"},"o":{"name":"hvac_control"},"cmps":{)" //
     BINARY_SENSOR_CMP("zone_pump", "Zone Pump") ","                                   //
     BINARY_SENSOR_CMP("fc_pump", "Fancoil Pump") ","                                  //
     SENSOR_CMP("hp_mode", "Heat Pump Mode", "") ","                                   //
