@@ -232,6 +232,9 @@ extern "C" void controller_main() {
     wifi_.init(config.wifi.logName);
     wifi_.connect(config.wifi.ssid, config.wifi.password);
     remote_logger_init(config.wifi.logName, default_log_host);
+    // LOGW immediately after remote_logger_init gives us an early remote log line
+    // to note a restart
+    ESP_LOGW(TAG, "Wifi started, booting app");
     netTaskMgr_ = new NetworkTaskManager(wifi_);
     netTaskMgr_->addTask(otaTaskFn, ota_);
 
