@@ -134,6 +134,7 @@ void ESPWifi::onWifiEvent(int32_t eventId, void *eventData) {
     case WIFI_EVENT_STA_DISCONNECTED: {
         uint8_t reason = ((wifi_event_sta_disconnected_t *)eventData)->reason;
         ESP_LOGI(TAG, "disconnected (%d)", reason);
+        remote_logger_set_connected(false);
         disconnectCount_++;
         lastDisconnectReason_ = reason;
         if (retryNum_ < MAX_RETRIES) {
@@ -153,6 +154,7 @@ void ESPWifi::onIPEvent(int32_t eventId, void *eventData) {
         ip_event_got_ip_t *event = (ip_event_got_ip_t *)eventData;
         ESP_LOGI(TAG, "got ip:" IPSTR, IP2STR(&event->ip_info.ip));
         retryNum_ = 0;
+        remote_logger_set_connected(true);
 
         // Restart SNTP every time we reconnect to reset the polling timeout
         esp_netif_sntp_deinit();
@@ -165,6 +167,7 @@ void ESPWifi::onIPEvent(int32_t eventId, void *eventData) {
         break;
     }
     case IP_EVENT_STA_LOST_IP:
+        remote_logger_set_connected(false);
         setState(State::Err, "lost IP", eventId);
         break;
     }
