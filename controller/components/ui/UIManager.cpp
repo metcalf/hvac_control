@@ -648,6 +648,22 @@ void UIManager::setAQI(int16_t aqi) {
         lv_label_set_text_fmt(ui_AQI_value, "%d", aqi);
     }
 
+    // Color the symbol and value by air quality category. Hues coordinate with
+    // the 0xFF9040 orange used elsewhere for heat text and stay readable on the
+    // black background.
+    uint32_t color = 0xFFFFFF;  // default (<= 50 or no reading)
+    if (aqi > 150) {
+        color = 0xFF4848;  // red
+    } else if (aqi > 100) {
+        color = 0xFF9040;  // orange (matches heat text)
+    } else if (aqi > 50) {
+        color = 0xFFD840;  // yellow
+    }
+    lv_obj_set_style_text_color(ui_AQI_symbol, lv_color_hex(color),
+                                LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_color(ui_AQI_value, lv_color_hex(color),
+                                LV_PART_MAIN | LV_STATE_DEFAULT);
+
     xSemaphoreGive(mutex_);
 }
 
