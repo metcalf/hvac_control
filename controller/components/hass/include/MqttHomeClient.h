@@ -18,6 +18,7 @@ class MqttHomeClient : public BaseMqttClient, public AbstractHomeClient {
     void updateClimateState(bool systemOn, ControllerDomain::HVACState hvacState,
                             ControllerDomain::FanSpeed fanSpeed, double inTempF, double highTempF,
                             double lowTempF) override;
+    void updateStaticPressure(uint32_t pressurePa) override;
     void updateName(const char *name) override;
 
   protected:
@@ -38,7 +39,8 @@ class MqttHomeClient : public BaseMqttClient, public AbstractHomeClient {
         LowTemp,
         Availability,
         Discovery,
-        Action
+        Action,
+        StaticPressure
     };
 
     AbstractUIManager::eventCb_t eventCb_;
@@ -49,14 +51,17 @@ class MqttHomeClient : public BaseMqttClient, public AbstractHomeClient {
     double lastLowTempC_ = std::nan("");
     ClimateMode lastClimateMode_ = ClimateMode::Unset;
     ClimateAction lastClimateAction_ = ClimateAction::Unset;
+    // Static pressure is always positive, so 0 means "not measured yet".
+    uint32_t lastStaticPressurePa_ = 0;
 
     static constexpr const char *vacationTopic_ = "home/global/on_vacation";
     static constexpr const char *outdoorTempTopic_ = "home/global/outdoor_temp_c";
     static constexpr const char *airQualityTopic_ = "home/global/air_quality_index";
 
-    char discoveryStr_[2048] = "", discoveryTopic_[64], availabilityTopic_[64],
+    char discoveryStr_[3072] = "", discoveryTopic_[64], availabilityTopic_[64],
          currentTempTopic_[64], modeStateTopic_[64], modeCmdTopic_[64], highTempTopic_[64],
-         highTempCmdTopic_[64], lowTempTopic_[64], lowTempCmdTopic_[64], actionTopic_[64];
+         highTempCmdTopic_[64], lowTempTopic_[64], lowTempCmdTopic_[64], actionTopic_[64],
+         staticPressureTopic_[64];
 
     esp_mqtt_topic_t topics_[6] = {
         {.filter = vacationTopic_, .qos = 0},
@@ -77,6 +82,7 @@ class MqttHomeClient : public BaseMqttClient, public AbstractHomeClient {
     int publishClimateMode(ClimateMode mode);
     int publishClimateAction(ClimateAction action);
     int publishTempC(char *topic, double tempC, bool retain);
+    int publishStaticPressure(uint32_t pressurePa);
 
     void parseModeCmdMessage(const char *data, int dataLen);
     void parseTempCmdMessage(bool high, const char *data, int dataLen);

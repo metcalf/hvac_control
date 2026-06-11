@@ -946,8 +946,9 @@ ControllerDomain::FreshAirState ControllerApp::getFreshAirState() {
                 if (speedT - fanLastStarted_ > STATIC_PRESSURE_OFF_TIME_MAX_AGE) {
                     ESP_LOGI(TAG, "Off pressure is stale, can't compute static pressure");
                 } else if (stoppedPressurePa_ > freshAirState.pressurePa) {
-                    ESP_LOGW(TAG, "est fresh air static pressure (pa): %" PRIu32,
-                             (stoppedPressurePa_ - freshAirState.pressurePa));
+                    uint32_t staticPressurePa = stoppedPressurePa_ - freshAirState.pressurePa;
+                    ESP_LOGW(TAG, "est fresh air static pressure (pa): %" PRIu32, staticPressurePa);
+                    homeCli_->updateStaticPressure(staticPressurePa);
                 } else {
                     ESP_LOGE(TAG, "Unexpected negative static pressure estimate");
                 }

@@ -52,6 +52,15 @@ static const char *discoveryTmpl = R"({
       "state_class": "measurement",
       "unit_of_measurement": "°F",
       "state_topic": "%s"
+    },
+    "hvac_control_sensor_static_pressure":{
+      "p": "sensor",
+      "name": "Fresh Air Static Pressure",
+      "unique_id": "%s_static_pressure",
+      "device_class": "pressure",
+      "state_class": "measurement",
+      "unit_of_measurement": "Pa",
+      "state_topic": "%s"
     }
   }
 })";
@@ -157,6 +166,18 @@ void MqttHomeClient::updateClimateState(bool systemOn, ControllerDomain::HVACSta
     esp_mqtt_dispatch_custom_event(client_, nullptr);
 }
 
+void MqttHomeClient::updateStaticPressure(uint32_t pressurePa) {
+    // Set the flag here and publish from the event loop to avoid blocking on the outbox.
+    xSemaphoreTake(mutex_, portMAX_DELAY);
+    if (lastStaticPressurePa_ != pressurePa) {
+        lastStaticPressurePa_ = pressurePa;
+        updatedFields_ |= updatedFieldMask(UpdatedFields::StaticPressure);
+    }
+    xSemaphoreGive(mutex_);
+
+    esp_mqtt_dispatch_custom_event(client_, nullptr);
+}
+
 void MqttHomeClient::updateName(const char *name) {
     // NB: We don't actually hold the mutex_ everywhere we read *topic_ since this should be
     // called very rarely so a race probably isn't a major risk. A separate topicMutex_ would
@@ -226,6 +247,9 @@ void MqttHomeClient::onConnected() {
     if (lastClimateAction_ != ClimateAction::Unset) {
         updatedFields_ |= updatedFieldMask(UpdatedFields::Action);
     }
+    if (lastStaticPressurePa_ != 0) {
+        updatedFields_ |= updatedFieldMask(UpdatedFields::StaticPressure);
+    }
     updatedFields_ |= updatedFieldMask(UpdatedFields::Availability);
     updatedFields_ |= updatedFieldMask(UpdatedFields::Discovery);
     xSemaphoreGive(mutex_);
@@ -240,6 +264,7 @@ void MqttHomeClient::onUserEvent() {
     double inTempC = lastInTempC_;
     double highTempC = lastHighTempC_;
     double lowTempC = lastLowTempC_;
+    uint32_t staticPressurePa = lastStaticPressurePa_;
     xSemaphoreGive(mutex_);
 
     if (fields & updatedFieldMask(UpdatedFields::ClimateMode)) {
@@ -293,6 +318,13 @@ void MqttHomeClient::onUserEvent() {
             xSemaphoreGive(mutex_);
         }
     }
+    if (fields & updatedFieldMask(UpdatedFields::StaticPressure)) {
+        if (publishStaticPressure(staticPressurePa) >= 0) {
+            xSemaphoreTake(mutex_, portMAX_DELAY);
+            updatedFields_ &= ~updatedFieldMask(UpdatedFields::StaticPressure);
+            xSemaphoreGive(mutex_);
+        }
+    }
 }
 
 void MqttHomeClient::updateTopics(const char *name) {
@@ -305,11 +337,14 @@ void MqttHomeClient::updateTopics(const char *name) {
     snprintf(lowTempTopic_, sizeof(lowTempTopic_), "home/%s/low_temp_f/state", name);
     snprintf(lowTempCmdTopic_, sizeof(lowTempCmdTopic_), "home/%s/low_temp_f/cmd", name);
     snprintf(actionTopic_, sizeof(actionTopic_), "home/%s/action", name);
+    snprintf(staticPressureTopic_, sizeof(staticPressureTopic_), "home/%s/static_pressure_pa/state",
+             name);
 
     snprintf(discoveryTopic_, sizeof(discoveryTopic_), "homeassistant/device/%s/config", name);
     snprintf(discoveryStr_, sizeof(discoveryStr_), discoveryTmpl, name, name, availabilityTopic_,
              currentTempTopic_, modeStateTopic_, modeCmdTopic_, highTempTopic_, highTempCmdTopic_,
-             lowTempTopic_, lowTempCmdTopic_, actionTopic_, name, currentTempTopic_);
+             lowTempTopic_, lowTempCmdTopic_, actionTopic_, name, currentTempTopic_, name,
+             staticPressureTopic_);
 
     config_.session.last_will.msg = "0";
     config_.session.last_will.topic = availabilityTopic_;
@@ -339,6 +374,13 @@ int MqttHomeClient::publishTempC(char *topic, double tempC, bool retain) {
     char buf[8];
     int len = snprintf(buf, sizeof(buf), "%.1f", ABS_C_TO_F(tempC));
     return esp_mqtt_client_publish(client_, topic, buf, len, 0, retain);
+}
+
+int MqttHomeClient::publishStaticPressure(uint32_t pressurePa) {
+    // Retain since static pressure is measured infrequently (only at max fan speed).
+    char buf[16];
+    int len = snprintf(buf, sizeof(buf), "%" PRIu32, pressurePa);
+    return esp_mqtt_client_publish(client_, staticPressureTopic_, buf, len, 0, true);
 }
 
 void MqttHomeClient::parseModeCmdMessage(const char *data, int dataLen) {
