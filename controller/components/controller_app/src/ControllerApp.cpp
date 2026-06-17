@@ -83,7 +83,7 @@ void ControllerApp::updateACMode(const double coolDemand, const double coolSetpo
             // Outdoor temp and demand must be high enough to turn on at all.
             // Just after boot we don't allow the A/C on solely because the outdoor
             // temp is unknown, giving wifi time to connect and fetch the temperature.
-            (outTempC >= AC_ON_MIN_OUT_TEMP_C ||
+            (outTempC > coolSetpointC ||
              (std::isnan(outTempC) && (steadyNow() - bootTime_) >= AC_WIFI_CONNECT_WAIT_TIME)) &&
             coolDemand > AC_ON_DEMAND_THRESHOLD &&
             ((inTempC - coolSetpointC) > AC_ON_THRESHOLD_C ||           // Indoor temp is high
@@ -94,7 +94,8 @@ void ControllerApp::updateACMode(const double coolDemand, const double coolSetpo
         }
         break;
     case ACMode::On:
-        if (outTempC < AC_OFF_OUT_TEMP_C || coolDemand < AC_OFF_DEMAND_THRESHOLD) {
+        if (outTempC < (coolSetpointC - AC_OFF_OUT_TEMP_BELOW_SETPOINT_C) ||
+            coolDemand < AC_OFF_DEMAND_THRESHOLD) {
             clearMessage(MsgID::ACMode);
             acMode_ = ACMode::Standby;
         }
