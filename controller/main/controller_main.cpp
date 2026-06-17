@@ -4,6 +4,7 @@
 
 #include "esp_log.h"
 #include "esp_netif_sntp.h"
+#include "esp_system.h"
 #include "esp_task.h"
 #include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
@@ -217,8 +218,15 @@ extern "C" void controller_main() {
 
     homeCli_ = new MqttHomeClient(config.wifi.logName, uiEvtCb);
 
+    // On a clean software restart (e.g. OTA or an intentional reboot) the temp
+    // sensor is already warm, so skip the post-boot warmup. After a power-on or a
+    // crash, treat the temperature as unreliable until the sensor stabilizes.
+    bool tempSensorWarmedUp = esp_reset_reason() == ESP_RST_SW;
+    ESP_LOGI(TAG, "Reset reason: %d", esp_reset_reason());
+
     app_ = new ControllerApp(config, uiManager_, modbusController_, &sensors_, &valveCtrl_, &wifi_,
-                             &appConfigStore_, homeCli_, ota_, uiEvtRcv, esp_restart);
+                             &appConfigStore_, homeCli_, ota_, uiEvtRcv, esp_restart,
+                             tempSensorWarmedUp);
     xTaskCreate(uiTask, "uiTask", UI_TASK_STACK_SIZE, uiManager_, UI_TASK_PRIO, NULL);
 
     setenv("TZ", POSIX_TZ_STR, 1);

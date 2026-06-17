@@ -80,8 +80,11 @@ void ControllerApp::updateACMode(const double coolDemand, const double coolSetpo
         // If we're too far off the cool setpoint or the coil is cold anyway, turn the A/C on
         // as long as the outdoor temp is above threshold
         if (
-            // Outdoor temp and demand must be high enough to turn on at all
-            (outTempC >= AC_ON_MIN_OUT_TEMP_C || std::isnan(outTempC)) &&
+            // Outdoor temp and demand must be high enough to turn on at all.
+            // Just after boot we don't allow the A/C on solely because the outdoor
+            // temp is unknown, giving wifi time to connect and fetch the temperature.
+            (outTempC >= AC_ON_MIN_OUT_TEMP_C ||
+             (std::isnan(outTempC) && (steadyNow() - bootTime_) >= AC_WIFI_CONNECT_WAIT_TIME)) &&
             coolDemand > AC_ON_DEMAND_THRESHOLD &&
             ((inTempC - coolSetpointC) > AC_ON_THRESHOLD_C ||           // Indoor temp is high
              (outTempC - coolSetpointC) > AC_ON_OUT_TEMP_THRESHOLD_C || // Outdoor temp is high
@@ -97,6 +100,13 @@ void ControllerApp::updateACMode(const double coolDemand, const double coolSetpo
         }
         break;
     }
+}
+
+bool ControllerApp::tempStabilizing() {
+    if (tempSensorWarmedUp_) {
+        return false;
+    }
+    return (steadyNow() - bootTime_) < TEMP_STABILIZE_TIME;
 }
 
 FanSpeed ControllerApp::computeFanSpeed(double ventDemand, double coolDemand,
@@ -403,6 +413,11 @@ void ControllerApp::handleCancelMessage(MsgID id) {
         //}
     case MsgID::HVACChangeLimit:
         resetHVACChangeLimit();
+        break;
+    case MsgID::TempStabilizing:
+        // The user dismissed the notice, so treat the sensor as warmed up: clear
+        // the message, show the real temperature, and re-enable heating.
+        tempSensorWarmedUp_ = true;
         break;
     default:
         ESP_LOGE(TAG, "Unexpected message cancellation for: %d", static_cast<int>(id));
@@ -1006,6 +1021,10 @@ void ControllerApp::setConfig(ControllerDomain::Config config) {
 }
 
 void ControllerApp::task(bool firstTime) {
+    if (bootTime_ == std::chrono::steady_clock::time_point{}) {
+        bootTime_ = steadyNow();
+    }
+
     handleHomeClient();
     ControllerDomain::FreshAirState freshAirState = getFreshAirState();
 
@@ -1023,6 +1042,13 @@ void ControllerApp::task(bool firstTime) {
 
     double ventDemand = 0, fanCoolDemand = 0, heatDemand = 0, coolDemand = 0;
 
+    bool stabilizing = tempStabilizing();
+    if (stabilizing) {
+        setMessage(MsgID::TempStabilizing, true, "No heat while temp stabilizes");
+    } else {
+        clearMessage(MsgID::TempStabilizing);
+    }
+
     if (strlen(sensorData.errMsg) == 0) {
         bool hvacWasOn = (lastHvacSpeed_ != FancoilSpeed::Off);
 
@@ -1030,14 +1056,16 @@ void ControllerApp::task(bool firstTime) {
             ventAlgo_->update(sensorData, setpoints, outdoorTempC(), steadyNow(), fanIsOn_);
         fanCoolDemand =
             fanCoolLimitAlgo_->update(sensorData, setpoints, outdoorTempC(), steadyNow(), fanIsOn_);
-        heatDemand = heatAlgo_->update(sensorData, setpoints, outdoorTempC(), steadyNow(),
-                                       hvacWasOn && !hvacLastCool_);
+        if (!stabilizing) {
+            heatDemand = heatAlgo_->update(sensorData, setpoints, outdoorTempC(), steadyNow(),
+                                           hvacWasOn && !hvacLastCool_);
+        }
         coolDemand = coolAlgo_->update(sensorData, setpoints, outdoorTempC(), steadyNow(),
                                        hvacWasOn && hvacLastCool_);
 
         clearMessage(MsgID::SensorErr);
 
-        uiManager_->setInTempC(sensorData.tempC);
+        uiManager_->setInTempC(stabilizing ? std::nan("") : sensorData.tempC);
         uiManager_->setInCO2(sensorData.co2);
     } else {
         setMessage(MsgID::SensorErr, false, sensorData.errMsg);

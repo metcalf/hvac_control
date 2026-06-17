@@ -31,6 +31,15 @@
 // for a short time to make sure the fan registers it.
 #define EXHAUST_BUTTON_ON_TIME std::chrono::seconds(6)
 
+// After a cold boot the temperature sensor self-heats and readings aren't accurate until
+// it stabilizes. For this long after boot we treat the indoor temperature as unreliable
+// and heating is disabled (cooling is still allowed since we'll just under-cool while the
+// sensor warms up).
+#define TEMP_STABILIZE_TIME std::chrono::minutes(15)
+// For this long after boot, don't turn the A/C on solely because the outdoor temperature
+// is unknown. This gives wifi time to connect and fetch outdoor temperature information.
+#define AC_WIFI_CONNECT_WAIT_TIME std::chrono::minutes(1)
+
 // Turn A/C on if we have cooling demand and the coil temp is below this
 #define COIL_COLD_TEMP_C ABS_F_TO_C(60.0)
 // Turn the A/C on if temp exceeds setpoint by this amount
@@ -63,7 +72,7 @@ class ControllerApp {
                   AbstractValveCtrl *valveCtrl, AbstractWifi *wifi,
                   AbstractConfigStore<ControllerDomain::Config> *cfgStore,
                   AbstractHomeClient *homeCli, AbstractOTAClient *ota, const uiEvtRcv_t &uiEvtRcv,
-                  const restartCb_t restartCb)
+                  const restartCb_t restartCb, bool tempSensorWarmedUp = true)
         : config_(config), uiManager_(uiManager), modbusController_(modbusController),
           sensors_(sensors), valveCtrl_(valveCtrl), wifi_(wifi), cfgStore_(cfgStore),
           homeCli_(homeCli), ota_(ota), uiEvtRcv_(uiEvtRcv), restartCb_(restartCb),
@@ -74,6 +83,8 @@ class ControllerApp {
         ventAlgo_ = new LinearVentAlgorithm();
         fanCoolAlgo_ = new PIDAlgorithm(false, REL_F_TO_C(3.0), 0.7);
         fanCoolLimitAlgo_ = new FanCoolLimitAlgorithm(fanCoolAlgo_);
+
+        tempSensorWarmedUp_ = tempSensorWarmedUp;
 
         updateEquipment(config_.equipment);
         setSystemPower(config_.systemOn);
@@ -116,6 +127,7 @@ class ControllerApp {
         OTA,
         Vacation,
         HVACChangeLimit,
+        TempStabilizing,
         _Last,
     };
     enum class FanSpeedReason {
@@ -148,6 +160,11 @@ class ControllerApp {
 
     SetpointReason setpointReason_ = SetpointReason::Unknown;
     FanSpeedReason fanSpeedReason_ = FanSpeedReason::Unknown;
+
+    // When true (e.g. after a clean software restart, or when the user cancels the
+    // warmup message) we skip the post-boot temp sensor warmup period since the
+    // sensor is treated as already warm.
+    bool tempSensorWarmedUp_ = true;
 
   private:
     using FancoilRequest = ControllerDomain::FancoilRequest;
@@ -209,6 +226,8 @@ class ControllerApp {
             return "Vacation";
         case MsgID::HVACChangeLimit:
             return "HVACChangeLimit";
+        case MsgID::TempStabilizing:
+            return "TempStabilizing";
         case MsgID::_Last:
             return "";
         }
@@ -263,6 +282,9 @@ class ControllerApp {
     void updateEquipment(ControllerDomain::Config::Equipment equipment);
     void updateACMode(const double coolDemand, const double coolSetpointC, const double inTempC,
                       const double outTempC);
+    // True while the indoor temperature sensor is still self-heating after a cold
+    // boot and its readings should be treated as unreliable.
+    bool tempStabilizing();
     FanSpeed computeFanSpeed(double ventDemand, double coolDemand, bool wantOutdoorTemp);
     void setFanSpeed(ControllerDomain::FanSpeed);
     void setExhaustFan(FanSpeed fanSpeed);
@@ -321,6 +343,10 @@ class ControllerApp {
     int tempOverrideUntilScheduleIdx_ = -1;
 
     ACMode acMode_ = ACMode::Standby;
+
+    // Set to steadyNow() on the first task() call so we can disable heating and
+    // delay A/C while the temp sensor warms up and wifi connects after boot.
+    std::chrono::steady_clock::time_point bootTime_{};
 
     double rawOutdoorTempC_ = std::nan("");
     std::chrono::steady_clock::time_point lastOutdoorTempUpdate_;

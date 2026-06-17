@@ -43,6 +43,9 @@ class TestControllerApp : public ControllerApp {
     SetpointReason setpointReason() { return setpointReason_; }
     FanSpeedReason fanSpeedReason() { return fanSpeedReason_; }
 
+    // Simulate a cold boot where the temp sensor hasn't warmed up yet.
+    void setTempSensorWarmedUp(bool warmedUp) { tempSensorWarmedUp_ = warmedUp; }
+
   protected:
     std::chrono::steady_clock::time_point steadyNow() override { return steadyNow_; }
     std::chrono::system_clock::time_point realNow() override { return realNow_; }
@@ -359,6 +362,13 @@ TEST_F(ControllerAppTest, CallsForACWithoutOutdoorTemp) {
                        .weatherTempC = std::nan(""),
                        .err = AbstractHomeClient::Error::FetchError});
 
+    // Just after boot we hold off enabling the A/C while the outdoor temp is
+    // unknown to give wifi a chance to connect.
+    app_->task(true);
+    EXPECT_EQ(modbusController_.getFancoilRequest().speed, FancoilSpeed::Off);
+
+    // Once the wifi connect window passes, turn on even without an outdoor temp.
+    app_->steadyNow_ += AC_WIFI_CONNECT_WAIT_TIME;
     app_->task();
 
     auto actual = modbusController_.getFancoilRequest();
@@ -382,6 +392,89 @@ TEST_F(ControllerAppTest, CallsForACWithHighOutdoorTemp) {
     actual = modbusController_.getFancoilRequest();
     EXPECT_TRUE(actual.cool);
     EXPECT_EQ(actual.speed, FancoilSpeed::Low); // Turns on with higher outdoor temp
+}
+
+TEST_F(ControllerAppTest, TempStabilizingDisablesHeatAndShowsMessage) {
+    app_->setTempSensorWarmedUp(false);
+
+    // Cold indoor temp that would normally call for heat.
+    sensors_.setLatest({.tempC = 15.0, .humidity = 2.0, .co2 = 500});
+    setOutdoorTempC(5);
+
+    // While stabilizing, show "--" and a cancellable warmup message.
+    EXPECT_CALL(uiManager_, setMessage(_, _, _)).Times(testing::AnyNumber());
+    EXPECT_CALL(uiManager_, clearMessage(_)).Times(testing::AnyNumber());
+    EXPECT_CALL(uiManager_, setInTempC(testing::NanSensitiveDoubleEq(std::nan(""))))
+        .Times(testing::AtLeast(1));
+    EXPECT_CALL(uiManager_,
+                setMessage(static_cast<uint8_t>(ControllerApp::MsgID::TempStabilizing), true, _))
+        .Times(testing::AtLeast(1));
+
+    app_->task(true);
+
+    // Heat stays off while the sensor warms up.
+    EXPECT_EQ(modbusController_.getFancoilRequest().speed, FancoilSpeed::Off);
+
+    // Once the sensor has warmed up, the real temp is shown and heat is allowed.
+    EXPECT_CALL(uiManager_, setInTempC(15.0)).Times(testing::AtLeast(1));
+    EXPECT_CALL(uiManager_,
+                clearMessage(static_cast<uint8_t>(ControllerApp::MsgID::TempStabilizing)))
+        .Times(testing::AtLeast(1));
+
+    app_->steadyNow_ += TEMP_STABILIZE_TIME;
+    app_->task();
+
+    auto actual = modbusController_.getFancoilRequest();
+    EXPECT_FALSE(actual.cool);
+    EXPECT_NE(actual.speed, FancoilSpeed::Off); // Heat turns on after warmup
+}
+
+TEST_F(ControllerAppTest, TempStabilizingAllowsCooling) {
+    app_->setTempSensorWarmedUp(false);
+
+    // Hot indoor temp with a warm outdoor temp so the A/C should run.
+    sensors_.setLatest({.tempC = 28.0, .humidity = 2.0, .co2 = 500});
+    setOutdoorTempC(30);
+
+    app_->task(true);
+
+    auto actual = modbusController_.getFancoilRequest();
+    EXPECT_TRUE(actual.cool);
+    EXPECT_NE(actual.speed, FancoilSpeed::Off); // Cooling runs while stabilizing
+}
+
+TEST_F(ControllerAppTest, CancellingMessageFullyEnablesHeat) {
+    app_->setTempSensorWarmedUp(false);
+    sensors_.setLatest({.tempC = 15.0, .humidity = 2.0, .co2 = 500});
+    setOutdoorTempC(5);
+
+    app_->task(true);
+    EXPECT_EQ(modbusController_.getFancoilRequest().speed, FancoilSpeed::Off);
+
+    // The user cancels the warmup message.
+    auto evt = AbstractUIManager::Event{
+        AbstractUIManager::EventType::MsgCancel,
+        {.msgID = static_cast<uint8_t>(ControllerApp::MsgID::TempStabilizing)},
+    };
+    evt_ = &evt;
+    app_->task();
+
+    // Cancelling fully cancels the warmup: the message isn't shown again, the real
+    // temp is displayed, and heat is enabled.
+    EXPECT_CALL(uiManager_,
+                setMessage(static_cast<uint8_t>(ControllerApp::MsgID::TempStabilizing), _, _))
+        .Times(0);
+    EXPECT_CALL(
+        uiManager_,
+        setMessage(testing::Ne(static_cast<uint8_t>(ControllerApp::MsgID::TempStabilizing)), _, _))
+        .Times(testing::AnyNumber());
+    EXPECT_CALL(uiManager_, setInTempC(15.0)).Times(testing::AtLeast(1));
+
+    app_->task();
+
+    auto actual = modbusController_.getFancoilRequest();
+    EXPECT_FALSE(actual.cool);
+    EXPECT_NE(actual.speed, FancoilSpeed::Off); // Heat turns on after cancelling
 }
 
 TEST_F(ControllerAppTest, FanSpeedOverride) {
