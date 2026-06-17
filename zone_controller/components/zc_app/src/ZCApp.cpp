@@ -213,21 +213,20 @@ void ZCApp::setIOStates(SystemState &state) {
 
     for (int i = 0; i < ZONE_IO_NUM_TS; i++) {
         bool on = state.valves[i].on();
-        if (valveChangeLimiters_[i].update(on, steadyNow())) {
+        if (testMode_ || valveChangeLimiters_[i].update(on, steadyNow())) {
             outIO_->setValve(i, on);
         } else {
             ON_LIMITED(&valveInLimit_[i], "Valve %d change rate limited", i);
         }
     }
 
-    // TODO: Also implement preventing rapid changing of any IOs
-    if (zonePumpChangeLimiter_.update(state.zonePump, steadyNow())) {
+    if (testMode_ || zonePumpChangeLimiter_.update(state.zonePump, steadyNow())) {
         outIO_->setZonePump(state.zonePump);
         zonePumpInLimit_ = false;
     } else {
         ON_LIMITED(&zonePumpInLimit_, "Zone pump change rate limited");
     }
-    if (fcPumpChangeLimiter_.update(state.fcPump, steadyNow())) {
+    if (testMode_ || fcPumpChangeLimiter_.update(state.fcPump, steadyNow())) {
         outIO_->setFancoilPump(state.fcPump);
         fcPumpInLimit_ = false;
     } else {
