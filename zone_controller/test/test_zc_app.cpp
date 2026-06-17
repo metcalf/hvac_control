@@ -10,10 +10,10 @@
 class TestZCApp : public ZCApp {
   public:
     using ZCApp::ZCApp;
-    // It's important that these values not be zero since we sometimes use
+    // It's important that time not be zero since we sometimes use
     // zero to flag a condition.
     std::chrono::steady_clock::time_point now_ =
-        std::chrono::steady_clock::time_point(std::chrono::hours(100));
+        std::chrono::steady_clock::time_point(std::chrono::seconds(1));
 
     void setSteadyNow(std::chrono::steady_clock::time_point t) { now_ = t; }
     std::chrono::steady_clock::time_point steadyNow() const override { return now_; }
@@ -35,9 +35,9 @@ class ZCAppTest : public testing::Test {
   protected:
     void SetUp() override {
         using namespace std::placeholders;
-        app_ = new TestZCApp(&uiManager_, &homeClient_, std::bind(&ZCAppTest::uiEvtRcv, this, _1, _2), &outIO_,
-                             &outCtrl_, &mbClient_, &valveStateManager_,
-                             std::bind(&ZCAppTest::getInputState, this));
+        app_ = new TestZCApp(
+            &uiManager_, &homeClient_, std::bind(&ZCAppTest::uiEvtRcv, this, _1, _2), &outIO_,
+            &outCtrl_, &mbClient_, &valveStateManager_, std::bind(&ZCAppTest::getInputState, this));
     }
     void TearDown() override { delete app_; }
 

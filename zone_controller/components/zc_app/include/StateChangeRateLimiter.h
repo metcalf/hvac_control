@@ -12,9 +12,13 @@ class StateChangeRateLimiter {
             return true;
         }
 
-        if (now - lastChangeTime_ < changeInterval_) {
+        if (hasChanged_ && now - lastChangeTime_ < changeInterval_) {
             return false;
         }
+
+        // We need to track hasChanged_ otherwise an attempt to change shortly
+        // after startup will hit a rate limit
+        hasChanged_ = true;
 
         state_ = newState;
         lastChangeTime_ = now;
@@ -24,7 +28,7 @@ class StateChangeRateLimiter {
     void reset() { lastChangeTime_ = std::chrono::steady_clock::time_point(); }
 
   private:
-    bool state_ = false;
+    bool state_ = false, hasChanged_ = false;
     std::chrono::steady_clock::time_point lastChangeTime_{};
     std::chrono::seconds changeInterval_; // Minimum interval between state changes
 };
