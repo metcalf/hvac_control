@@ -387,19 +387,20 @@ class ControllerApp {
     static constexpr FancoilCutoff fancoilCoolCutoffs_[] = {
         FancoilCutoff{FancoilSpeed::Off, 0.01},
         FancoilCutoff{FancoilSpeed::Low, AC_ON_DEMAND_THRESHOLD},
-        FancoilCutoff{FancoilSpeed::Med, 0.7}, FancoilCutoff{FancoilSpeed::High, 0.9}};
+        FancoilCutoff{FancoilSpeed::Med, 0.7}};
     static constexpr FancoilCutoff fancoilHeatCutoffs_[] = {
-        fancoilCoolCutoffs_[0], FancoilCutoff{FancoilSpeed::Min, 0.15},
-        FancoilCutoff{FancoilSpeed::Low, 0.4}, fancoilCoolCutoffs_[2], fancoilCoolCutoffs_[3]};
+        FancoilCutoff{FancoilSpeed::Off, 0.01}, FancoilCutoff{FancoilSpeed::Min, 0.15},
+        FancoilCutoff{FancoilSpeed::Low, 0.5}, FancoilCutoff{FancoilSpeed::Med, 0.9}};
     FancoilSetpointHandler fancoilCoolHandler_;
     FancoilSetpointHandler fancoilHeatHandler_;
 
     static constexpr FancoilCutoff fancoilPBRCoolCutoffs_[] = {
-        fancoilCoolCutoffs_[0], fancoilCoolCutoffs_[1], FancoilCutoff{FancoilSpeed::Med, 0.4},
-        FancoilCutoff{FancoilSpeed::High, 0.5}};
+        fancoilCoolCutoffs_[0], fancoilCoolCutoffs_[1], FancoilCutoff{FancoilSpeed::Med, 0.6},
+        FancoilCutoff{FancoilSpeed::High, 0.95}};
     static constexpr FancoilCutoff fancoilPBRHeatCutoffs_[] = {
-        fancoilCoolCutoffs_[0], FancoilCutoff{FancoilSpeed::Low, 0.2},
-        FancoilCutoff{FancoilSpeed::Med, 0.5}, FancoilCutoff{FancoilSpeed::High, 0.7}};
+        fancoilCoolCutoffs_[0], FancoilCutoff{FancoilSpeed::Min, 0.15},
+        FancoilCutoff{FancoilSpeed::Low, 0.35}, FancoilCutoff{FancoilSpeed::Med, 0.6},
+        FancoilCutoff{FancoilSpeed::High, 0.95}};
     FancoilSetpointHandler fancoilPBRCoolHandler_;
     FancoilSetpointHandler fancoilPBRHeatHandler_;
 };
