@@ -39,6 +39,18 @@ static std::atomic<bool> connected_{false};
 
 static const char *TAG = "RLOG";
 
+// Tags that still print over UART but are not forwarded to syslog, so they stay
+// visible when debugging over USB. esp_log_level_set() can't express this since
+// these are logged with ESP_LOGE and it would have to drop them entirely.
+//
+// esp-modbus logs an error for every failed transaction with no context beyond
+// the esp_err_t, and callers retry (cxi_client up to 3x per read), so these
+// arrive several to a failure. Every call site already re-logs the register name
+// and error under its own tag, so nothing is lost -- see getParam()/setParam()
+// in the controller's ModbusClient.cpp, cxi_client_get_param()/
+// cxi_client_set_param(), and the zone controller's ESPModbusClient.cpp.
+static const char *const syslog_suppressed_tags_[] = {"MB_CONTROLLER_MASTER"};
+
 static esp_err_t resolve_syslog_server(void) {
     std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now();
 
@@ -137,6 +149,15 @@ static void send_to_syslog(const char *msg, const size_t len) {
     }
 }
 
+static bool tag_suppressed(const char *tag) {
+    for (size_t i = 0; i < sizeof(syslog_suppressed_tags_) / sizeof(*syslog_suppressed_tags_); i++) {
+        if (strcmp(syslog_suppressed_tags_[i], tag) == 0) {
+            return true;
+        }
+    }
+    return false;
+}
+
 static void queue_for_syslog(esp_log_level_t level, const char *fmt, va_list args) {
     if (xPortInIsrContext()) {
         // Until there's a
@@ -150,6 +171,13 @@ static void queue_for_syslog(esp_log_level_t level, const char *fmt, va_list arg
     const char *fmt_after_tag = strstr(fmt, ": ") + 2;
     va_arg(args, unsigned int);
     char *tag = va_arg(args, char *);
+
+    // Returning here (rather than in custom_log_vprintf) since the tag isn't
+    // known until it's pulled off the va_list. The caller still runs vprintf, so
+    // the message goes out over UART either way.
+    if (tag_suppressed(tag)) {
+        return;
+    }
 
     int priority = (FACILITY * 8) + get_syslog_severity(level);
 
