@@ -855,11 +855,8 @@ Setpoints ControllerApp::getCurrentSetpoints(double currTempC) {
     if (config_.systemOn && setpoints.coolTempC > nextSchedule.coolC &&
         currTempC > nextSchedule.coolC) {
         int minsUntilNext = (nextSchedule.startMinOfDay() - localMinOfDay()) % (60 * 24);
-        double outdoorTempDelta = outdoorTempC() - setpoints.coolTempC;
         double precoolC = setpoints.coolTempC;
-        if (outdoorTempDelta > AC_ON_OUT_TEMP_THRESHOLD_C) {
-            precoolC = nextSchedule.coolC;
-        } else if (minsUntilNext <= PRECOOL_MINS) {
+        if (minsUntilNext <= PRECOOL_MINS) {
             precoolC = nextSchedule.coolC + minsUntilNext * PRECOOL_DEG_PER_MIN;
         }
 

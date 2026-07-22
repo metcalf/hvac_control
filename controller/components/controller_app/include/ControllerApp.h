@@ -46,7 +46,7 @@
 #define AC_ON_THRESHOLD_C REL_F_TO_C(4.0)
 // Turn the A/C on if the outdoor temp is above the setpoint by this amount
 // since we want to get ahead of the heat
-#define AC_ON_OUT_TEMP_THRESHOLD_C REL_F_TO_C(5.0)
+#define AC_ON_OUT_TEMP_THRESHOLD_C REL_F_TO_C(4.0)
 // Do not turn A/C on if the outdoor temp is below the cooling setpoint
 // Turn A/C off if the outdoor temp falls this far below the cooling setpoint
 #define AC_OFF_OUT_TEMP_BELOW_SETPOINT_C REL_F_TO_C(10.0)
