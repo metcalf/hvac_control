@@ -1,6 +1,7 @@
 #include "MqttZCHomeClient.h"
 
 #include <cstdio>
+#include <optional>
 
 #include "BaseModbusClient.h"
 #include "ZCDomain.h"
@@ -46,6 +47,17 @@
 
 static const char *TAG = "MQTT";
 
+// Copies a newly read value over the last known good one. Values that are absent (the
+// Modbus read failed) leave the stored value alone, so a failed read never reaches Home
+// Assistant. Returns true if the stored value changed.
+template <typename T> static bool mergeReading(std::optional<T> &last, const std::optional<T> &v) {
+    if (!v.has_value() || last == v) {
+        return false;
+    }
+    last = v;
+    return true;
+}
+
 static const char *discoveryTmpl =
     R"({"device":{"ids":"zone_controller","name":"Zone Controller"},"o":{"name":"hvac_control"},"cmps":{)" //
     BINARY_SENSOR_CMP("zone_pump", "Zone Pump") ","                                    //
@@ -78,22 +90,19 @@ AbstractZCHomeClient::HomeState MqttZCHomeClient::state() {
     return r;
 }
 
-void MqttZCHomeClient::updateState(const ZCDomain::SystemState &state, CxOpMode cxOpMode,
-                                   double hpOutletTempC, uint16_t hpCompressorFreq,
-                                   double hpACCurrent, double hpAmbientTempC) {
+void MqttZCHomeClient::updateState(const ZCDomain::SystemState &state, const HeatPumpState &hp) {
     xSemaphoreTake(mutex_, portMAX_DELAY);
-    bool changed = !haveState_ || state != lastState_ || cxOpMode != lastCxOpMode_ ||
-                   hpOutletTempC != lastHpOutletTempC_ ||
-                   hpCompressorFreq != lastHpCompressorFreq_ || hpACCurrent != lastHpACCurrent_ ||
-                   hpAmbientTempC != lastHpAmbientTempC_;
+    bool changed = !haveState_ || state != lastState_;
+    // Merge each heat pump reading separately: a field we failed to read this round is
+    // not news, and must not clobber the value Home Assistant is already showing.
+    changed |= mergeReading(lastHp_.cxOpMode, hp.cxOpMode);
+    changed |= mergeReading(lastHp_.outletTempC, hp.outletTempC);
+    changed |= mergeReading(lastHp_.compressorFreq, hp.compressorFreq);
+    changed |= mergeReading(lastHp_.acCurrent, hp.acCurrent);
+    changed |= mergeReading(lastHp_.ambientTempC, hp.ambientTempC);
     if (changed) {
         haveState_ = true;
         lastState_ = state;
-        lastCxOpMode_ = cxOpMode;
-        lastHpOutletTempC_ = hpOutletTempC;
-        lastHpCompressorFreq_ = hpCompressorFreq;
-        lastHpACCurrent_ = hpACCurrent;
-        lastHpAmbientTempC_ = hpAmbientTempC;
         updatedFields_ |= updatedFieldMask(UpdatedFields::State);
     }
     xSemaphoreGive(mutex_);
@@ -133,16 +142,11 @@ void MqttZCHomeClient::onUserEvent() {
     xSemaphoreTake(mutex_, portMAX_DELAY);
     uint8_t fields = updatedFields_;
     ZCDomain::SystemState state = lastState_;
-    CxOpMode cxOpMode = lastCxOpMode_;
-    double hpOutletTempC = lastHpOutletTempC_;
-    uint16_t hpCompressorFreq = lastHpCompressorFreq_;
-    double hpACCurrent = lastHpACCurrent_;
-    double hpAmbientTempC = lastHpAmbientTempC_;
+    HeatPumpState hp = lastHp_;
     xSemaphoreGive(mutex_);
 
     if (fields & updatedFieldMask(UpdatedFields::State)) {
-        if (publishState(state, cxOpMode, hpOutletTempC, hpCompressorFreq, hpACCurrent,
-                         hpAmbientTempC) >= 0) {
+        if (publishState(state, hp) >= 0) {
             xSemaphoreTake(mutex_, portMAX_DELAY);
             updatedFields_ &= ~updatedFieldMask(UpdatedFields::State);
             xSemaphoreGive(mutex_);
@@ -169,11 +173,10 @@ int MqttZCHomeClient::publishDiscoveryMessage() {
     return esp_mqtt_client_publish(client_, DISCOVERY_TOPIC, discoveryTmpl, 0, 0, true);
 }
 
-int MqttZCHomeClient::publishState(const ZCDomain::SystemState &state, CxOpMode cxOpMode,
-                                   double hpOutletTempC, uint16_t hpCompressorFreq,
-                                   double hpACCurrent, double hpAmbientTempC) {
+int MqttZCHomeClient::publishState(const ZCDomain::SystemState &state, const HeatPumpState &hp) {
     // Publish every value retained so Home Assistant recovers the full state after a restart.
-    // Track the first failure so onUserEvent retries the whole snapshot.
+    // Track the first failure so onUserEvent retries the whole snapshot. Heat pump values we
+    // have never successfully read are skipped rather than published as a placeholder.
     int rv = 0;
     auto pub = [&](const char *topic, const char *payload) {
         int r = esp_mqtt_client_publish(client_, topic, payload, 0, 0, true);
@@ -186,19 +189,30 @@ int MqttZCHomeClient::publishState(const ZCDomain::SystemState &state, CxOpMode 
     pub(BASE_TOPIC "zone_pump", state.zonePump ? "ON" : "OFF");
     pub(BASE_TOPIC "fc_pump", state.fcPump ? "ON" : "OFF");
     pub(BASE_TOPIC "hp_mode", ZCDomain::stringForHeatPumpMode(state.heatPumpMode));
-    pub(BASE_TOPIC "cx_mode", BaseModbusClient::cxOpModeToString(cxOpMode));
 
-    snprintf(buf, sizeof(buf), "%.1f", hpOutletTempC);
-    pub(BASE_TOPIC "hp_outlet_temp", buf);
+    if (hp.cxOpMode.has_value()) {
+        pub(BASE_TOPIC "cx_mode", BaseModbusClient::cxOpModeToString(*hp.cxOpMode));
+    }
 
-    snprintf(buf, sizeof(buf), "%u", hpCompressorFreq);
-    pub(BASE_TOPIC "hp_compressor_freq", buf);
+    if (hp.outletTempC.has_value()) {
+        snprintf(buf, sizeof(buf), "%.1f", *hp.outletTempC);
+        pub(BASE_TOPIC "hp_outlet_temp", buf);
+    }
 
-    snprintf(buf, sizeof(buf), "%.1f", hpACCurrent);
-    pub(BASE_TOPIC "hp_ac_current", buf);
+    if (hp.compressorFreq.has_value()) {
+        snprintf(buf, sizeof(buf), "%u", *hp.compressorFreq);
+        pub(BASE_TOPIC "hp_compressor_freq", buf);
+    }
 
-    snprintf(buf, sizeof(buf), "%.1f", hpAmbientTempC);
-    pub(BASE_TOPIC "hp_ambient_temp", buf);
+    if (hp.acCurrent.has_value()) {
+        snprintf(buf, sizeof(buf), "%.1f", *hp.acCurrent);
+        pub(BASE_TOPIC "hp_ac_current", buf);
+    }
+
+    if (hp.ambientTempC.has_value()) {
+        snprintf(buf, sizeof(buf), "%.1f", *hp.ambientTempC);
+        pub(BASE_TOPIC "hp_ambient_temp", buf);
+    }
 
     return rv;
 }

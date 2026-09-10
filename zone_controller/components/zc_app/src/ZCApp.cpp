@@ -1,11 +1,30 @@
 #include "ZCApp.h"
 
+#include <optional>
+
 #include "esp_log.h"
 
 #define VALVE_STUCK_MSG "valves may be stuck"
 #define VALVE_SW_MSG "valves not consistent with switches"
 
 static const char *TAG = "APP";
+
+// Renders a heat pump reading for the state log, or "n/a" when the Modbus read failed.
+static const char *fmtReading(char *buf, size_t len, std::optional<double> v) {
+    if (!v.has_value()) {
+        return "n/a";
+    }
+    snprintf(buf, len, "%0.1f", *v);
+    return buf;
+}
+
+static const char *fmtReading(char *buf, size_t len, std::optional<uint16_t> v) {
+    if (!v.has_value()) {
+        return "n/a";
+    }
+    snprintf(buf, len, "%u", *v);
+    return buf;
+}
 
 void ZCApp::task() {
     InputState zioState = getZioState_();
@@ -97,28 +116,43 @@ void ZCApp::logSystemState(SystemState state) {
     wrote = ZCDomain::writeCallStates(state.fancoils, buffer + pos, sizeof(buffer) - pos);
     CHECK_STRING_ERROR_AND_ADVANCE(wrote, pos)
 
-    double hpOutT = -1;
-    uint16_t hpHz = UINT16_MAX;
-    double hpACCurrent = -1;
-    double hpAmbientT = -1;
-    CxOpMode cxOpMode = CxOpMode::Unknown;
-    mbClient_->getCxOpMode(&cxOpMode);
-    mbClient_->getCxAcOutletWaterTemp(&hpOutT);
-    mbClient_->getCxCompressorFrequency(&hpHz);
-    mbClient_->getCxInputACCurrent(&hpACCurrent);
-    mbClient_->getCxAmbientTemp(&hpAmbientT);
+    // Only record readings we actually got: a failed read leaves the field empty rather
+    // than reporting a placeholder that looks like real data downstream.
+    AbstractZCHomeClient::HeatPumpState hp;
+    CxOpMode cxOpMode;
+    double dVal;
+    uint16_t uVal;
+    if (mbClient_->getCxOpMode(&cxOpMode) == ESP_OK) {
+        hp.cxOpMode = cxOpMode;
+    }
+    if (mbClient_->getCxAcOutletWaterTemp(&dVal) == ESP_OK) {
+        hp.outletTempC = dVal;
+    }
+    if (mbClient_->getCxCompressorFrequency(&uVal) == ESP_OK) {
+        hp.compressorFreq = uVal;
+    }
+    if (mbClient_->getCxInputACCurrent(&dVal) == ESP_OK) {
+        hp.acCurrent = dVal;
+    }
+    if (mbClient_->getCxAmbientTemp(&dVal) == ESP_OK) {
+        hp.ambientTempC = dVal;
+    }
 
+    char outT[16], hz[16], acI[16], ambT[16];
     wrote = snprintf(
         buffer + pos, sizeof(buffer) - pos,
-        " zone_pump=%d fc_pump=%d hp_mode=%s cx_mode=%s hp_out_t=%0.1f hp_hz=%d"
-        " hp_ac_i=%0.1f hp_amb_t=%0.1f",
+        " zone_pump=%d fc_pump=%d hp_mode=%s cx_mode=%s hp_out_t=%s hp_hz=%s"
+        " hp_ac_i=%s hp_amb_t=%s",
         state.zonePump, state.fcPump, ZCDomain::stringForHeatPumpMode(state.heatPumpMode),
-        BaseModbusClient::cxOpModeToString(cxOpMode), hpOutT, hpHz, hpACCurrent, hpAmbientT);
+        hp.cxOpMode.has_value() ? BaseModbusClient::cxOpModeToString(*hp.cxOpMode) : "n/a",
+        fmtReading(outT, sizeof(outT), hp.outletTempC),
+        fmtReading(hz, sizeof(hz), hp.compressorFreq), fmtReading(acI, sizeof(acI), hp.acCurrent),
+        fmtReading(ambT, sizeof(ambT), hp.ambientTempC));
     CHECK_STRING_ERROR_AND_ADVANCE(wrote, pos)
 
     ESP_LOGW(TAG, "%s", buffer);
 
-    homeCli_->updateState(state, cxOpMode, hpOutT, hpHz, hpACCurrent, hpAmbientT);
+    homeCli_->updateState(state, hp);
 }
 
 void ZCApp::handleCancelMessage(MsgID id) {
