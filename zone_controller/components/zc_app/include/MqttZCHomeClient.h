@@ -24,23 +24,30 @@ class MqttZCHomeClient : public BaseMqttClient, public AbstractZCHomeClient {
   private:
     SemaphoreHandle_t mutex_;
 
+    // One flag per sensor: each is published on its own so Home Assistant sees exactly
+    // when that value last changed, rather than every sensor refreshing together.
     enum class UpdatedFields {
         Discovery,
         Availability,
-        State,
+        ZonePump,
+        FcPump,
+        HpMode,
+        CxMode,
+        HpOutletTemp,
+        HpCompressorFreq,
+        HpACCurrent,
+        HpAmbientTemp,
     };
 
-    uint8_t updatedFields_ = 0;
+    uint16_t updatedFields_ = 0;
 
-    // Last reported system state, mirrored to Home Assistant. Guarded by mutex_.
-    // lastHp_ holds the last successfully read value of each heat pump field, so fields
-    // missing from an update keep publishing whatever we last knew.
+    // Last value published for each sensor, used to tell a new reading from a repeat.
+    // Heat pump fields stay empty until their first successful read. Guarded by mutex_.
     bool haveState_ = false;
     ZCDomain::SystemState lastState_{};
     HeatPumpState lastHp_{};
 
-    uint8_t updatedFieldMask(UpdatedFields field) { return 1 << static_cast<uint8_t>(field); }
+    uint16_t updatedFieldMask(UpdatedFields field) { return 1 << static_cast<uint8_t>(field); }
 
     int publishDiscoveryMessage();
-    int publishState(const ZCDomain::SystemState &state, const HeatPumpState &hp);
 };
