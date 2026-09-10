@@ -41,8 +41,9 @@ class MqttZCHomeClient : public BaseMqttClient, public AbstractZCHomeClient {
 
     uint16_t updatedFields_ = 0;
 
-    // Last value published for each sensor, used to tell a new reading from a repeat.
-    // Heat pump fields stay empty until their first successful read. Guarded by mutex_.
+    // Latest known value of each sensor, used to tell a new reading from a repeat. A heat
+    // pump field is empty when we have yet to read it, or its last read failed. Guarded by
+    // mutex_.
     bool haveState_ = false;
     ZCDomain::SystemState lastState_{};
     HeatPumpState lastHp_{};

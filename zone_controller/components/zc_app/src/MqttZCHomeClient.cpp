@@ -47,16 +47,14 @@
 
 static const char *TAG = "MQTT";
 
-// Records a reading against the last value published for that sensor. A reading we failed
-// to take is absent, and is not news: it leaves the stored value alone so the sensor isn't
-// republished and Home Assistant keeps timing its staleness from the last real reading.
-// Returns true if this is a new value that needs publishing.
+// Records the latest reading for a sensor, including a failed one, so `last` always says
+// what we currently know rather than what we once knew. Only a reading we actually took
+// and that differs from the one we published is news; a failed read publishes nothing and
+// leaves Home Assistant timing that sensor's staleness from its last real reading.
 template <typename T> static bool recordReading(std::optional<T> &last, const std::optional<T> &v) {
-    if (!v.has_value() || last == v) {
-        return false;
-    }
+    bool isNew = v.has_value() && last != v;
     last = v;
-    return true;
+    return isNew;
 }
 
 static const char *discoveryTmpl =
@@ -149,7 +147,8 @@ void MqttZCHomeClient::onErr(esp_mqtt_error_codes_t err) {
 
 void MqttZCHomeClient::onConnected() {
     // Publish values via a user message to avoid duplication and consolidate retries.
-    // Only values we actually hold are re-flagged; a sensor we've never read stays absent.
+    // Only currently valid values are re-flagged: a sensor whose last read failed is left
+    // alone rather than republished, which would pass a stale reading off as a fresh one.
     xSemaphoreTake(mutex_, portMAX_DELAY);
     if (haveState_) {
         updatedFields_ |= updatedFieldMask(UpdatedFields::ZonePump);
