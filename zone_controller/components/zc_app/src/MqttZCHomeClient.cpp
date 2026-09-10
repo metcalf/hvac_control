@@ -21,6 +21,7 @@
 #define SENSOR_CMP(id, name, extra)                                                                \
     "\"" id "\":{"                                                                                 \
     "\"p\":\"sensor\","                                                                            \
+    "\"object_id\":\"zone_controller_" id "\","                                                    \
     "\"name\":\"" name "\","                                                                       \
     "\"unique_id\":\"zone_controller_" id "\"," extra AVAILABILITY_BLOCK ","                       \
     "\"state_topic\":\"" BASE_TOPIC id "\"}"
@@ -28,6 +29,7 @@
 #define BINARY_SENSOR_CMP(id, name)                                                                \
     "\"" id "\":{"                                                                                 \
     "\"p\":\"binary_sensor\","                                                                     \
+    "\"object_id\":\"zone_controller_" id "\","                                                    \
     "\"name\":\"" name "\","                                                                       \
     "\"unique_id\":\"zone_controller_" id "\"," AVAILABILITY_BLOCK ","                             \
     "\"state_topic\":\"" BASE_TOPIC id "\"}"
