@@ -48,14 +48,14 @@ static const char *TAG = "MQTT";
 
 static const char *discoveryTmpl =
     R"({"device":{"ids":"zone_controller","name":"Zone Controller"},"o":{"name":"hvac_control"},"cmps":{)" //
-    BINARY_SENSOR_CMP("zone_pump", "Zone Pump") ","                                   //
-    BINARY_SENSOR_CMP("fc_pump", "Fancoil Pump") ","                                  //
-    SENSOR_CMP("hp_mode", "Heat Pump Mode", "") ","                                   //
-    SENSOR_CMP("cx_mode", "CX Mode", "") ","                                          //
-    SENSOR_CMP("hp_outlet_temp", "Heat Pump Outlet Temperature", TEMP_EXTRA) ","      //
+    BINARY_SENSOR_CMP("zone_pump", "Zone Pump") ","                                    //
+    BINARY_SENSOR_CMP("fc_pump", "Fancoil Pump") ","                                   //
+    SENSOR_CMP("hp_mode", "Heat Pump Mode", "") ","                                    //
+    SENSOR_CMP("cx_mode", "CX Mode", "") ","                                           //
+    SENSOR_CMP("hp_outlet_temp", "Heat Pump Outlet Temperature", TEMP_EXTRA) ","       //
     SENSOR_CMP("hp_compressor_freq", "Heat Pump Compressor Frequency", FREQ_EXTRA) "," //
-    SENSOR_CMP("hp_ac_current", "Heat Pump AC Current", CURRENT_EXTRA) ","            //
-    SENSOR_CMP("hp_ambient_temp", "Ambient Temperature", TEMP_EXTRA)                  //
+    SENSOR_CMP("hp_ac_current", "Heat Pump AC Current", CURRENT_EXTRA) ","             //
+    SENSOR_CMP("hp_ambient_temp", "Heat Pump Ambient Temperature", TEMP_EXTRA)         //
     R"(}})";
 
 MqttZCHomeClient::MqttZCHomeClient() {
