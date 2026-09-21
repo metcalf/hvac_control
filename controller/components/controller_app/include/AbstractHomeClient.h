@@ -25,7 +25,8 @@ class AbstractHomeClient {
     virtual HomeState state() = 0;
 
     virtual void updateClimateState(bool systemOn, ControllerDomain::HVACState hvacState,
-                                    ControllerDomain::FanSpeed fanSpeed, double inTempC,
+                                    ControllerDomain::FanSpeed fanSpeed,
+                                    ControllerDomain::FancoilSpeed fancoilSpeed, double inTempC,
                                     double highTempC, double lowTempC) {};
     virtual void updateStaticPressure(uint32_t pressurePa) {};
     virtual void updateName(const char *name) {};

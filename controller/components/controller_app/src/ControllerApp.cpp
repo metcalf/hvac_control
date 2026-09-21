@@ -1094,8 +1094,8 @@ void ControllerApp::task(bool firstTime) {
     logState(freshAirState, sensorData, ventDemand, fanCoolDemand, heatDemand, coolDemand,
              setpoints, hvacState, fanSpeed, exhaustFanOn_);
 
-    homeCli_->updateClimateState(config_.systemOn, hvacState, fanSpeed, sensorData.tempC,
-                                 setpoints.coolTempC, setpoints.heatTempC);
+    homeCli_->updateClimateState(config_.systemOn, hvacState, fanSpeed, lastHvacSpeed_,
+                                 sensorData.tempC, setpoints.coolTempC, setpoints.heatTempC);
 
     if (pollUIEvent(true)) {
         // If we found something in the queue, clear the queue before proceeeding with

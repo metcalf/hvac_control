@@ -61,6 +61,39 @@ static const char *discoveryTmpl = R"({
       "state_class": "measurement",
       "unit_of_measurement": "Pa",
       "state_topic": "%s"
+    },
+    "hvac_control_fan": {
+      "p": "fan",
+      "name": "Fresh Air Fan",
+      "unique_id": "%s_fan",
+      "availability": [{
+        "topic": "%s",
+        "payload_available": "1",
+        "payload_not_available": "0"
+      }],
+      "state_topic": "%s",
+      "command_topic": "%s",
+      "payload_on": "ON",
+      "payload_off": "OFF",
+      "percentage_state_topic": "%s",
+      "percentage_command_topic": "%s",
+      "speed_range_min": 1,
+      "speed_range_max": 255,
+      "optimistic": false
+    },
+    "hvac_control_sensor_hvac_mode":{
+      "p": "sensor",
+      "name": "HVAC Mode",
+      "unique_id": "%s_hvac_mode",
+      "state_class": "measurement",
+      "state_topic": "%s"
+    },
+    "hvac_control_sensor_fancoil_speed":{
+      "p": "sensor",
+      "name": "Fancoil Speed",
+      "unique_id": "%s_fancoil_speed",
+      "state_class": "measurement",
+      "state_topic": "%s"
     }
   }
 })";
@@ -105,6 +138,42 @@ const char *MqttHomeClient::climateActionToS(ClimateAction action) {
     __builtin_unreachable();
 }
 
+MqttHomeClient::ClimateAction MqttHomeClient::climateActionFor(
+    bool systemOn, ControllerDomain::HVACState hvacState, ControllerDomain::FanSpeed fanSpeed) {
+    if (!systemOn) {
+        return ClimateAction::Off;
+    }
+
+    switch (hvacState) {
+    case ControllerDomain::HVACState::Off:
+        return fanSpeed > 0 ? ClimateAction::Fan : ClimateAction::Idle;
+    case ControllerDomain::HVACState::Heat:
+        return ClimateAction::Heating;
+    case ControllerDomain::HVACState::ACCool:
+        return ClimateAction::Cooling;
+    }
+
+    __builtin_unreachable();
+}
+
+MqttHomeClient::HVACModeNum MqttHomeClient::hvacModeNumFor(bool systemOn,
+                                                           ControllerDomain::HVACState hvacState) {
+    if (!systemOn) {
+        return HVACModeNum::Off;
+    }
+
+    switch (hvacState) {
+    case ControllerDomain::HVACState::Off:
+        return HVACModeNum::Off;
+    case ControllerDomain::HVACState::Heat:
+        return HVACModeNum::Heat;
+    case ControllerDomain::HVACState::ACCool:
+        return HVACModeNum::Cool;
+    }
+
+    __builtin_unreachable();
+}
+
 AbstractHomeClient::HomeState MqttHomeClient::state() {
     xSemaphoreTake(mutex_, portMAX_DELAY);
     HomeState r = state_;
@@ -113,32 +182,15 @@ AbstractHomeClient::HomeState MqttHomeClient::state() {
 }
 
 void MqttHomeClient::updateClimateState(bool systemOn, ControllerDomain::HVACState hvacState,
-                                        ControllerDomain::FanSpeed fanSpeed, double inTempC,
+                                        ControllerDomain::FanSpeed fanSpeed,
+                                        ControllerDomain::FancoilSpeed fancoilSpeed, double inTempC,
                                         double highTempC, double lowTempC) {
     // Since enqueue can block and we don't want to overflow the outbox,
     // we set flags here and submit a user event to handle the actual publishing in the event loop.
     ClimateMode mode = systemOn ? ClimateMode::Auto : ClimateMode::Off;
-
-    ClimateAction climateAction = ClimateAction::Unset;
-    if (!systemOn) {
-        climateAction = ClimateAction::Off;
-    } else {
-        switch (hvacState) {
-        case ControllerDomain::HVACState::Off:
-            if (fanSpeed > 0) {
-                climateAction = ClimateAction::Fan;
-            } else {
-                climateAction = ClimateAction::Idle;
-            }
-            break;
-        case ControllerDomain::HVACState::Heat:
-            climateAction = ClimateAction::Heating;
-            break;
-        case ControllerDomain::HVACState::ACCool:
-            climateAction = ClimateAction::Cooling;
-            break;
-        }
-    }
+    ClimateAction climateAction = climateActionFor(systemOn, hvacState, fanSpeed);
+    HVACModeNum hvacModeNum = hvacModeNumFor(systemOn, hvacState);
+    int8_t fancoilSpeedNum = static_cast<int8_t>(fancoilSpeed);
 
     xSemaphoreTake(mutex_, portMAX_DELAY);
     if (lastClimateMode_ != mode) {
@@ -160,6 +212,18 @@ void MqttHomeClient::updateClimateState(bool systemOn, ControllerDomain::HVACSta
     if (lastClimateAction_ != climateAction) {
         lastClimateAction_ = climateAction;
         updatedFields_ |= updatedFieldMask(UpdatedFields::Action);
+    }
+    if (lastFanSpeed_ != fanSpeed) {
+        lastFanSpeed_ = fanSpeed;
+        updatedFields_ |= updatedFieldMask(UpdatedFields::FanSpeed);
+    }
+    if (lastHVACModeNum_ != hvacModeNum) {
+        lastHVACModeNum_ = hvacModeNum;
+        updatedFields_ |= updatedFieldMask(UpdatedFields::HVACMode);
+    }
+    if (lastFancoilSpeedNum_ != fancoilSpeedNum) {
+        lastFancoilSpeedNum_ = fancoilSpeedNum;
+        updatedFields_ |= updatedFieldMask(UpdatedFields::FancoilSpeed);
     }
     xSemaphoreGive(mutex_);
 
@@ -250,6 +314,15 @@ void MqttHomeClient::onConnected() {
     if (lastStaticPressurePa_ != 0) {
         updatedFields_ |= updatedFieldMask(UpdatedFields::StaticPressure);
     }
+    if (lastFanSpeed_ >= 0) {
+        updatedFields_ |= updatedFieldMask(UpdatedFields::FanSpeed);
+    }
+    if (lastHVACModeNum_ != HVACModeNum::Unset) {
+        updatedFields_ |= updatedFieldMask(UpdatedFields::HVACMode);
+    }
+    if (lastFancoilSpeedNum_ >= 0) {
+        updatedFields_ |= updatedFieldMask(UpdatedFields::FancoilSpeed);
+    }
     updatedFields_ |= updatedFieldMask(UpdatedFields::Availability);
     updatedFields_ |= updatedFieldMask(UpdatedFields::Discovery);
     xSemaphoreGive(mutex_);
@@ -259,12 +332,15 @@ void MqttHomeClient::onConnected() {
 
 void MqttHomeClient::onUserEvent() {
     xSemaphoreTake(mutex_, portMAX_DELAY);
-    uint8_t fields = updatedFields_;
+    uint16_t fields = updatedFields_;
     ClimateMode mode = lastClimateMode_;
     double inTempC = lastInTempC_;
     double highTempC = lastHighTempC_;
     double lowTempC = lastLowTempC_;
     uint32_t staticPressurePa = lastStaticPressurePa_;
+    int16_t fanSpeed = lastFanSpeed_;
+    HVACModeNum hvacModeNum = lastHVACModeNum_;
+    int8_t fancoilSpeedNum = lastFancoilSpeedNum_;
     xSemaphoreGive(mutex_);
 
     if (fields & updatedFieldMask(UpdatedFields::ClimateMode)) {
@@ -325,6 +401,27 @@ void MqttHomeClient::onUserEvent() {
             xSemaphoreGive(mutex_);
         }
     }
+    if (fields & updatedFieldMask(UpdatedFields::FanSpeed)) {
+        if (publishFanSpeed(fanSpeed) >= 0) {
+            xSemaphoreTake(mutex_, portMAX_DELAY);
+            updatedFields_ &= ~updatedFieldMask(UpdatedFields::FanSpeed);
+            xSemaphoreGive(mutex_);
+        }
+    }
+    if (fields & updatedFieldMask(UpdatedFields::HVACMode)) {
+        if (publishHVACModeNum(hvacModeNum) >= 0) {
+            xSemaphoreTake(mutex_, portMAX_DELAY);
+            updatedFields_ &= ~updatedFieldMask(UpdatedFields::HVACMode);
+            xSemaphoreGive(mutex_);
+        }
+    }
+    if (fields & updatedFieldMask(UpdatedFields::FancoilSpeed)) {
+        if (publishFancoilSpeed(fancoilSpeedNum) >= 0) {
+            xSemaphoreTake(mutex_, portMAX_DELAY);
+            updatedFields_ &= ~updatedFieldMask(UpdatedFields::FancoilSpeed);
+            xSemaphoreGive(mutex_);
+        }
+    }
 }
 
 void MqttHomeClient::updateTopics(const char *name) {
@@ -339,12 +436,24 @@ void MqttHomeClient::updateTopics(const char *name) {
     snprintf(actionTopic_, sizeof(actionTopic_), "home/%s/action", name);
     snprintf(staticPressureTopic_, sizeof(staticPressureTopic_), "home/%s/static_pressure_pa/state",
              name);
+    snprintf(fanStateTopic_, sizeof(fanStateTopic_), "home/%s/fan/state", name);
+    // The fan is read-only for now, but HA requires a command_topic on an mqtt fan, so the
+    // command topics below are advertised in discovery without being added to topics_.
+    // Commands published to them are intentionally ignored; `optimistic: false` makes HA
+    // revert its controls rather than show a state we never entered. To make the fan
+    // writable, subscribe to these and handle them in onMsg() -- no discovery change needed.
+    snprintf(fanCmdTopic_, sizeof(fanCmdTopic_), "home/%s/fan/cmd", name);
+    snprintf(fanPctTopic_, sizeof(fanPctTopic_), "home/%s/fan_speed/state", name);
+    snprintf(fanPctCmdTopic_, sizeof(fanPctCmdTopic_), "home/%s/fan_speed/cmd", name);
+    snprintf(hvacModeNumTopic_, sizeof(hvacModeNumTopic_), "home/%s/hvac_mode_num/state", name);
+    snprintf(fancoilSpeedTopic_, sizeof(fancoilSpeedTopic_), "home/%s/fancoil_speed/state", name);
 
     snprintf(discoveryTopic_, sizeof(discoveryTopic_), "homeassistant/device/%s/config", name);
     snprintf(discoveryStr_, sizeof(discoveryStr_), discoveryTmpl, name, name, availabilityTopic_,
              currentTempTopic_, modeStateTopic_, modeCmdTopic_, highTempTopic_, highTempCmdTopic_,
              lowTempTopic_, lowTempCmdTopic_, actionTopic_, name, currentTempTopic_, name,
-             staticPressureTopic_);
+             staticPressureTopic_, name, availabilityTopic_, fanStateTopic_, fanCmdTopic_,
+             fanPctTopic_, fanPctCmdTopic_, name, hvacModeNumTopic_, name, fancoilSpeedTopic_);
 
     config_.session.last_will.msg = "0";
     config_.session.last_will.topic = availabilityTopic_;
@@ -381,6 +490,32 @@ int MqttHomeClient::publishStaticPressure(uint32_t pressurePa) {
     char buf[16];
     int len = snprintf(buf, sizeof(buf), "%" PRIu32, pressurePa);
     return esp_mqtt_client_publish(client_, staticPressureTopic_, buf, len, 0, true);
+}
+
+int MqttHomeClient::publishFanSpeed(int16_t fanSpeed) {
+    // The fan entity's speed_range is 1-255, matching ControllerDomain::FanSpeed, so the raw
+    // speed is published as-is and HA converts it to a percentage.
+    const char *stateStr = fanSpeed > 0 ? "ON" : "OFF";
+    int res = esp_mqtt_client_publish(client_, fanStateTopic_, stateStr, 0, 0, true);
+    if (res < 0) {
+        return res;
+    }
+
+    char buf[8];
+    int len = snprintf(buf, sizeof(buf), "%" PRId16, fanSpeed);
+    return esp_mqtt_client_publish(client_, fanPctTopic_, buf, len, 0, true);
+}
+
+int MqttHomeClient::publishHVACModeNum(HVACModeNum mode) {
+    char buf[8];
+    int len = snprintf(buf, sizeof(buf), "%d", static_cast<int>(mode));
+    return esp_mqtt_client_publish(client_, hvacModeNumTopic_, buf, len, 0, true);
+}
+
+int MqttHomeClient::publishFancoilSpeed(int8_t speed) {
+    char buf[8];
+    int len = snprintf(buf, sizeof(buf), "%d", speed);
+    return esp_mqtt_client_publish(client_, fancoilSpeedTopic_, buf, len, 0, true);
 }
 
 void MqttHomeClient::parseModeCmdMessage(const char *data, int dataLen) {
