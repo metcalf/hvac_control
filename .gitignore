@@ -79,3 +79,6 @@ dkms.conf
 # Eagle CAD backups
 *.s#[0-9]
 *.b#[0-9]
+
+# VS Code/ESP-IDF extension rewrites this per-machine
+**/.vscode/settings.json
