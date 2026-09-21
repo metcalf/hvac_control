@@ -45,6 +45,15 @@ if [[ $version == *"-dirty" ]]; then
   exit 1
 fi
 
+# Gate the release on the unit tests so a known-broken build can't ship. Run after the
+# dirty checks (cheap, fails faster) but before the build and any deploy.
+if [[ -x "test/run_tests.sh" ]]; then
+    echo "running unit tests"
+    ./test/run_tests.sh
+else
+    echo "WARNING: ${PROJECT_NAME} has no test/run_tests.sh, skipping tests"
+fi
+
 echo "removing old firmware and running build"
 idf.py build
 
