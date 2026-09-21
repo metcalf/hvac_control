@@ -108,7 +108,11 @@ class ControllerAppTest : public testing::Test {
                 },
             .wifi =
                 {
-                    .logName = "test_hvac_ctrl",
+                    // The "_pbr" suffix selects the PBR fancoil cutoffs, which keep a full
+                    // Min/Low/Med/High curve for both heating and cooling. The default
+                    // (non-PBR) heat curve tops out at Med, so the speed transitions these
+                    // tests exercise wouldn't all be observable there.
+                    .logName = "test_hvac_ctrl_pbr",
                 },
             .schedules =
                 {
@@ -269,7 +273,7 @@ TEST_F(ControllerAppTest, CallsForValveHVAC) {
 
 double fcCallTempSeq[] = {
     20.0, // Off
-    18.6, // Min heating demand
+    18.7, // Min heating demand
     15.0, // High heating demand
     18.6, // Medium heating demand
     23.0, // Establish cooling demand below the "ac on" threshold
@@ -310,7 +314,7 @@ TEST_F(ControllerAppTest, CallsForFancoilHVAC) {
 }
 
 TEST_F(ControllerAppTest, IncreasesFancoilSpeedOverTime) {
-    sensors_.setLatest({.tempC = 18.3, .humidity = 2.0, .co2 = 500});
+    sensors_.setLatest({.tempC = 18.4, .humidity = 2.0, .co2 = 500});
 
     modbusController_.setFancoilState({.coilTempC = COIL_COLD_TEMP_C + 1}, app_->steadyNow_);
     app_->task();
