@@ -20,6 +20,7 @@ class MqttHomeClient : public BaseMqttClient, public AbstractHomeClient {
                             ControllerDomain::FancoilSpeed fancoilSpeed, double inTempC,
                             double highTempC, double lowTempC) override;
     void updateStaticPressure(uint32_t pressurePa) override;
+    void updateSchedules(const ControllerDomain::Config::Schedule *schedules) override;
     void updateName(const char *name) override;
 
   protected:
@@ -48,6 +49,7 @@ class MqttHomeClient : public BaseMqttClient, public AbstractHomeClient {
         FanSpeed,
         HVACMode,
         FancoilSpeed,
+        Schedules,
     };
 
     AbstractUIManager::eventCb_t eventCb_;
@@ -65,24 +67,28 @@ class MqttHomeClient : public BaseMqttClient, public AbstractHomeClient {
     HVACModeNum lastHVACModeNum_ = HVACModeNum::Unset;
     // ControllerDomain::FancoilSpeed values are all >= 0, so -1 means "not published yet".
     int8_t lastFancoilSpeedNum_ = -1;
+    bool haveSchedules_ = false;
+    ControllerDomain::Config::Schedule lastSchedules_[NUM_SCHEDULE_TIMES]{};
 
     static constexpr const char *vacationTopic_ = "home/global/on_vacation";
     static constexpr const char *outdoorTempTopic_ = "home/global/outdoor_temp_c";
     static constexpr const char *airQualityTopic_ = "home/global/air_quality_index";
 
-    char discoveryStr_[4096] = "", discoveryTopic_[64], availabilityTopic_[64],
+    char discoveryStr_[8192] = "", discoveryTopic_[64], availabilityTopic_[64],
          currentTempTopic_[64], modeStateTopic_[64], modeCmdTopic_[64], highTempTopic_[64],
          highTempCmdTopic_[64], lowTempTopic_[64], lowTempCmdTopic_[64], actionTopic_[64],
          staticPressureTopic_[64], fanStateTopic_[64], fanCmdTopic_[64], fanPctTopic_[64],
-         fanPctCmdTopic_[64], hvacModeNumTopic_[64], fancoilSpeedTopic_[64];
+         fanPctCmdTopic_[64], hvacModeNumTopic_[64], fancoilSpeedTopic_[64],
+         scheduleStateTopic_[64], scheduleCmdTopic_[64];
 
-    esp_mqtt_topic_t topics_[6] = {
+    esp_mqtt_topic_t topics_[7] = {
         {.filter = vacationTopic_, .qos = 0},
         {.filter = outdoorTempTopic_, .qos = 0},
         {.filter = airQualityTopic_, .qos = 0},
         {}, // Mode command
         {}, // Temp High command
         {}, // Temp Low command
+        {}, // Schedule command
     };
 
     static const char *climateModeToS(ClimateMode mode);
@@ -102,9 +108,11 @@ class MqttHomeClient : public BaseMqttClient, public AbstractHomeClient {
     int publishFanSpeed(int16_t fanSpeed);
     int publishHVACModeNum(HVACModeNum mode);
     int publishFancoilSpeed(int8_t speed);
+    int publishSchedules(const ControllerDomain::Config::Schedule *schedules);
 
     void parseModeCmdMessage(const char *data, int dataLen);
     void parseTempCmdMessage(bool high, const char *data, int dataLen);
+    void parseScheduleCmdMessage(const char *data, int dataLen);
     void parseVacationMessage(const char *data, int dataLen);
     void parseOutdoorTempMessage(const char *data, int dataLen);
     void parseAirQualityMessage(const char *data, int dataLen);

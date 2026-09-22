@@ -12,10 +12,6 @@ using Config = ControllerDomain::Config;
 
 #define TEMP_LIMIT_ROLLER_START 60
 #define TEMP_LIMIT_ROLLER_END 80
-#define MIN_HEAT_DEG 50
-#define MAX_COOL_DEG 99
-#define MIN_HEAT_COOL_DELTA_DEG 2
-#define MIN_HEAT_COOL_DELTA_C ABS_F_TO_C(MIN_HEAT_COOL_DELTA_DEG)
 
 static const char *TAG = "UI";
 
@@ -234,10 +230,14 @@ void UIManager::eSchedule() {
         .startMin = (uint8_t)lv_roller_get_selected(ui_Night_min),
     };
 
-    Event evt{EventType::SetSchedule, EventPayload{.schedules = {
-                                                       currSchedules_[0],
-                                                       currSchedules_[1],
-                                                   }}};
+    sendScheduleEvent();
+}
+
+void UIManager::sendScheduleEvent() {
+    Event evt{EventType::UpdateSchedule, EventPayload{.scheduleUpdates = {
+                                                          ScheduleUpdate::from(currSchedules_[0]),
+                                                          ScheduleUpdate::from(currSchedules_[1]),
+                                                      }}};
     sendEvent(evt);
 }
 
@@ -341,11 +341,7 @@ void UIManager::eSaveTempLimits() {
         }
     }
     if (scheduleChanged) {
-        Event scheduleEvt{EventType::SetSchedule, EventPayload{.schedules = {
-                                                                   currSchedules_[0],
-                                                                   currSchedules_[1],
-                                                               }}};
-        sendEvent(scheduleEvt);
+        sendScheduleEvent();
     }
 }
 
@@ -758,5 +754,15 @@ void UIManager::setSystemPowerInternal(bool on) {
 void UIManager::setSystemPower(bool on) {
     xSemaphoreTake(mutex_, portMAX_DELAY);
     setSystemPowerInternal(on);
+    xSemaphoreGive(mutex_);
+}
+
+void UIManager::setSchedules(const Config::Schedule *schedules) {
+    // Only update our copy; the schedule screen's rollers are populated from it when the
+    // screen loads, so we don't disturb an edit in progress.
+    xSemaphoreTake(mutex_, portMAX_DELAY);
+    for (int i = 0; i < NUM_SCHEDULE_TIMES; i++) {
+        currSchedules_[i] = schedules[i];
+    }
     xSemaphoreGive(mutex_);
 }

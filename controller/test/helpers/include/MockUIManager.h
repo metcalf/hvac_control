@@ -14,6 +14,8 @@ class MockUIManager : public AbstractUIManager {
     MOCK_METHOD(void, setHVACState, (ControllerDomain::HVACState state), (override));
     MOCK_METHOD(void, setCurrentSetpoints, (double heatC, double coolC), (override));
     MOCK_METHOD(void, setSystemPower, (bool on), (override));
+    MOCK_METHOD(void, setSchedules, (const ControllerDomain::Config::Schedule *schedules),
+                (override));
 
     MOCK_METHOD(void, setMessage, (uint8_t msgID, bool allowCancel, const char *msg), (override));
     MOCK_METHOD(void, clearMessage, (uint8_t msgID), (override));

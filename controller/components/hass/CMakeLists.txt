@@ -4,5 +4,5 @@ idf_component_register(
     SRCS ${SOURCES}
     INCLUDE_DIRS "include"
     REQUIRES controller_app wifi
-    PRIV_REQUIRES log
+    PRIV_REQUIRES log json
 )

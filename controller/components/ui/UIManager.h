@@ -32,6 +32,7 @@ class UIManager : public AbstractUIManager {
     void setHVACState(ControllerDomain::HVACState state) override;
     void setCurrentSetpoints(double heatC, double coolC) override;
     void setSystemPower(bool on) override;
+    void setSchedules(const ControllerDomain::Config::Schedule *schedules) override;
 
     void setFirmwareVersion(const char *version) {
         lv_label_set_text(firmwareVersionLabel_, version);
@@ -89,6 +90,7 @@ class UIManager : public AbstractUIManager {
   private:
     void sendACOverrideEvent(ACOverride override);
     void sendPowerEvent(bool on);
+    void sendScheduleEvent();
     int getHeatRollerValueDeg(lv_obj_t *roller);
     int getCoolRollerValueDeg(lv_obj_t *roller);
     double getHeatRollerValueC(lv_obj_t *roller);

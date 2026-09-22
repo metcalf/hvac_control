@@ -25,8 +25,27 @@ class AbstractUIManager {
         double inTempOffsetC, outTempOffsetC;
     };
 
+    // A partial update to one schedule slot. NaN temps and a negative start time mean
+    // "leave unchanged". (No default member initializers since this lives in a union.)
+    struct ScheduleUpdate {
+        double heatC, coolC;
+        // Unlike Schedule's startHr/startMin, the start time is a single minute-of-day so that
+        // it's always updated as a unit with one "unchanged" sentinel, and so validating it
+        // (e.g. day in the AM, night in the PM) is a simple range check.
+        int16_t startMinOfDay;
+
+        static ScheduleUpdate none() { return {.heatC = NAN, .coolC = NAN, .startMinOfDay = -1}; }
+        static ScheduleUpdate from(const ControllerDomain::Config::Schedule &schedule) {
+            return {
+                .heatC = schedule.heatC,
+                .coolC = schedule.coolC,
+                .startMinOfDay = (int16_t)(schedule.startHr * 60 + schedule.startMin),
+            };
+        }
+    };
+
     enum class EventType {
-        SetSchedule,
+        UpdateSchedule,
         SetCO2Target,
         SetSystemPower,
         SetTempLimits,
@@ -42,7 +61,7 @@ class AbstractUIManager {
     };
 
     union EventPayload {
-        ControllerDomain::Config::Schedule schedules[2];
+        ScheduleUpdate scheduleUpdates[NUM_SCHEDULE_TIMES];
         uint16_t co2Target;
         bool systemPower;
         FanOverride fanOverride;
@@ -73,6 +92,7 @@ class AbstractUIManager {
     virtual void setHVACState(ControllerDomain::HVACState state) = 0;
     virtual void setCurrentSetpoints(double heatC, double coolC) = 0;
     virtual void setSystemPower(bool on) = 0;
+    virtual void setSchedules(const ControllerDomain::Config::Schedule *schedules) = 0;
 
     virtual void setMessage(uint8_t msgID, bool allowCancel, const char *msg) = 0;
     virtual void clearMessage(uint8_t msgID) = 0;

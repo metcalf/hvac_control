@@ -29,6 +29,7 @@ class AbstractHomeClient {
                                     ControllerDomain::FancoilSpeed fancoilSpeed, double inTempC,
                                     double highTempC, double lowTempC) {};
     virtual void updateStaticPressure(uint32_t pressurePa) {};
+    virtual void updateSchedules(const ControllerDomain::Config::Schedule *schedules) {};
     virtual void updateName(const char *name) {};
 
   protected:

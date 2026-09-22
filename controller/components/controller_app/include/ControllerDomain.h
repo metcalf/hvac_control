@@ -10,6 +10,13 @@
 #define REL_C_TO_F(t) (t * 9.0 / 5.0)
 #define ABS_C_TO_F(t) (REL_C_TO_F(t) + 32)
 
+// Setpoint bounds (in whole degrees F, matching the UI rollers)
+#define MIN_HEAT_DEG 50
+#define MAX_COOL_DEG 99
+// Minimum separation between heat and cool setpoints
+#define MIN_HEAT_COOL_DELTA_DEG 2
+#define MIN_HEAT_COOL_DELTA_C REL_F_TO_C(MIN_HEAT_COOL_DELTA_DEG)
+
 #define CONTROLLER_CONFIG_VERSION 3
 
 // Maximum age of outdoor temp to display in the UI before treating it as stale
@@ -71,6 +78,7 @@ struct Config {
         uint8_t startHr, startMin;
 
         int16_t startMinOfDay() { return startHr * 60 + startMin; }
+        bool operator==(const Schedule &) const = default;
     };
     enum class HVACType { None, Fancoil, Valve };
     struct Equipment {

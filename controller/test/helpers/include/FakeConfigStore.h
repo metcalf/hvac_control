@@ -4,6 +4,7 @@
 
 template <typename T>
 class FakeConfigStore : public AbstractConfigStore<T> {
+  public:
     void store(T &config) override;
     esp_err_t load(T *config) override;
 

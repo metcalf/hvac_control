@@ -252,25 +252,15 @@ bool ControllerApp::pollUIEvent(bool wait) {
     }
 
     switch (uiEvent.type) {
-    case EventType::SetSchedule: {
-        ControllerDomain::Config::Schedule *schedules = uiEvent.payload.schedules;
-        ESP_LOGI(
-            TAG, "SetSchedule: %.1f/%.1f@%02d:%02d %.1f/%.1f@%02d:%02d",
-            // Day
-            schedules[0].heatC, schedules[0].coolC, schedules[0].startHr, schedules[0].startMin,
-            // Night
-            schedules[1].heatC, schedules[1].coolC, schedules[1].startHr, schedules[1].startMin);
-        for (int i = 0; i < NUM_SCHEDULE_TIMES; i++) {
-            config_.schedules[i] = schedules[i];
+    case EventType::UpdateSchedule:
+        ESP_LOGI(TAG, "UpdateSchedule");
+        // Config is stored in applyScheduleUpdates if needed
+        if (applyScheduleUpdates(uiEvent.payload.scheduleUpdates)) {
+            // The UI keeps its own copy of the schedule, so let it know about changes
+            // made elsewhere (e.g. Home Assistant).
+            uiManager_->setSchedules(config_.schedules);
         }
-        cfgStore_->store(config_);
-
-        // Clear the temp override when we set a new schedule to avoid having
-        // to think about how these interact.
-        tempOverrideUntilScheduleIdx_ = -1;
-        clearMessage(MsgID::TempOverride);
         break;
-    }
     case EventType::SetCO2Target:
         ESP_LOGI(TAG, "SetCO2Target: %u", uiEvent.payload.co2Target);
         config_.co2Target = uiEvent.payload.co2Target;
@@ -777,6 +767,83 @@ bool ControllerApp::isCoilCold() {
     return (fcState.coilTempC <= COIL_COLD_TEMP_C);
 }
 
+// Merges a partial schedule update into the current schedules, clamping temps the same way
+// the UI does. Both the UI (which sends every field) and Home Assistant (which may send only
+// some) use this. Returns true if the schedules changed; false if nothing changed or the
+// update was rejected.
+bool ControllerApp::applyScheduleUpdates(const AbstractUIManager::ScheduleUpdate *updates) {
+    Config::Schedule schedules[NUM_SCHEDULE_TIMES];
+    std::copy(std::begin(config_.schedules), std::end(config_.schedules), schedules);
+
+    for (int i = 0; i < NUM_SCHEDULE_TIMES; i++) {
+        const AbstractUIManager::ScheduleUpdate &update = updates[i];
+        Config::Schedule &schedule = schedules[i];
+
+        if (update.startMinOfDay >= 0) {
+            // The UI can only represent a day (first) start time in the AM and a night
+            // (second) start time in the PM, which also keeps the schedules in order.
+            int16_t minStart = i == 0 ? 0 : 12 * 60;
+            int16_t maxStart = minStart + 12 * 60;
+            if (update.startMinOfDay < minStart || update.startMinOfDay >= maxStart) {
+                ESP_LOGW(TAG, "Rejecting schedule %d start time %d:%02d outside of %s", i,
+                         update.startMinOfDay / 60, update.startMinOfDay % 60,
+                         i == 0 ? "AM" : "PM");
+                return false;
+            }
+            schedule.startHr = update.startMinOfDay / 60;
+            schedule.startMin = update.startMinOfDay % 60;
+        }
+
+        // Work in whole degrees F, matching the UI rollers, so that stored values are exactly
+        // what the UI would store.
+        bool heatSet = !std::isnan(update.heatC);
+        bool coolSet = !std::isnan(update.coolC);
+        int heatF = 0, coolF = 0;
+        if (heatSet) {
+            int maxHeatF = std::round(ABS_C_TO_F(config_.maxHeatC));
+            heatF = std::max(std::min((int)std::round(ABS_C_TO_F(update.heatC)), maxHeatF),
+                             MIN_HEAT_DEG);
+            schedule.heatC = ABS_F_TO_C(heatF);
+        }
+        if (coolSet) {
+            int minCoolF = std::round(ABS_C_TO_F(config_.minCoolC));
+            coolF = std::min(std::max((int)std::round(ABS_C_TO_F(update.coolC)), minCoolF),
+                             MAX_COOL_DEG);
+            schedule.coolC = ABS_F_TO_C(coolF);
+        }
+
+        // Maintain the minimum separation by pushing the setpoint that wasn't set, as the UI
+        // rollers do. If both were set, the heat setpoint wins. The epsilon avoids pushing
+        // setpoints that are exactly the minimum separation apart.
+        if ((heatSet || coolSet) &&
+            schedule.coolC - schedule.heatC < MIN_HEAT_COOL_DELTA_C - 0.01) {
+            if (heatSet) {
+                schedule.coolC = ABS_F_TO_C(heatF + MIN_HEAT_COOL_DELTA_DEG);
+            } else {
+                schedule.heatC = ABS_F_TO_C(coolF - MIN_HEAT_COOL_DELTA_DEG);
+            }
+        }
+    }
+
+    if (std::equal(std::begin(schedules), std::end(schedules), config_.schedules)) {
+        return false;
+    }
+
+    ESP_LOGI(TAG, "Schedules: %.1f/%.1f@%02d:%02d %.1f/%.1f@%02d:%02d",
+             // Day
+             schedules[0].heatC, schedules[0].coolC, schedules[0].startHr, schedules[0].startMin,
+             // Night
+             schedules[1].heatC, schedules[1].coolC, schedules[1].startHr, schedules[1].startMin);
+    std::copy(std::begin(schedules), std::end(schedules), config_.schedules);
+    cfgStore_->store(config_);
+
+    // Clear the temp override when the schedule changes to avoid having
+    // to think about how these interact.
+    tempOverrideUntilScheduleIdx_ = -1;
+    clearMessage(MsgID::TempOverride);
+    return true;
+}
+
 int ControllerApp::getScheduleIdx(int offset) {
     if (!clockReady()) {
         return -1;
@@ -1096,6 +1163,7 @@ void ControllerApp::task(bool firstTime) {
 
     homeCli_->updateClimateState(config_.systemOn, hvacState, fanSpeed, lastHvacSpeed_,
                                  sensorData.tempC, setpoints.coolTempC, setpoints.heatTempC);
+    homeCli_->updateSchedules(config_.schedules);
 
     if (pollUIEvent(true)) {
         // If we found something in the queue, clear the queue before proceeeding with

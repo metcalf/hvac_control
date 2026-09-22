@@ -301,6 +301,7 @@ class ControllerApp {
     int getScheduleIdx(int offset);
     Setpoints getCurrentSetpoints(double currTempC);
     void setTempOverride(AbstractUIManager::TempOverride tempOverride);
+    bool applyScheduleUpdates(const AbstractUIManager::ScheduleUpdate *updates);
     uint16_t localMinOfDay();
     void logState(const ControllerDomain::FreshAirState &freshAirState,
                   const ControllerDomain::SensorData &sensorData, double ventDemand,

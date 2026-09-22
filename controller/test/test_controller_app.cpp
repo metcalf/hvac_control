@@ -3,6 +3,7 @@
 
 #include "ControllerApp.h"
 
+#include "ControllerDomainPrinters.h"
 #include "FakeConfigStore.h"
 #include "FakeHomeClient.h"
 #include "FakeModbusController.h"
@@ -16,6 +17,7 @@ using ::testing::_;
 using ::testing::AllOf;
 using ::testing::AtMost;
 using ::testing::DoubleNear;
+using ::testing::ElementsAreArray;
 using ::testing::ExpectationSet;
 using ::testing::Ge;
 using ::testing::InSequence;
@@ -88,6 +90,27 @@ class ControllerAppTest : public testing::Test {
 
     void setRealNow(std::tm tm) {
         app_->realNow_ = std::chrono::system_clock::from_time_t(std::mktime(&tm));
+    }
+
+    static AbstractUIManager::ScheduleUpdate noScheduleUpdate() {
+        return AbstractUIManager::ScheduleUpdate::none();
+    }
+
+    // Sends an UpdateSchedule event and runs the app so it's handled
+    void updateSchedule(AbstractUIManager::ScheduleUpdate day,
+                        AbstractUIManager::ScheduleUpdate night) {
+        auto evt = AbstractUIManager::Event{
+            AbstractUIManager::EventType::UpdateSchedule,
+            {.scheduleUpdates = {day, night}},
+        };
+        evt_ = &evt;
+        app_->task();
+    }
+
+    Config storedConfig() {
+        Config config;
+        cfgStore_.load(&config);
+        return config;
     }
 
     void setOutdoorTempC(double tempC) {
@@ -718,6 +741,150 @@ TEST_F(ControllerAppTest, InvalidTimeSetpoints) {
     app_->realNow_ = std::chrono::system_clock::time_point{};
 
     app_->task();
+}
+
+TEST_F(ControllerAppTest, PublishesSchedulesToHomeClient) {
+    app_->task();
+    EXPECT_THAT(homeCli_.schedules_, ElementsAreArray(default_test_config().schedules));
+}
+
+TEST_F(ControllerAppTest, UpdateScheduleMergesPartialUpdate) {
+    EXPECT_CALL(uiManager_, setSchedules(_)).Times(1);
+
+    auto night = noScheduleUpdate();
+    night.coolC = ABS_F_TO_C(75);
+    night.startMinOfDay = 22 * 60 + 30;
+    updateSchedule(noScheduleUpdate(), night);
+
+    // Only the fields that were set change
+    Config expected = default_test_config();
+    expected.schedules[1].coolC = ABS_F_TO_C(75);
+    expected.schedules[1].startHr = 22;
+    expected.schedules[1].startMin = 30;
+    EXPECT_THAT(storedConfig().schedules, ElementsAreArray(expected.schedules));
+
+    // The home client sees the change on the next publish
+    app_->task();
+    EXPECT_THAT(homeCli_.schedules_, ElementsAreArray(expected.schedules));
+}
+
+TEST_F(ControllerAppTest, UpdateScheduleAppliesFullUpdate) {
+    // The UI sends every field for both schedules
+    Config::Schedule schedules[] = {
+        {.heatC = ABS_F_TO_C(66), .coolC = ABS_F_TO_C(76), .startHr = 6, .startMin = 45},
+        {.heatC = ABS_F_TO_C(62), .coolC = ABS_F_TO_C(78), .startHr = 22, .startMin = 15},
+    };
+    updateSchedule(AbstractUIManager::ScheduleUpdate::from(schedules[0]),
+                   AbstractUIManager::ScheduleUpdate::from(schedules[1]));
+    EXPECT_THAT(storedConfig().schedules, ElementsAreArray(schedules));
+}
+
+TEST_F(ControllerAppTest, UpdateScheduleRoundsAndClampsToLimits) {
+    auto day = noScheduleUpdate();
+    day.heatC = 30; // Above maxHeatC (25)
+    auto night = noScheduleUpdate();
+    night.coolC = 10; // Below minCoolC (15)
+    updateSchedule(day, night);
+
+    Config expected = default_test_config();
+    expected.schedules[0].heatC = 25;
+    expected.schedules[1].coolC = 15;
+    // The clamped values are too close to the other setpoints, which get pushed
+    expected.schedules[0].coolC = ABS_F_TO_C(79);
+    expected.schedules[1].heatC = ABS_F_TO_C(57);
+    EXPECT_THAT(storedConfig().schedules, ElementsAreArray(expected.schedules));
+
+    // Rounds to whole degrees F
+    day = noScheduleUpdate();
+    day.heatC = ABS_F_TO_C(66.4);
+    updateSchedule(day, noScheduleUpdate());
+    expected.schedules[0].heatC = ABS_F_TO_C(66);
+    EXPECT_THAT(storedConfig().schedules, ElementsAreArray(expected.schedules));
+}
+
+TEST_F(ControllerAppTest, UpdateSchedulePushesOtherSetpoint) {
+    // Raising heat above cool pushes cool up
+    auto day = noScheduleUpdate();
+    day.heatC = ABS_F_TO_C(76);
+    // Lowering cool below heat pushes heat down
+    auto night = noScheduleUpdate();
+    night.coolC = ABS_F_TO_C(64);
+    updateSchedule(day, night);
+
+    Config expected = default_test_config();
+    expected.schedules[0].heatC = ABS_F_TO_C(76);
+    expected.schedules[0].coolC = ABS_F_TO_C(78);
+    expected.schedules[1].heatC = ABS_F_TO_C(62);
+    expected.schedules[1].coolC = ABS_F_TO_C(64);
+    EXPECT_THAT(storedConfig().schedules, ElementsAreArray(expected.schedules));
+
+    // When both are set, heat wins
+    day = noScheduleUpdate();
+    day.heatC = ABS_F_TO_C(70);
+    day.coolC = ABS_F_TO_C(69);
+    updateSchedule(day, noScheduleUpdate());
+    expected.schedules[0].heatC = ABS_F_TO_C(70);
+    expected.schedules[0].coolC = ABS_F_TO_C(72);
+    EXPECT_THAT(storedConfig().schedules, ElementsAreArray(expected.schedules));
+
+    // Setpoints exactly the minimum separation apart aren't pushed
+    day = noScheduleUpdate();
+    day.coolC = ABS_F_TO_C(72);
+    EXPECT_CALL(uiManager_, setSchedules(_)).Times(0);
+    updateSchedule(day, noScheduleUpdate());
+}
+
+TEST_F(ControllerAppTest, UpdateScheduleRejectsStartOutsideAMPM) {
+    EXPECT_CALL(uiManager_, setSchedules(_)).Times(0);
+
+    // Day must start in the AM
+    auto day = noScheduleUpdate();
+    day.startMinOfDay = 12 * 60;
+    // Even valid fields in the same update are dropped
+    day.heatC = ABS_F_TO_C(60);
+    updateSchedule(day, noScheduleUpdate());
+
+    // Night must start in the PM
+    auto night = noScheduleUpdate();
+    night.startMinOfDay = 11 * 60 + 59;
+    updateSchedule(noScheduleUpdate(), night);
+
+    app_->task();
+    EXPECT_THAT(homeCli_.schedules_, ElementsAreArray(default_test_config().schedules));
+}
+
+TEST_F(ControllerAppTest, UpdateScheduleClearsTempOverride) {
+    // Start from a whole °F schedule, as the UI would save, since a full update rounds to
+    // whole °F and would otherwise change the default test schedule.
+    Config::Schedule schedules[] = {
+        {.heatC = ABS_F_TO_C(68), .coolC = ABS_F_TO_C(77), .startHr = 7, .startMin = 0},
+        {.heatC = ABS_F_TO_C(66), .coolC = ABS_F_TO_C(72), .startHr = 21, .startMin = 0},
+    };
+    auto updateAll = [&] {
+        updateSchedule(AbstractUIManager::ScheduleUpdate::from(schedules[0]),
+                       AbstractUIManager::ScheduleUpdate::from(schedules[1]));
+    };
+    updateAll();
+
+    auto evt = AbstractUIManager::Event{
+        AbstractUIManager::EventType::TempOverride,
+        {.tempOverride = AbstractUIManager::TempOverride{.heatC = 10, .coolC = 15}},
+    };
+    evt_ = &evt;
+    app_->task();
+    app_->task();
+    ASSERT_EQ(SetpointReason::Override, app_->setpointReason());
+
+    // Re-saving the same schedule is a no-op, so the override stays in place
+    updateAll();
+    app_->task();
+    EXPECT_EQ(SetpointReason::Override, app_->setpointReason());
+
+    // An actual change clears it
+    schedules[1].startHr = 22;
+    updateAll();
+    app_->task();
+    EXPECT_EQ(SetpointReason::Normal, app_->setpointReason());
 }
 
 TEST_F(ControllerAppTest, AllowHVACChangeLimit) {
