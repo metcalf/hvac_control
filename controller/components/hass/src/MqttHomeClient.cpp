@@ -1,201 +1,17 @@
 #include "MqttHomeClient.h"
 
 #include <algorithm>
-#include <cctype>
 #include <chrono>
-#include <cstdarg>
 #include <cstring>
 #include <inttypes.h>
 
 #include "ControllerDomain.h"
-#include "cJSON.h"
+#include "HassMessages.h"
 #include "esp_err.h"
 #include "esp_log.h"
 
 static const char *TAG = "MQTT";
 
-static const char *discoveryTmpl = R"({
-  "device": {
-    "ids": "%s"
-  },
-  "o": {
-    "name": "hvac_control"
-  },
-  "cmps": {
-    "hvac_control_climate": {
-      "p": "climate",
-      "name": "Thermostat",
-      "unique_id": "%s_climate",
-      "modes": ["off", "auto"],
-      "precision": 1.0,
-      "temperature_unit": "F",
-      "temp_step": "1",
-      "min_temp": 50,
-      "max_temp": 99,
-      "availability": [{
-        "topic": "%s",
-        "payload_available": "1",
-        "payload_not_available": "0"
-      }],
-      "current_temperature_topic": "%s",
-      "mode_state_topic": "%s",
-      "mode_command_topic": "%s",
-      "temperature_high_state_topic": "%s",
-      "temperature_high_command_topic": "%s",
-      "temperature_low_state_topic": "%s",
-      "temperature_low_command_topic": "%s",
-      "action_topic": "%s",
-      "optimistic": false
-    },
-    "hvac_control_sensor_indoor_temp":{
-      "p": "sensor",
-      "name": "Indoor Temperature",
-      "unique_id": "%s_indoor_temp",
-      "device_class": "temperature",
-      "state_class": "measurement",
-      "unit_of_measurement": "°F",
-      "state_topic": "%s"
-    },
-    "hvac_control_sensor_static_pressure":{
-      "p": "sensor",
-      "name": "Fresh Air Static Pressure",
-      "unique_id": "%s_static_pressure",
-      "device_class": "pressure",
-      "state_class": "measurement",
-      "unit_of_measurement": "Pa",
-      "state_topic": "%s"
-    },
-    "hvac_control_fan": {
-      "p": "fan",
-      "name": "Fresh Air Fan",
-      "unique_id": "%s_fan",
-      "availability": [{
-        "topic": "%s",
-        "payload_available": "1",
-        "payload_not_available": "0"
-      }],
-      "state_topic": "%s",
-      "command_topic": "%s",
-      "payload_on": "ON",
-      "payload_off": "OFF",
-      "percentage_state_topic": "%s",
-      "percentage_command_topic": "%s",
-      "speed_range_min": 1,
-      "speed_range_max": 255,
-      "optimistic": false
-    },
-    "hvac_control_sensor_hvac_mode":{
-      "p": "sensor",
-      "name": "HVAC Mode",
-      "unique_id": "%s_hvac_mode",
-      "state_class": "measurement",
-      "state_topic": "%s"
-    },
-    "hvac_control_sensor_fancoil_speed":{
-      "p": "sensor",
-      "name": "Fancoil Speed",
-      "unique_id": "%s_fancoil_speed",
-      "state_class": "measurement",
-      "state_topic": "%s"
-    })"; // cmps and the root object are closed after appending the schedule components
-
-// Schedule setpoints are exposed as config entities that all read from the one JSON schedule
-// state topic and send partial updates (just the field that changed) to the schedule command
-// topic. The device clamps values and republishes, so none of these are optimistic.
-static const char *scheduleSetpointDiscoveryTmpl = R"(,
-    "hvac_control_%s_%s": {
-      "p": "number",
-      "name": "%s %s Setpoint",
-      "unique_id": "%s_%s_%s",
-      "entity_category": "config",
-      "device_class": "temperature",
-      "unit_of_measurement": "°F",
-      "min": %d,
-      "max": %d,
-      "step": 1,
-      "mode": "box",
-      "availability": [{
-        "topic": "%s",
-        "payload_available": "1",
-        "payload_not_available": "0"
-      }],
-      "state_topic": "%s",
-      "value_template": "{{ value_json.%s.%s }}",
-      "command_topic": "%s",
-      "command_template": "{\"%s\":{\"%s\":{{ value }}}}"
-    })";
-
-static const char *scheduleStartDiscoveryTmpl = R"(,
-    "hvac_control_%s_start": {
-      "p": "text",
-      "name": "%s Start Time",
-      "unique_id": "%s_%s_start",
-      "entity_category": "config",
-      "icon": "mdi:clock-outline",
-      "min": 5,
-      "max": 5,
-      "pattern": "%s",
-      "availability": [{
-        "topic": "%s",
-        "payload_available": "1",
-        "payload_not_available": "0"
-      }],
-      "state_topic": "%s",
-      "value_template": "{{ value_json.%s.start }}",
-      "command_topic": "%s",
-      "command_template": "{\"%s\":{\"start\":\"{{ value }}\"}}"
-    })";
-
-namespace {
-struct ScheduleSlot {
-    const char *key, *name;
-    // HH:MM, restricted to the AM for day and the PM for night since that's all the UI's
-    // schedule screen can represent. The controller enforces this too.
-    const char *startPattern;
-};
-const ScheduleSlot scheduleSlots[] = {
-    {"day", "Day", "^(0[0-9]|1[01]):[0-5][0-9]$"},
-    {"night", "Night", "^(1[2-9]|2[0-3]):[0-5][0-9]$"},
-};
-static_assert(std::size(scheduleSlots) == NUM_SCHEDULE_TIMES);
-
-// Appends formatted output to buf at *len. Returns false (leaving *len at the end of the
-// buffer) if the output was truncated.
-__attribute__((format(printf, 4, 5))) bool appendf(char *buf, size_t size, size_t *len,
-                                                   const char *fmt, ...) {
-    if (*len >= size) {
-        return false;
-    }
-    va_list args;
-    va_start(args, fmt);
-    int n = vsnprintf(buf + *len, size - *len, fmt, args);
-    va_end(args);
-    if (n < 0 || (size_t)n >= size - *len) {
-        *len = size;
-        return false;
-    }
-    *len += n;
-    return true;
-}
-
-// Parses a strict "HH:MM" time. Returns the minute of the day, or -1 if invalid.
-int16_t parseStartTime(const char *str) {
-    if (strlen(str) != 5 || str[2] != ':') {
-        return -1;
-    }
-    for (int i : {0, 1, 3, 4}) {
-        if (!isdigit((unsigned char)str[i])) {
-            return -1;
-        }
-    }
-    int hr = (str[0] - '0') * 10 + (str[1] - '0');
-    int min = (str[3] - '0') * 10 + (str[4] - '0');
-    if (hr > 23 || min > 59) {
-        return -1;
-    }
-    return hr * 60 + min;
-}
-} // namespace
 
 MqttHomeClient::MqttHomeClient(const char *name, AbstractUIManager::eventCb_t eventCb)
     : eventCb_(eventCb) {
@@ -384,13 +200,13 @@ void MqttHomeClient::onMsg(char *topic, int topicLen, char *data, int dataLen) {
         parseOutdoorTempMessage(data, dataLen);
     } else if (matchesTopic(topic, topicLen, airQualityTopic_)) {
         parseAirQualityMessage(data, dataLen);
-    } else if (matchesTopic(topic, topicLen, modeCmdTopic_)) {
+    } else if (matchesTopic(topic, topicLen, topics_.modeCmd)) {
         parseModeCmdMessage(data, dataLen);
-    } else if (matchesTopic(topic, topicLen, highTempCmdTopic_)) {
+    } else if (matchesTopic(topic, topicLen, topics_.highTempCmd)) {
         parseTempCmdMessage(true, data, dataLen);
-    } else if (matchesTopic(topic, topicLen, lowTempCmdTopic_)) {
+    } else if (matchesTopic(topic, topicLen, topics_.lowTempCmd)) {
         parseTempCmdMessage(false, data, dataLen);
-    } else if (matchesTopic(topic, topicLen, scheduleCmdTopic_)) {
+    } else if (matchesTopic(topic, topicLen, topics_.scheduleCmd)) {
         parseScheduleCmdMessage(data, dataLen);
     } else {
         ESP_LOGW(TAG, "Received message on unknown topic: %.*s", topicLen, topic);
@@ -405,11 +221,11 @@ void MqttHomeClient::onErr(esp_mqtt_error_codes_t err) {
 }
 
 void MqttHomeClient::onConnected() {
-    int res = esp_mqtt_client_subscribe_multiple(client_, topics_, std::size(topics_));
+    int res = esp_mqtt_client_subscribe_multiple(client_, subscriptions_, std::size(subscriptions_));
     if (res < 0) {
         ESP_LOGE(TAG, "Error subscribing to topics (%d)", res);
     } else {
-        ESP_LOGD(TAG, "Subscribed to %d topics", std::size(topics_));
+        ESP_LOGD(TAG, "Subscribed to %d topics", std::size(subscriptions_));
     }
 
     // Publish values via a user message to avoid duplication and consolidate retries
@@ -476,28 +292,28 @@ void MqttHomeClient::onUserEvent() {
     if (fields & updatedFieldMask(UpdatedFields::InTemp)) {
         // Don't retain the current temperature since it goes stale quickly
         // and is updated frequently.
-        if (publishTempC(currentTempTopic_, inTempC, false) >= 0) {
+        if (publishTempC(topics_.currentTemp, inTempC, false) >= 0) {
             xSemaphoreTake(mutex_, portMAX_DELAY);
             updatedFields_ &= ~updatedFieldMask(UpdatedFields::InTemp);
             xSemaphoreGive(mutex_);
         }
     }
     if (fields & updatedFieldMask(UpdatedFields::HighTemp)) {
-        if (publishTempC(highTempTopic_, highTempC, true) >= 0) {
+        if (publishTempC(topics_.highTemp, highTempC, true) >= 0) {
             xSemaphoreTake(mutex_, portMAX_DELAY);
             updatedFields_ &= ~updatedFieldMask(UpdatedFields::HighTemp);
             xSemaphoreGive(mutex_);
         }
     }
     if (fields & updatedFieldMask(UpdatedFields::LowTemp)) {
-        if (publishTempC(lowTempTopic_, lowTempC, true) >= 0) {
+        if (publishTempC(topics_.lowTemp, lowTempC, true) >= 0) {
             xSemaphoreTake(mutex_, portMAX_DELAY);
             updatedFields_ &= ~updatedFieldMask(UpdatedFields::LowTemp);
             xSemaphoreGive(mutex_);
         }
     }
     if (fields & updatedFieldMask(UpdatedFields::Availability)) {
-        if (esp_mqtt_client_publish(client_, availabilityTopic_, "1", 1, 0, true) >= 0) {
+        if (esp_mqtt_client_publish(client_, topics_.availability, "1", 1, 0, true) >= 0) {
             xSemaphoreTake(mutex_, portMAX_DELAY);
             updatedFields_ &= ~updatedFieldMask(UpdatedFields::Availability);
             xSemaphoreGive(mutex_);
@@ -555,87 +371,34 @@ void MqttHomeClient::onUserEvent() {
 }
 
 void MqttHomeClient::updateTopics(const char *name) {
-    snprintf(availabilityTopic_, sizeof(availabilityTopic_), "home/%s/availability", name);
-    snprintf(currentTempTopic_, sizeof(currentTempTopic_), "home/%s/in_temp_f/state", name);
-    snprintf(modeStateTopic_, sizeof(modeStateTopic_), "home/%s/mode/state", name);
-    snprintf(modeCmdTopic_, sizeof(modeCmdTopic_), "home/%s/mode/cmd", name);
-    snprintf(highTempTopic_, sizeof(highTempTopic_), "home/%s/high_temp_f/state", name);
-    snprintf(highTempCmdTopic_, sizeof(highTempCmdTopic_), "home/%s/high_temp_f/cmd", name);
-    snprintf(lowTempTopic_, sizeof(lowTempTopic_), "home/%s/low_temp_f/state", name);
-    snprintf(lowTempCmdTopic_, sizeof(lowTempCmdTopic_), "home/%s/low_temp_f/cmd", name);
-    snprintf(actionTopic_, sizeof(actionTopic_), "home/%s/action", name);
-    snprintf(staticPressureTopic_, sizeof(staticPressureTopic_), "home/%s/static_pressure_pa/state",
-             name);
-    snprintf(fanStateTopic_, sizeof(fanStateTopic_), "home/%s/fan/state", name);
-    // The fan is read-only for now, but HA requires a command_topic on an mqtt fan, so the
-    // command topics below are advertised in discovery without being added to topics_.
-    // Commands published to them are intentionally ignored; `optimistic: false` makes HA
-    // revert its controls rather than show a state we never entered. To make the fan
-    // writable, subscribe to these and handle them in onMsg() -- no discovery change needed.
-    snprintf(fanCmdTopic_, sizeof(fanCmdTopic_), "home/%s/fan/cmd", name);
-    snprintf(fanPctTopic_, sizeof(fanPctTopic_), "home/%s/fan_speed/state", name);
-    snprintf(fanPctCmdTopic_, sizeof(fanPctCmdTopic_), "home/%s/fan_speed/cmd", name);
-    snprintf(hvacModeNumTopic_, sizeof(hvacModeNumTopic_), "home/%s/hvac_mode_num/state", name);
-    snprintf(fancoilSpeedTopic_, sizeof(fancoilSpeedTopic_), "home/%s/fancoil_speed/state", name);
-    snprintf(scheduleStateTopic_, sizeof(scheduleStateTopic_), "home/%s/schedule/state", name);
-    snprintf(scheduleCmdTopic_, sizeof(scheduleCmdTopic_), "home/%s/schedule/cmd", name);
-
-    snprintf(discoveryTopic_, sizeof(discoveryTopic_), "homeassistant/device/%s/config", name);
-    size_t len = 0;
-    bool ok = appendf(discoveryStr_, sizeof(discoveryStr_), &len, discoveryTmpl, name, name,
-                      availabilityTopic_, currentTempTopic_, modeStateTopic_, modeCmdTopic_,
-                      highTempTopic_, highTempCmdTopic_, lowTempTopic_, lowTempCmdTopic_,
-                      actionTopic_, name, currentTempTopic_, name, staticPressureTopic_, name,
-                      availabilityTopic_, fanStateTopic_, fanCmdTopic_, fanPctTopic_,
-                      fanPctCmdTopic_, name, hvacModeNumTopic_, name, fancoilSpeedTopic_);
-    const struct {
-        const char *key, *name;
-        int min, max;
-    } setpointFields[] = {
-        {"heat_f", "Heat", MIN_HEAT_DEG, MAX_COOL_DEG},
-        {"cool_f", "Cool", MIN_HEAT_DEG, MAX_COOL_DEG},
-    };
-    for (const ScheduleSlot &slot : scheduleSlots) {
-        for (const auto &field : setpointFields) {
-            ok = ok && appendf(discoveryStr_, sizeof(discoveryStr_), &len,
-                               scheduleSetpointDiscoveryTmpl, slot.key, field.key, slot.name,
-                               field.name, name, slot.key, field.key, field.min, field.max,
-                               availabilityTopic_, scheduleStateTopic_, slot.key, field.key,
-                               scheduleCmdTopic_, slot.key, field.key);
-        }
-        ok = ok && appendf(discoveryStr_, sizeof(discoveryStr_), &len, scheduleStartDiscoveryTmpl,
-                           slot.key, slot.name, name, slot.key, slot.startPattern,
-                           availabilityTopic_, scheduleStateTopic_, slot.key, scheduleCmdTopic_,
-                           slot.key);
-    }
-    ok = ok && appendf(discoveryStr_, sizeof(discoveryStr_), &len, "\n  }\n}");
-    if (!ok) {
+    HassMessages::buildTopics(name, &topics_);
+    if (!HassMessages::buildDiscovery(name, topics_, discoveryStr_, sizeof(discoveryStr_))) {
         ESP_LOGE(TAG, "Discovery message truncated; increase discoveryStr_ size");
     }
 
     config_.session.last_will.msg = "0";
-    config_.session.last_will.topic = availabilityTopic_;
+    config_.session.last_will.topic = topics_.availability;
     config_.session.last_will.retain = true;
 
-    topics_[3].filter = modeCmdTopic_;
-    topics_[4].filter = highTempCmdTopic_;
-    topics_[5].filter = lowTempCmdTopic_;
-    topics_[6].filter = scheduleCmdTopic_;
+    subscriptions_[3].filter = topics_.modeCmd;
+    subscriptions_[4].filter = topics_.highTempCmd;
+    subscriptions_[5].filter = topics_.lowTempCmd;
+    subscriptions_[6].filter = topics_.scheduleCmd;
 }
 
 int MqttHomeClient::publishDiscoveryMessage() {
-    ESP_LOGD(TAG, "Publishing discovery message to topic %s: %s", discoveryTopic_, discoveryStr_);
-    return esp_mqtt_client_publish(client_, discoveryTopic_, discoveryStr_, 0, 0, true);
+    ESP_LOGD(TAG, "Publishing discovery message to topic %s: %s", topics_.discovery, discoveryStr_);
+    return esp_mqtt_client_publish(client_, topics_.discovery, discoveryStr_, 0, 0, true);
 }
 
 int MqttHomeClient::publishClimateMode(ClimateMode mode) {
     const char *modeStr = climateModeToS(mode);
-    return esp_mqtt_client_publish(client_, modeStateTopic_, modeStr, 0, 0, true);
+    return esp_mqtt_client_publish(client_, topics_.modeState, modeStr, 0, 0, true);
 }
 
 int MqttHomeClient::publishClimateAction(ClimateAction action) {
     const char *actionStr = climateActionToS(action);
-    return esp_mqtt_client_publish(client_, actionTopic_, actionStr, 0, 0, true);
+    return esp_mqtt_client_publish(client_, topics_.action, actionStr, 0, 0, true);
 }
 
 int MqttHomeClient::publishTempC(char *topic, double tempC, bool retain) {
@@ -648,53 +411,43 @@ int MqttHomeClient::publishStaticPressure(uint32_t pressurePa) {
     // Retain since static pressure is measured infrequently (only at max fan speed).
     char buf[16];
     int len = snprintf(buf, sizeof(buf), "%" PRIu32, pressurePa);
-    return esp_mqtt_client_publish(client_, staticPressureTopic_, buf, len, 0, true);
+    return esp_mqtt_client_publish(client_, topics_.staticPressure, buf, len, 0, true);
 }
 
 int MqttHomeClient::publishFanSpeed(int16_t fanSpeed) {
     // The fan entity's speed_range is 1-255, matching ControllerDomain::FanSpeed, so the raw
     // speed is published as-is and HA converts it to a percentage.
     const char *stateStr = fanSpeed > 0 ? "ON" : "OFF";
-    int res = esp_mqtt_client_publish(client_, fanStateTopic_, stateStr, 0, 0, true);
+    int res = esp_mqtt_client_publish(client_, topics_.fanState, stateStr, 0, 0, true);
     if (res < 0) {
         return res;
     }
 
     char buf[8];
     int len = snprintf(buf, sizeof(buf), "%" PRId16, fanSpeed);
-    return esp_mqtt_client_publish(client_, fanPctTopic_, buf, len, 0, true);
+    return esp_mqtt_client_publish(client_, topics_.fanPct, buf, len, 0, true);
 }
 
 int MqttHomeClient::publishHVACModeNum(HVACModeNum mode) {
     char buf[8];
     int len = snprintf(buf, sizeof(buf), "%d", static_cast<int>(mode));
-    return esp_mqtt_client_publish(client_, hvacModeNumTopic_, buf, len, 0, true);
+    return esp_mqtt_client_publish(client_, topics_.hvacModeNum, buf, len, 0, true);
 }
 
 int MqttHomeClient::publishFancoilSpeed(int8_t speed) {
     char buf[8];
     int len = snprintf(buf, sizeof(buf), "%d", speed);
-    return esp_mqtt_client_publish(client_, fancoilSpeedTopic_, buf, len, 0, true);
+    return esp_mqtt_client_publish(client_, topics_.fancoilSpeed, buf, len, 0, true);
 }
 
 int MqttHomeClient::publishSchedules(const ControllerDomain::Config::Schedule *schedules) {
     char buf[192];
-    size_t len = 0;
-    bool ok = appendf(buf, sizeof(buf), &len, "{");
-    for (int i = 0; i < NUM_SCHEDULE_TIMES; i++) {
-        const ControllerDomain::Config::Schedule &schedule = schedules[i];
-        ok = ok && appendf(buf, sizeof(buf), &len,
-                           "%s\"%s\":{\"start\":\"%02u:%02u\",\"heat_f\":%.0f,\"cool_f\":%.0f}",
-                           i == 0 ? "" : ",", scheduleSlots[i].key, schedule.startHr,
-                           schedule.startMin, ABS_C_TO_F(schedule.heatC),
-                           ABS_C_TO_F(schedule.coolC));
-    }
-    ok = ok && appendf(buf, sizeof(buf), &len, "}");
-    if (!ok) {
+    int len = HassMessages::formatScheduleState(schedules, buf, sizeof(buf));
+    if (len < 0) {
         ESP_LOGE(TAG, "Schedule state message truncated");
         return -1;
     }
-    return esp_mqtt_client_publish(client_, scheduleStateTopic_, buf, len, 0, true);
+    return esp_mqtt_client_publish(client_, topics_.scheduleState, buf, len, 0, true);
 }
 
 void MqttHomeClient::parseModeCmdMessage(const char *data, int dataLen) {
@@ -740,54 +493,9 @@ void MqttHomeClient::parseTempCmdMessage(bool high, const char *data, int dataLe
     eventCb_(evt);
 }
 
-// Accepts a full or partial schedule, e.g. {"night":{"cool_f":76}} or
-// {"day":{"start":"06:30","heat_f":68,"cool_f":74},"night":{...}}. Any fields not present are
-// left unchanged. Clamping and validation against the current schedule happen in the
-// controller, which republishes the resulting schedule.
 void MqttHomeClient::parseScheduleCmdMessage(const char *data, int dataLen) {
-    cJSON *root = cJSON_ParseWithLength(data, dataLen);
-    if (!cJSON_IsObject(root)) {
-        ESP_LOGW(TAG, "Failed to parse schedule command: %.*s", dataLen, data);
-        cJSON_Delete(root);
-        return;
-    }
-
     AbstractUIManager::Event evt{.type = AbstractUIManager::EventType::UpdateSchedule, .payload{}};
-    bool valid = true, anySet = false;
-    for (int i = 0; i < NUM_SCHEDULE_TIMES && valid; i++) {
-        AbstractUIManager::ScheduleUpdate &update = evt.payload.scheduleUpdates[i];
-        update = AbstractUIManager::ScheduleUpdate::none();
-
-        const cJSON *slot = cJSON_GetObjectItemCaseSensitive(root, scheduleSlots[i].key);
-        if (slot == nullptr) {
-            continue;
-        }
-        if (!cJSON_IsObject(slot)) {
-            valid = false;
-            break;
-        }
-
-        const cJSON *heat = cJSON_GetObjectItemCaseSensitive(slot, "heat_f");
-        const cJSON *cool = cJSON_GetObjectItemCaseSensitive(slot, "cool_f");
-        const cJSON *start = cJSON_GetObjectItemCaseSensitive(slot, "start");
-        if (heat != nullptr) {
-            valid &= cJSON_IsNumber(heat);
-            update.heatC = ABS_F_TO_C(cJSON_GetNumberValue(heat));
-        }
-        if (cool != nullptr) {
-            valid &= cJSON_IsNumber(cool);
-            update.coolC = ABS_F_TO_C(cJSON_GetNumberValue(cool));
-        }
-        if (start != nullptr) {
-            const char *startStr = cJSON_GetStringValue(start);
-            update.startMinOfDay = startStr == nullptr ? -1 : parseStartTime(startStr);
-            valid &= update.startMinOfDay >= 0;
-        }
-        anySet |= heat != nullptr || cool != nullptr || start != nullptr;
-    }
-    cJSON_Delete(root);
-
-    if (!valid || !anySet) {
+    if (!HassMessages::parseScheduleCmd(data, dataLen, evt.payload.scheduleUpdates)) {
         ESP_LOGW(TAG, "Invalid schedule command: %.*s", dataLen, data);
         return;
     }

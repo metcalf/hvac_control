@@ -3,6 +3,7 @@
 #include "AbstractHomeClient.h"
 #include "AbstractUIManager.h"
 #include "BaseMqttClient.h"
+#include "HassMessages.h"
 
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
@@ -74,14 +75,10 @@ class MqttHomeClient : public BaseMqttClient, public AbstractHomeClient {
     static constexpr const char *outdoorTempTopic_ = "home/global/outdoor_temp_c";
     static constexpr const char *airQualityTopic_ = "home/global/air_quality_index";
 
-    char discoveryStr_[8192] = "", discoveryTopic_[64], availabilityTopic_[64],
-         currentTempTopic_[64], modeStateTopic_[64], modeCmdTopic_[64], highTempTopic_[64],
-         highTempCmdTopic_[64], lowTempTopic_[64], lowTempCmdTopic_[64], actionTopic_[64],
-         staticPressureTopic_[64], fanStateTopic_[64], fanCmdTopic_[64], fanPctTopic_[64],
-         fanPctCmdTopic_[64], hvacModeNumTopic_[64], fancoilSpeedTopic_[64],
-         scheduleStateTopic_[64], scheduleCmdTopic_[64];
+    HassMessages::Topics topics_;
+    char discoveryStr_[HassMessages::DISCOVERY_LEN] = "";
 
-    esp_mqtt_topic_t topics_[7] = {
+    esp_mqtt_topic_t subscriptions_[7] = {
         {.filter = vacationTopic_, .qos = 0},
         {.filter = outdoorTempTopic_, .qos = 0},
         {.filter = airQualityTopic_, .qos = 0},
