@@ -71,21 +71,19 @@ void coolRollerChangeCb(lv_event_t *e) {
 void restartCb(lv_event_t *e) { ((UIManager *)lv_event_get_user_data(e))->eRestart(); }
 
 void UIManager::bootDone() {
-    xSemaphoreTake(mutex_, portMAX_DELAY);
+    std::lock_guard<std::mutex> lock(mutex_);
     booted_ = true;
     _ui_screen_change(&ui_Home, LV_SCR_LOAD_ANIM_NONE, 0, 0, &ui_Home_screen_init);
     lv_disp_trig_activity(NULL);
-    xSemaphoreGive(mutex_);
 }
 
 void UIManager::bootErr(const char *msg) {
-    xSemaphoreTake(mutex_, portMAX_DELAY);
+    std::lock_guard<std::mutex> lock(mutex_);
     lv_label_set_text(ui_boot_error_text, msg);
 
     objSetVisibility(false, ui_boot_message);
     objSetVisibility(true, ui_boot_error_heading);
     objSetVisibility(true, ui_boot_error_text);
-    xSemaphoreGive(mutex_);
 }
 
 void UIManager::sendACOverrideEvent(ACOverride override) {
@@ -566,23 +564,10 @@ void UIManager::initExtraWidgets() {
     lv_obj_add_flag(continuousFanDropdown_, LV_OBJ_FLAG_SCROLL_ON_FOCUS); /// Flags
 }
 
-void UIManager::sendEvent(Event &evt) {
-    // Release the mutex while calling the event callback to avoid deadlock.
-    // Usually this thread will be holding the mutex via handleTasks
-    // and the callback may want to call something like SetMessage/ClearMessage
-    // I'm not 100% sure it's safe to do this but seems plausible as long
-    // as this thread is blocked.
-    bool had = xSemaphoreGive(mutex_);
-    eventCb_(evt);
-    if (had) {
-        xSemaphoreTake(mutex_, portMAX_DELAY);
-    }
-}
+void UIManager::sendEvent(Event &evt) { eventCb_(evt); }
 
 UIManager::UIManager(ControllerDomain::Config config, size_t nMsgIds, eventCb_t eventCb)
     : eventCb_(eventCb) {
-    mutex_ = xSemaphoreCreateMutex();
-
     inTempOffsetC_ = config.inTempOffsetC;
     outTempOffsetC_ = config.outTempOffsetC;
     co2Target_ = config.co2Target;
@@ -626,18 +611,16 @@ UIManager::UIManager(ControllerDomain::Config config, size_t nMsgIds, eventCb_t 
 }
 
 uint32_t UIManager::handleTasks() {
-    xSemaphoreTake(mutex_, portMAX_DELAY);
+    std::lock_guard<std::mutex> lock(mutex_);
 
     if (booted_) {
         sleepMgr_->update();
     }
-    auto rv = lv_timer_handler();
-    xSemaphoreGive(mutex_);
-    return rv;
+    return lv_timer_handler();
 }
 
 void UIManager::setAQI(int16_t aqi) {
-    xSemaphoreTake(mutex_, portMAX_DELAY);
+    std::lock_guard<std::mutex> lock(mutex_);
     if (aqi > 999 || aqi < 0) {
         lv_label_set_text(ui_AQI_value, "---");
     } else {
@@ -659,55 +642,48 @@ void UIManager::setAQI(int16_t aqi) {
                                 LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_color(ui_AQI_value, lv_color_hex(color),
                                 LV_PART_MAIN | LV_STATE_DEFAULT);
-
-    xSemaphoreGive(mutex_);
 }
 
 void UIManager::setCurrentFanSpeed(uint8_t speed) {
-    xSemaphoreTake(mutex_, portMAX_DELAY);
+    std::lock_guard<std::mutex> lock(mutex_);
     if (speed == 0) {
         lv_label_set_text(ui_Fan_value, "OFF");
     } else {
         lv_label_set_text_fmt(ui_Fan_value, "%u%%", (uint)std::round(speed / 255.0 * 100));
     }
-    xSemaphoreGive(mutex_);
 }
 
 void UIManager::setOutTempC(double tc) {
-    xSemaphoreTake(mutex_, portMAX_DELAY);
+    std::lock_guard<std::mutex> lock(mutex_);
     currOutTempC_ = tc;
     if (std::isnan(tc)) {
         lv_label_set_text(ui_Out_temp_value, "--°");
     } else {
         lv_label_set_text_fmt(ui_Out_temp_value, "%u°", (uint)std::round(ABS_C_TO_F(tc)));
     }
-    xSemaphoreGive(mutex_);
 }
 
 void UIManager::setInTempC(double tc) {
-    xSemaphoreTake(mutex_, portMAX_DELAY);
+    std::lock_guard<std::mutex> lock(mutex_);
     currInTempC_ = tc;
     if (std::isnan(tc)) {
         lv_label_set_text(ui_Indoor_temp_value, "--");
     } else {
         lv_label_set_text_fmt(ui_Indoor_temp_value, "%u", (uint)std::round(ABS_C_TO_F(tc)));
     }
-    xSemaphoreGive(mutex_);
 }
 
 void UIManager::setInCO2(uint16_t ppm) {
-    xSemaphoreTake(mutex_, portMAX_DELAY);
+    std::lock_guard<std::mutex> lock(mutex_);
     if (ppm == 0) {
         lv_label_set_text(ui_co2_value, "--");
     } else {
         lv_label_set_text_fmt(ui_co2_value, "%u", ppm);
     }
-
-    xSemaphoreGive(mutex_);
 }
 
 void UIManager::setHVACState(ControllerDomain::HVACState state) {
-    xSemaphoreTake(mutex_, portMAX_DELAY);
+    std::lock_guard<std::mutex> lock(mutex_);
     if (state == HVACState::Off) {
         lv_obj_set_style_border_side(ui_Indoor_temp_value, LV_BORDER_SIDE_NONE, 0);
     } else {
@@ -718,18 +694,15 @@ void UIManager::setHVACState(ControllerDomain::HVACState state) {
             lv_obj_set_style_border_color(ui_Indoor_temp_value, lv_color_hex(0x4CAFFF), 0);
         }
     }
-
-    xSemaphoreGive(mutex_);
 }
 
 void UIManager::setCurrentSetpoints(double heatC, double coolC) {
     currHeatDeg_ = std::round(ABS_C_TO_F(heatC));
     currCoolDeg_ = std::round(ABS_C_TO_F(coolC));
 
-    xSemaphoreTake(mutex_, portMAX_DELAY);
+    std::lock_guard<std::mutex> lock(mutex_);
     lv_label_set_text_fmt(ui_Heat_setpoint, "%u", currHeatDeg_);
     lv_label_set_text_fmt(ui_Cool_setpoint, "%u", currCoolDeg_);
-    xSemaphoreGive(mutex_);
 }
 
 // NB: Only call while holding mutex_ (or during single-threaded setup)
@@ -752,17 +725,15 @@ void UIManager::setSystemPowerInternal(bool on) {
 }
 
 void UIManager::setSystemPower(bool on) {
-    xSemaphoreTake(mutex_, portMAX_DELAY);
+    std::lock_guard<std::mutex> lock(mutex_);
     setSystemPowerInternal(on);
-    xSemaphoreGive(mutex_);
 }
 
 void UIManager::setSchedules(const Config::Schedule *schedules) {
     // Only update our copy; the schedule screen's rollers are populated from it when the
     // screen loads, so we don't disturb an edit in progress.
-    xSemaphoreTake(mutex_, portMAX_DELAY);
+    std::lock_guard<std::mutex> lock(mutex_);
     for (int i = 0; i < NUM_SCHEDULE_TIMES; i++) {
         currSchedules_[i] = schedules[i];
     }
-    xSemaphoreGive(mutex_);
 }

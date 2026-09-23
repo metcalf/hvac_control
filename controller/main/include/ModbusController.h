@@ -1,10 +1,10 @@
 #pragma once
 
 #include <chrono>
+#include <mutex>
 
 #include "freertos/FreeRTOS.h"
 #include "freertos/event_groups.h"
-#include "freertos/semphr.h"
 
 #include "AbstractModbusController.h"
 #include "ControllerDomain.h"
@@ -14,15 +14,9 @@
 
 class ModbusController : public AbstractModbusController {
   public:
-    ModbusController() {
-        requests_ = xEventGroupCreate();
-        mutex_ = xSemaphoreCreateMutex();
-    }
+    ModbusController() { requests_ = xEventGroupCreate(); }
 
-    ~ModbusController() {
-        vEventGroupDelete(requests_);
-        vSemaphoreDelete(mutex_);
-    }
+    ~ModbusController() { vEventGroupDelete(requests_); }
 
     esp_err_t init() { return client_.init(); }
     void task();
@@ -60,7 +54,7 @@ class ModbusController : public AbstractModbusController {
 
     ModbusClient client_;
     EventGroupHandle_t requests_;
-    SemaphoreHandle_t mutex_;
+    std::mutex mutex_;
 
     FancoilRequest requestFancoil_;
     FanSpeed requestFreshAirSpeed_;

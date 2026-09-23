@@ -126,6 +126,14 @@ void modbusTask(void *mb) { ((ModbusController *)mb)->task(); }
 
 void uiEvtCb(UIManager::Event &evt) { xQueueSend(uiEvtQueue_, &evt, portMAX_DELAY); }
 
+// UIManager calls this while holding its lock, so it must not block: the app task may be
+// waiting on that lock and so unable to drain the queue.
+void uiManagerEvtCb(UIManager::Event &evt) {
+    if (xQueueSend(uiEvtQueue_, &evt, 0) != pdTRUE) {
+        ESP_LOGW(TAG, "UI event queue full, dropping event %d", static_cast<int>(evt.type));
+    }
+}
+
 bool uiEvtRcv(UIManager::Event *evt, uint waitMs) {
     return xQueueReceive(uiEvtQueue_, evt, pdMS_TO_TICKS(waitMs)) == pdTRUE;
 }
@@ -210,7 +218,7 @@ extern "C" void controller_main() {
         bootErr("Failed to load config: %d", err);
     }
     ota_ = new ESPOTAClient("controller", otaMsgCb, UI_MAX_MSG_LEN);
-    uiManager_ = new UIManager(config, ControllerApp::nMsgIds(), uiEvtCb);
+    uiManager_ = new UIManager(config, ControllerApp::nMsgIds(), uiManagerEvtCb);
     UIManager::setEventsInst(uiManager_);
     uiManager_->setFirmwareVersion(ota_->currentVersion());
     modbusController_ = new ModbusController();

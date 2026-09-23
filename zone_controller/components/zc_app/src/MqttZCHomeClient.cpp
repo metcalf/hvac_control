@@ -70,8 +70,6 @@ static const char *discoveryTmpl =
     R"(}})";
 
 MqttZCHomeClient::MqttZCHomeClient() {
-    mutex_ = xSemaphoreCreateMutex();
-
     // Register the last will so the broker marks us unavailable if we drop without
     // publishing "0" ourselves. config_ is consumed by BaseMqttClient::start(), which
     // runs after construction, so setting it here takes effect.
@@ -80,52 +78,49 @@ MqttZCHomeClient::MqttZCHomeClient() {
     config_.session.last_will.retain = true;
 }
 
-MqttZCHomeClient::~MqttZCHomeClient() { vSemaphoreDelete(mutex_); }
-
 AbstractZCHomeClient::HomeState MqttZCHomeClient::state() {
-    xSemaphoreTake(mutex_, portMAX_DELAY);
-    HomeState r = state_;
-    xSemaphoreGive(mutex_);
-    return r;
+    std::lock_guard<std::mutex> lock(mutex_);
+    return state_;
 }
 
 void MqttZCHomeClient::updateState(const ZCDomain::SystemState &state, const HeatPumpState &hp) {
-    xSemaphoreTake(mutex_, portMAX_DELAY);
     bool changed = false;
-    auto flag = [&](UpdatedFields field) {
-        updatedFields_ |= updatedFieldMask(field);
-        changed = true;
-    };
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        auto flag = [&](UpdatedFields field) {
+            updatedFields_ |= updatedFieldMask(field);
+            changed = true;
+        };
 
-    // Flag each sensor on its own so an update to one doesn't republish the rest.
-    if (!haveState_ || state.zonePump != lastState_.zonePump) {
-        flag(UpdatedFields::ZonePump);
-    }
-    if (!haveState_ || state.fcPump != lastState_.fcPump) {
-        flag(UpdatedFields::FcPump);
-    }
-    if (!haveState_ || state.heatPumpMode != lastState_.heatPumpMode) {
-        flag(UpdatedFields::HpMode);
-    }
-    haveState_ = true;
-    lastState_ = state;
+        // Flag each sensor on its own so an update to one doesn't republish the rest.
+        if (!haveState_ || state.zonePump != lastState_.zonePump) {
+            flag(UpdatedFields::ZonePump);
+        }
+        if (!haveState_ || state.fcPump != lastState_.fcPump) {
+            flag(UpdatedFields::FcPump);
+        }
+        if (!haveState_ || state.heatPumpMode != lastState_.heatPumpMode) {
+            flag(UpdatedFields::HpMode);
+        }
+        haveState_ = true;
+        lastState_ = state;
 
-    if (recordReading(lastHp_.cxOpMode, hp.cxOpMode)) {
-        flag(UpdatedFields::CxMode);
+        if (recordReading(lastHp_.cxOpMode, hp.cxOpMode)) {
+            flag(UpdatedFields::CxMode);
+        }
+        if (recordReading(lastHp_.outletTempC, hp.outletTempC)) {
+            flag(UpdatedFields::HpOutletTemp);
+        }
+        if (recordReading(lastHp_.compressorFreq, hp.compressorFreq)) {
+            flag(UpdatedFields::HpCompressorFreq);
+        }
+        if (recordReading(lastHp_.acCurrent, hp.acCurrent)) {
+            flag(UpdatedFields::HpACCurrent);
+        }
+        if (recordReading(lastHp_.ambientTempC, hp.ambientTempC)) {
+            flag(UpdatedFields::HpAmbientTemp);
+        }
     }
-    if (recordReading(lastHp_.outletTempC, hp.outletTempC)) {
-        flag(UpdatedFields::HpOutletTemp);
-    }
-    if (recordReading(lastHp_.compressorFreq, hp.compressorFreq)) {
-        flag(UpdatedFields::HpCompressorFreq);
-    }
-    if (recordReading(lastHp_.acCurrent, hp.acCurrent)) {
-        flag(UpdatedFields::HpACCurrent);
-    }
-    if (recordReading(lastHp_.ambientTempC, hp.ambientTempC)) {
-        flag(UpdatedFields::HpAmbientTemp);
-    }
-    xSemaphoreGive(mutex_);
 
     if (client_ == nullptr || !changed) {
         return; // client not started yet (state published on connect), or nothing new
@@ -140,49 +135,53 @@ void MqttZCHomeClient::onMsg(char *topic, int topicLen, char *, int) {
 
 void MqttZCHomeClient::onErr(esp_mqtt_error_codes_t err) {
     ESP_LOGE(TAG, "MQTT error occurred: %d", err.error_type);
-    xSemaphoreTake(mutex_, portMAX_DELAY);
+    std::lock_guard<std::mutex> lock(mutex_);
     state_.err = Error::FetchError;
-    xSemaphoreGive(mutex_);
 }
 
 void MqttZCHomeClient::onConnected() {
     // Publish values via a user message to avoid duplication and consolidate retries.
     // Only currently valid values are re-flagged: a sensor whose last read failed is left
     // alone rather than republished, which would pass a stale reading off as a fresh one.
-    xSemaphoreTake(mutex_, portMAX_DELAY);
-    if (haveState_) {
-        updatedFields_ |= updatedFieldMask(UpdatedFields::ZonePump);
-        updatedFields_ |= updatedFieldMask(UpdatedFields::FcPump);
-        updatedFields_ |= updatedFieldMask(UpdatedFields::HpMode);
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        if (haveState_) {
+            updatedFields_ |= updatedFieldMask(UpdatedFields::ZonePump);
+            updatedFields_ |= updatedFieldMask(UpdatedFields::FcPump);
+            updatedFields_ |= updatedFieldMask(UpdatedFields::HpMode);
+        }
+        if (lastHp_.cxOpMode.has_value()) {
+            updatedFields_ |= updatedFieldMask(UpdatedFields::CxMode);
+        }
+        if (lastHp_.outletTempC.has_value()) {
+            updatedFields_ |= updatedFieldMask(UpdatedFields::HpOutletTemp);
+        }
+        if (lastHp_.compressorFreq.has_value()) {
+            updatedFields_ |= updatedFieldMask(UpdatedFields::HpCompressorFreq);
+        }
+        if (lastHp_.acCurrent.has_value()) {
+            updatedFields_ |= updatedFieldMask(UpdatedFields::HpACCurrent);
+        }
+        if (lastHp_.ambientTempC.has_value()) {
+            updatedFields_ |= updatedFieldMask(UpdatedFields::HpAmbientTemp);
+        }
+        updatedFields_ |= updatedFieldMask(UpdatedFields::Availability);
+        updatedFields_ |= updatedFieldMask(UpdatedFields::Discovery);
     }
-    if (lastHp_.cxOpMode.has_value()) {
-        updatedFields_ |= updatedFieldMask(UpdatedFields::CxMode);
-    }
-    if (lastHp_.outletTempC.has_value()) {
-        updatedFields_ |= updatedFieldMask(UpdatedFields::HpOutletTemp);
-    }
-    if (lastHp_.compressorFreq.has_value()) {
-        updatedFields_ |= updatedFieldMask(UpdatedFields::HpCompressorFreq);
-    }
-    if (lastHp_.acCurrent.has_value()) {
-        updatedFields_ |= updatedFieldMask(UpdatedFields::HpACCurrent);
-    }
-    if (lastHp_.ambientTempC.has_value()) {
-        updatedFields_ |= updatedFieldMask(UpdatedFields::HpAmbientTemp);
-    }
-    updatedFields_ |= updatedFieldMask(UpdatedFields::Availability);
-    updatedFields_ |= updatedFieldMask(UpdatedFields::Discovery);
-    xSemaphoreGive(mutex_);
 
     esp_mqtt_dispatch_custom_event(client_, nullptr);
 }
 
 void MqttZCHomeClient::onUserEvent() {
-    xSemaphoreTake(mutex_, portMAX_DELAY);
-    uint16_t fields = updatedFields_;
-    ZCDomain::SystemState state = lastState_;
-    HeatPumpState hp = lastHp_;
-    xSemaphoreGive(mutex_);
+    uint16_t fields;
+    ZCDomain::SystemState state;
+    HeatPumpState hp;
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        fields = updatedFields_;
+        state = lastState_;
+        hp = lastHp_;
+    }
 
     // Publish each flagged sensor on its own, retained so Home Assistant recovers the value
     // after a restart. A failed publish leaves that flag set, so the next event retries just
@@ -194,9 +193,8 @@ void MqttZCHomeClient::onUserEvent() {
         if (esp_mqtt_client_publish(client_, topic, payload, 0, 0, true) < 0) {
             return;
         }
-        xSemaphoreTake(mutex_, portMAX_DELAY);
+        std::lock_guard<std::mutex> lock(mutex_);
         updatedFields_ &= ~updatedFieldMask(field);
-        xSemaphoreGive(mutex_);
     };
 
     char buf[16];
@@ -230,9 +228,8 @@ void MqttZCHomeClient::onUserEvent() {
 
     if (fields & updatedFieldMask(UpdatedFields::Discovery)) {
         if (publishDiscoveryMessage() >= 0) {
-            xSemaphoreTake(mutex_, portMAX_DELAY);
+            std::lock_guard<std::mutex> lock(mutex_);
             updatedFields_ &= ~updatedFieldMask(UpdatedFields::Discovery);
-            xSemaphoreGive(mutex_);
         }
     }
 }

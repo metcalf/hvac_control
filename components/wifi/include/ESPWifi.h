@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstring>
+#include <mutex>
 
 #include "AbstractWifi.h"
 
@@ -8,15 +9,10 @@
 #include "esp_netif_sntp.h"
 #include "esp_timer.h"
 #include "esp_wifi.h"
-#include "freertos/FreeRTOS.h"
-#include "freertos/semphr.h"
 
 // NB: Maybe need to set CONFIG_ESP_SYSTEM_EVENT_TASK_STACK_SIZE >= 3584?
 class ESPWifi : public AbstractWifi {
   public:
-    ESPWifi() { mutex_ = xSemaphoreCreateMutex(); }
-    ~ESPWifi() { vSemaphoreDelete(mutex_); }
-
     void init(const char *name);
     void connect(const char *ssid, const char *password);
     void disconnect();
@@ -36,10 +32,8 @@ class ESPWifi : public AbstractWifi {
 
     void msg(char *msg, size_t n) override;
     State getState() override {
-        xSemaphoreTake(mutex_, portMAX_DELAY);
-        State state = state_;
-        xSemaphoreGive(mutex_);
-        return state;
+        std::lock_guard<std::mutex> lock(mutex_);
+        return state_;
     }
     void updateSTA(const char *ssid, const char *password) override;
     void updateName(const char *name) override;
@@ -55,7 +49,7 @@ class ESPWifi : public AbstractWifi {
     char hostname_[64] = "";
     int reason_ = 0;
     esp_netif_t *netif_ = nullptr;
-    SemaphoreHandle_t mutex_;
+    std::mutex mutex_;
 
     // Diagnostics counters, updated from event handlers.
     uint32_t disconnectCount_ = 0;

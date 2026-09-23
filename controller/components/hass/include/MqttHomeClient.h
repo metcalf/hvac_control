@@ -5,14 +5,12 @@
 #include "BaseMqttClient.h"
 #include "HassMessages.h"
 
-#include "freertos/FreeRTOS.h"
-#include "freertos/semphr.h"
 #include <cmath>
+#include <mutex>
 
 class MqttHomeClient : public BaseMqttClient, public AbstractHomeClient {
   public:
     MqttHomeClient(const char *name, AbstractUIManager::eventCb_t eventCb);
-    ~MqttHomeClient();
 
     HomeState state() override;
 
@@ -31,7 +29,7 @@ class MqttHomeClient : public BaseMqttClient, public AbstractHomeClient {
     void onUserEvent() override;
 
   private:
-    SemaphoreHandle_t mutex_;
+    std::mutex mutex_;
 
     enum class ClimateMode { Unset = -1, Off, Auto };
     enum class ClimateAction { Unset = -1, Off, Idle, Heating, Cooling, Fan };

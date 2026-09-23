@@ -15,11 +15,8 @@ static const char *TAG = "MQTT";
 
 MqttHomeClient::MqttHomeClient(const char *name, AbstractUIManager::eventCb_t eventCb)
     : eventCb_(eventCb) {
-    mutex_ = xSemaphoreCreateMutex();
     updateTopics(name);
 }
-
-MqttHomeClient::~MqttHomeClient() { vSemaphoreDelete(mutex_); }
 
 const char *MqttHomeClient::climateModeToS(ClimateMode mode) {
     switch (mode) {
@@ -90,10 +87,8 @@ MqttHomeClient::HVACModeNum MqttHomeClient::hvacModeNumFor(bool systemOn,
 }
 
 AbstractHomeClient::HomeState MqttHomeClient::state() {
-    xSemaphoreTake(mutex_, portMAX_DELAY);
-    HomeState r = state_;
-    xSemaphoreGive(mutex_);
-    return r;
+    std::lock_guard<std::mutex> lock(mutex_);
+    return state_;
 }
 
 void MqttHomeClient::updateClimateState(bool systemOn, ControllerDomain::HVACState hvacState,
@@ -107,67 +102,71 @@ void MqttHomeClient::updateClimateState(bool systemOn, ControllerDomain::HVACSta
     HVACModeNum hvacModeNum = hvacModeNumFor(systemOn, hvacState);
     int8_t fancoilSpeedNum = static_cast<int8_t>(fancoilSpeed);
 
-    xSemaphoreTake(mutex_, portMAX_DELAY);
-    if (lastClimateMode_ != mode) {
-        lastClimateMode_ = mode;
-        updatedFields_ |= updatedFieldMask(UpdatedFields::ClimateMode);
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        if (lastClimateMode_ != mode) {
+            lastClimateMode_ = mode;
+            updatedFields_ |= updatedFieldMask(UpdatedFields::ClimateMode);
+        }
+        if (lastInTempC_ != inTempC) {
+            lastInTempC_ = inTempC;
+            updatedFields_ |= updatedFieldMask(UpdatedFields::InTemp);
+        }
+        if (lastHighTempC_ != highTempC) {
+            lastHighTempC_ = highTempC;
+            updatedFields_ |= updatedFieldMask(UpdatedFields::HighTemp);
+        }
+        if (lastLowTempC_ != lowTempC) {
+            lastLowTempC_ = lowTempC;
+            updatedFields_ |= updatedFieldMask(UpdatedFields::LowTemp);
+        }
+        if (lastClimateAction_ != climateAction) {
+            lastClimateAction_ = climateAction;
+            updatedFields_ |= updatedFieldMask(UpdatedFields::Action);
+        }
+        if (lastFanSpeed_ != fanSpeed) {
+            lastFanSpeed_ = fanSpeed;
+            updatedFields_ |= updatedFieldMask(UpdatedFields::FanSpeed);
+        }
+        if (lastHVACModeNum_ != hvacModeNum) {
+            lastHVACModeNum_ = hvacModeNum;
+            updatedFields_ |= updatedFieldMask(UpdatedFields::HVACMode);
+        }
+        if (lastFancoilSpeedNum_ != fancoilSpeedNum) {
+            lastFancoilSpeedNum_ = fancoilSpeedNum;
+            updatedFields_ |= updatedFieldMask(UpdatedFields::FancoilSpeed);
+        }
     }
-    if (lastInTempC_ != inTempC) {
-        lastInTempC_ = inTempC;
-        updatedFields_ |= updatedFieldMask(UpdatedFields::InTemp);
-    }
-    if (lastHighTempC_ != highTempC) {
-        lastHighTempC_ = highTempC;
-        updatedFields_ |= updatedFieldMask(UpdatedFields::HighTemp);
-    }
-    if (lastLowTempC_ != lowTempC) {
-        lastLowTempC_ = lowTempC;
-        updatedFields_ |= updatedFieldMask(UpdatedFields::LowTemp);
-    }
-    if (lastClimateAction_ != climateAction) {
-        lastClimateAction_ = climateAction;
-        updatedFields_ |= updatedFieldMask(UpdatedFields::Action);
-    }
-    if (lastFanSpeed_ != fanSpeed) {
-        lastFanSpeed_ = fanSpeed;
-        updatedFields_ |= updatedFieldMask(UpdatedFields::FanSpeed);
-    }
-    if (lastHVACModeNum_ != hvacModeNum) {
-        lastHVACModeNum_ = hvacModeNum;
-        updatedFields_ |= updatedFieldMask(UpdatedFields::HVACMode);
-    }
-    if (lastFancoilSpeedNum_ != fancoilSpeedNum) {
-        lastFancoilSpeedNum_ = fancoilSpeedNum;
-        updatedFields_ |= updatedFieldMask(UpdatedFields::FancoilSpeed);
-    }
-    xSemaphoreGive(mutex_);
 
     esp_mqtt_dispatch_custom_event(client_, nullptr);
 }
 
 void MqttHomeClient::updateStaticPressure(uint32_t pressurePa) {
     // Set the flag here and publish from the event loop to avoid blocking on the outbox.
-    xSemaphoreTake(mutex_, portMAX_DELAY);
-    if (lastStaticPressurePa_ != pressurePa) {
-        lastStaticPressurePa_ = pressurePa;
-        updatedFields_ |= updatedFieldMask(UpdatedFields::StaticPressure);
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        if (lastStaticPressurePa_ != pressurePa) {
+            lastStaticPressurePa_ = pressurePa;
+            updatedFields_ |= updatedFieldMask(UpdatedFields::StaticPressure);
+        }
     }
-    xSemaphoreGive(mutex_);
 
     esp_mqtt_dispatch_custom_event(client_, nullptr);
 }
 
 void MqttHomeClient::updateSchedules(const ControllerDomain::Config::Schedule *schedules) {
     // Set the flag here and publish from the event loop to avoid blocking on the outbox.
-    xSemaphoreTake(mutex_, portMAX_DELAY);
-    bool changed =
-        !haveSchedules_ || !std::equal(schedules, schedules + NUM_SCHEDULE_TIMES, lastSchedules_);
-    std::copy(schedules, schedules + NUM_SCHEDULE_TIMES, lastSchedules_);
-    haveSchedules_ = true;
-    if (changed) {
-        updatedFields_ |= updatedFieldMask(UpdatedFields::Schedules);
+    bool changed;
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        changed = !haveSchedules_ ||
+                  !std::equal(schedules, schedules + NUM_SCHEDULE_TIMES, lastSchedules_);
+        std::copy(schedules, schedules + NUM_SCHEDULE_TIMES, lastSchedules_);
+        haveSchedules_ = true;
+        if (changed) {
+            updatedFields_ |= updatedFieldMask(UpdatedFields::Schedules);
+        }
     }
-    xSemaphoreGive(mutex_);
 
     if (changed) {
         esp_mqtt_dispatch_custom_event(client_, nullptr);
@@ -178,9 +177,10 @@ void MqttHomeClient::updateName(const char *name) {
     // NB: We don't actually hold the mutex_ everywhere we read *topic_ since this should be
     // called very rarely so a race probably isn't a major risk. A separate topicMutex_ would
     // be a more correct solution.
-    xSemaphoreTake(mutex_, portMAX_DELAY);
-    updateTopics(name);
-    xSemaphoreGive(mutex_);
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        updateTopics(name);
+    }
 
     // Need to reconnect to update LWT
     esp_mqtt_client_reconnect(client_);
@@ -215,9 +215,8 @@ void MqttHomeClient::onMsg(char *topic, int topicLen, char *data, int dataLen) {
 
 void MqttHomeClient::onErr(esp_mqtt_error_codes_t err) {
     ESP_LOGE(TAG, "MQTT error occurred: %d", err.error_type);
-    xSemaphoreTake(mutex_, portMAX_DELAY);
+    std::lock_guard<std::mutex> lock(mutex_);
     state_.err = Error::FetchError;
-    xSemaphoreGive(mutex_);
 }
 
 void MqttHomeClient::onConnected() {
@@ -229,143 +228,140 @@ void MqttHomeClient::onConnected() {
     }
 
     // Publish values via a user message to avoid duplication and consolidate retries
-    xSemaphoreTake(mutex_, portMAX_DELAY);
-    if (lastClimateMode_ != ClimateMode::Unset) {
-        updatedFields_ |= updatedFieldMask(UpdatedFields::ClimateMode);
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        if (lastClimateMode_ != ClimateMode::Unset) {
+            updatedFields_ |= updatedFieldMask(UpdatedFields::ClimateMode);
+        }
+        if (!std::isnan(lastInTempC_)) {
+            updatedFields_ |= updatedFieldMask(UpdatedFields::InTemp);
+        }
+        if (!std::isnan(lastHighTempC_)) {
+            updatedFields_ |= updatedFieldMask(UpdatedFields::HighTemp);
+        }
+        if (!std::isnan(lastLowTempC_)) {
+            updatedFields_ |= updatedFieldMask(UpdatedFields::LowTemp);
+        }
+        if (lastClimateAction_ != ClimateAction::Unset) {
+            updatedFields_ |= updatedFieldMask(UpdatedFields::Action);
+        }
+        if (lastStaticPressurePa_ != 0) {
+            updatedFields_ |= updatedFieldMask(UpdatedFields::StaticPressure);
+        }
+        if (lastFanSpeed_ >= 0) {
+            updatedFields_ |= updatedFieldMask(UpdatedFields::FanSpeed);
+        }
+        if (lastHVACModeNum_ != HVACModeNum::Unset) {
+            updatedFields_ |= updatedFieldMask(UpdatedFields::HVACMode);
+        }
+        if (lastFancoilSpeedNum_ >= 0) {
+            updatedFields_ |= updatedFieldMask(UpdatedFields::FancoilSpeed);
+        }
+        if (haveSchedules_) {
+            updatedFields_ |= updatedFieldMask(UpdatedFields::Schedules);
+        }
+        updatedFields_ |= updatedFieldMask(UpdatedFields::Availability);
+        updatedFields_ |= updatedFieldMask(UpdatedFields::Discovery);
     }
-    if (!std::isnan(lastInTempC_)) {
-        updatedFields_ |= updatedFieldMask(UpdatedFields::InTemp);
-    }
-    if (!std::isnan(lastHighTempC_)) {
-        updatedFields_ |= updatedFieldMask(UpdatedFields::HighTemp);
-    }
-    if (!std::isnan(lastLowTempC_)) {
-        updatedFields_ |= updatedFieldMask(UpdatedFields::LowTemp);
-    }
-    if (lastClimateAction_ != ClimateAction::Unset) {
-        updatedFields_ |= updatedFieldMask(UpdatedFields::Action);
-    }
-    if (lastStaticPressurePa_ != 0) {
-        updatedFields_ |= updatedFieldMask(UpdatedFields::StaticPressure);
-    }
-    if (lastFanSpeed_ >= 0) {
-        updatedFields_ |= updatedFieldMask(UpdatedFields::FanSpeed);
-    }
-    if (lastHVACModeNum_ != HVACModeNum::Unset) {
-        updatedFields_ |= updatedFieldMask(UpdatedFields::HVACMode);
-    }
-    if (lastFancoilSpeedNum_ >= 0) {
-        updatedFields_ |= updatedFieldMask(UpdatedFields::FancoilSpeed);
-    }
-    if (haveSchedules_) {
-        updatedFields_ |= updatedFieldMask(UpdatedFields::Schedules);
-    }
-    updatedFields_ |= updatedFieldMask(UpdatedFields::Availability);
-    updatedFields_ |= updatedFieldMask(UpdatedFields::Discovery);
-    xSemaphoreGive(mutex_);
 
     esp_mqtt_dispatch_custom_event(client_, nullptr);
 }
 
 void MqttHomeClient::onUserEvent() {
-    xSemaphoreTake(mutex_, portMAX_DELAY);
-    uint16_t fields = updatedFields_;
-    ClimateMode mode = lastClimateMode_;
-    double inTempC = lastInTempC_;
-    double highTempC = lastHighTempC_;
-    double lowTempC = lastLowTempC_;
-    uint32_t staticPressurePa = lastStaticPressurePa_;
-    int16_t fanSpeed = lastFanSpeed_;
-    HVACModeNum hvacModeNum = lastHVACModeNum_;
-    int8_t fancoilSpeedNum = lastFancoilSpeedNum_;
+    uint16_t fields;
+    ClimateMode mode;
+    double inTempC, highTempC, lowTempC;
+    uint32_t staticPressurePa;
+    int16_t fanSpeed;
+    HVACModeNum hvacModeNum;
+    int8_t fancoilSpeedNum;
     ControllerDomain::Config::Schedule schedules[NUM_SCHEDULE_TIMES];
-    std::copy(std::begin(lastSchedules_), std::end(lastSchedules_), schedules);
-    xSemaphoreGive(mutex_);
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        fields = updatedFields_;
+        mode = lastClimateMode_;
+        inTempC = lastInTempC_;
+        highTempC = lastHighTempC_;
+        lowTempC = lastLowTempC_;
+        staticPressurePa = lastStaticPressurePa_;
+        fanSpeed = lastFanSpeed_;
+        hvacModeNum = lastHVACModeNum_;
+        fancoilSpeedNum = lastFancoilSpeedNum_;
+        std::copy(std::begin(lastSchedules_), std::end(lastSchedules_), schedules);
+    }
 
     if (fields & updatedFieldMask(UpdatedFields::ClimateMode)) {
         if (publishClimateMode(mode) >= 0) {
-            xSemaphoreTake(mutex_, portMAX_DELAY);
+            std::lock_guard<std::mutex> lock(mutex_);
             updatedFields_ &= ~updatedFieldMask(UpdatedFields::ClimateMode);
-            xSemaphoreGive(mutex_);
         }
     }
     if (fields & updatedFieldMask(UpdatedFields::InTemp)) {
         // Don't retain the current temperature since it goes stale quickly
         // and is updated frequently.
         if (publishTempC(topics_.currentTemp, inTempC, false) >= 0) {
-            xSemaphoreTake(mutex_, portMAX_DELAY);
+            std::lock_guard<std::mutex> lock(mutex_);
             updatedFields_ &= ~updatedFieldMask(UpdatedFields::InTemp);
-            xSemaphoreGive(mutex_);
         }
     }
     if (fields & updatedFieldMask(UpdatedFields::HighTemp)) {
         if (publishTempC(topics_.highTemp, highTempC, true) >= 0) {
-            xSemaphoreTake(mutex_, portMAX_DELAY);
+            std::lock_guard<std::mutex> lock(mutex_);
             updatedFields_ &= ~updatedFieldMask(UpdatedFields::HighTemp);
-            xSemaphoreGive(mutex_);
         }
     }
     if (fields & updatedFieldMask(UpdatedFields::LowTemp)) {
         if (publishTempC(topics_.lowTemp, lowTempC, true) >= 0) {
-            xSemaphoreTake(mutex_, portMAX_DELAY);
+            std::lock_guard<std::mutex> lock(mutex_);
             updatedFields_ &= ~updatedFieldMask(UpdatedFields::LowTemp);
-            xSemaphoreGive(mutex_);
         }
     }
     if (fields & updatedFieldMask(UpdatedFields::Availability)) {
         if (esp_mqtt_client_publish(client_, topics_.availability, "1", 1, 0, true) >= 0) {
-            xSemaphoreTake(mutex_, portMAX_DELAY);
+            std::lock_guard<std::mutex> lock(mutex_);
             updatedFields_ &= ~updatedFieldMask(UpdatedFields::Availability);
-            xSemaphoreGive(mutex_);
         }
     }
     if (fields & updatedFieldMask(UpdatedFields::Discovery)) {
         if (publishDiscoveryMessage() >= 0) {
-            xSemaphoreTake(mutex_, portMAX_DELAY);
+            std::lock_guard<std::mutex> lock(mutex_);
             updatedFields_ &= ~updatedFieldMask(UpdatedFields::Discovery);
-            xSemaphoreGive(mutex_);
         }
     }
     if (fields & updatedFieldMask(UpdatedFields::Action)) {
         if (publishClimateAction(lastClimateAction_) >= 0) {
-            xSemaphoreTake(mutex_, portMAX_DELAY);
+            std::lock_guard<std::mutex> lock(mutex_);
             updatedFields_ &= ~updatedFieldMask(UpdatedFields::Action);
-            xSemaphoreGive(mutex_);
         }
     }
     if (fields & updatedFieldMask(UpdatedFields::StaticPressure)) {
         if (publishStaticPressure(staticPressurePa) >= 0) {
-            xSemaphoreTake(mutex_, portMAX_DELAY);
+            std::lock_guard<std::mutex> lock(mutex_);
             updatedFields_ &= ~updatedFieldMask(UpdatedFields::StaticPressure);
-            xSemaphoreGive(mutex_);
         }
     }
     if (fields & updatedFieldMask(UpdatedFields::FanSpeed)) {
         if (publishFanSpeed(fanSpeed) >= 0) {
-            xSemaphoreTake(mutex_, portMAX_DELAY);
+            std::lock_guard<std::mutex> lock(mutex_);
             updatedFields_ &= ~updatedFieldMask(UpdatedFields::FanSpeed);
-            xSemaphoreGive(mutex_);
         }
     }
     if (fields & updatedFieldMask(UpdatedFields::HVACMode)) {
         if (publishHVACModeNum(hvacModeNum) >= 0) {
-            xSemaphoreTake(mutex_, portMAX_DELAY);
+            std::lock_guard<std::mutex> lock(mutex_);
             updatedFields_ &= ~updatedFieldMask(UpdatedFields::HVACMode);
-            xSemaphoreGive(mutex_);
         }
     }
     if (fields & updatedFieldMask(UpdatedFields::FancoilSpeed)) {
         if (publishFancoilSpeed(fancoilSpeedNum) >= 0) {
-            xSemaphoreTake(mutex_, portMAX_DELAY);
+            std::lock_guard<std::mutex> lock(mutex_);
             updatedFields_ &= ~updatedFieldMask(UpdatedFields::FancoilSpeed);
-            xSemaphoreGive(mutex_);
         }
     }
     if (fields & updatedFieldMask(UpdatedFields::Schedules)) {
         if (publishSchedules(schedules) >= 0) {
-            xSemaphoreTake(mutex_, portMAX_DELAY);
+            std::lock_guard<std::mutex> lock(mutex_);
             updatedFields_ &= ~updatedFieldMask(UpdatedFields::Schedules);
-            xSemaphoreGive(mutex_);
         }
     }
 }
@@ -504,12 +500,11 @@ void MqttHomeClient::parseScheduleCmdMessage(const char *data, int dataLen) {
 }
 
 void MqttHomeClient::parseVacationMessage(const char *data, int dataLen) {
-    xSemaphoreTake(mutex_, portMAX_DELAY);
+    std::lock_guard<std::mutex> lock(mutex_);
 
     if (dataLen <= 0) {
         ESP_LOGE(TAG, "Empty vacation message");
         state_.err = Error::ParseError;
-        xSemaphoreGive(mutex_);
         return;
     }
 
@@ -521,17 +516,14 @@ void MqttHomeClient::parseVacationMessage(const char *data, int dataLen) {
         ESP_LOGE(TAG, "Failed to parse vacation message: %.*s", dataLen, data);
         state_.err = Error::ParseError;
     }
-
-    xSemaphoreGive(mutex_);
 }
 
 void MqttHomeClient::parseOutdoorTempMessage(const char *data, int dataLen) {
-    xSemaphoreTake(mutex_, portMAX_DELAY);
+    std::lock_guard<std::mutex> lock(mutex_);
 
     if (dataLen <= 0) {
         ESP_LOGE(TAG, "Empty outdoor temp message");
         state_.err = Error::ParseError;
-        xSemaphoreGive(mutex_);
         return;
     }
 
@@ -553,17 +545,14 @@ void MqttHomeClient::parseOutdoorTempMessage(const char *data, int dataLen) {
         ESP_LOGE(TAG, "Failed to parse outdoor temp message: %.*s", dataLen, data);
         state_.err = Error::ParseError;
     }
-
-    xSemaphoreGive(mutex_);
 }
 
 void MqttHomeClient::parseAirQualityMessage(const char *data, int dataLen) {
-    xSemaphoreTake(mutex_, portMAX_DELAY);
+    std::lock_guard<std::mutex> lock(mutex_);
 
     if (dataLen <= 0) {
         ESP_LOGE(TAG, "Empty air quality message");
         state_.err = Error::ParseError;
-        xSemaphoreGive(mutex_);
         return;
     }
 
@@ -580,6 +569,4 @@ void MqttHomeClient::parseAirQualityMessage(const char *data, int dataLen) {
         ESP_LOGE(TAG, "Failed to parse air quality message: %.*s", dataLen, data);
         state_.err = Error::ParseError;
     }
-
-    xSemaphoreGive(mutex_);
 }

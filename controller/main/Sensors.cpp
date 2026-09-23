@@ -4,6 +4,8 @@
 
 #include "esp_err.h"
 #include "esp_log.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 #include "sts3x.h"
 
 #include "NVSConfigStore.h"
@@ -25,7 +27,6 @@ using SensorData = ControllerDomain::SensorData;
 uint16_t paToHpa(uint32_t pa) { return (pa + 100 / 2) / 100; }
 
 Sensors::Sensors() {
-    mutex_ = xSemaphoreCreateMutex();
     co2Calibration_ = new CO2Calibration(&co2CalibrationStore);
 }
 
@@ -130,15 +131,18 @@ bool Sensors::pollInternal(SensorData &prevData) {
 }
 
 bool Sensors::poll() {
-    xSemaphoreTake(mutex_, portMAX_DELAY);
-    SensorData data = lastData_;
-    xSemaphoreGive(mutex_);
+    SensorData data;
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        data = lastData_;
+    }
 
     bool res = pollInternal(data);
 
-    xSemaphoreTake(mutex_, portMAX_DELAY);
-    lastData_ = data;
-    xSemaphoreGive(mutex_);
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        lastData_ = data;
+    }
 
     if (strlen(data.errMsg) > 0) {
         ESP_LOGE(TAG, "%s", data.errMsg);
@@ -148,20 +152,13 @@ bool Sensors::poll() {
 }
 
 SensorData Sensors::getLatest() {
-    SensorData data;
-
-    xSemaphoreTake(mutex_, portMAX_DELAY);
-    data = lastData_;
-    xSemaphoreGive(mutex_);
-
-    return data;
+    std::lock_guard<std::mutex> lock(mutex_);
+    return lastData_;
 }
 
 int16_t Sensors::getCO2Offset() {
-    xSemaphoreTake(mutex_, portMAX_DELAY);
-    int16_t offset = co2Calibration_->getCurrentOffset();
-    xSemaphoreGive(mutex_);
-    return offset;
+    std::lock_guard<std::mutex> lock(mutex_);
+    return co2Calibration_->getCurrentOffset();
 }
 
 int8_t Sensors::initStsTemperature(uint8_t address) {
