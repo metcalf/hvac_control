@@ -48,7 +48,6 @@ static const char *COOL_CHAR = "\uf166";
 static const char *OFF_CHAR = "\ue836";
 
 ZCUIManager::ZCUIManager(SystemState state, size_t nMsgIds, eventCb_t eventCb) : eventCb_(eventCb) {
-    mutex_ = xSemaphoreCreateMutex();
     ui_init();
 
     sleepMgr_ = new SleepManager(ui_Home, GPIO_NUM_48);
@@ -80,16 +79,14 @@ ZCUIManager::ZCUIManager(SystemState state, size_t nMsgIds, eventCb_t eventCb) :
 }
 
 uint32_t ZCUIManager::handleTasks() {
-    xSemaphoreTake(mutex_, portMAX_DELAY);
+    std::lock_guard<std::mutex> lock(mutex_);
 
     sleepMgr_->update();
-    auto rv = lv_timer_handler();
-    xSemaphoreGive(mutex_);
-    return rv;
+    return lv_timer_handler();
 }
 
 void ZCUIManager::updateState(SystemState state) {
-    xSemaphoreTake(mutex_, portMAX_DELAY);
+    std::lock_guard<std::mutex> lock(mutex_);
     for (int i = 0; i < 4; i++) {
         updateCall(*zoneCalls[i], state.thermostats[i]);
         lv_label_set_text(*zoneValves[i], getValveText(state.valves[i]));
@@ -99,7 +96,6 @@ void ZCUIManager::updateState(SystemState state) {
     updatePump(ui_fc_pump_state, state.fcPump);
 
     lv_label_set_text(ui_heat_pump_state, getHeatPumpText(state.heatPumpMode));
-    xSemaphoreGive(mutex_);
 }
 
 void ZCUIManager::updateCall(lv_obj_t *icon, Call call) {

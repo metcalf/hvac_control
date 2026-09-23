@@ -3,6 +3,7 @@ file(GLOB TEST_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/test_*.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/helpers/src/*.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/../components/controller_app/src/*.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/../components/hass/src/HassMessages.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/../../components/wifi/Abstract*.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/../../components/wifi/Fake*.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/../../components/esp_local_test_helpers/src/*.cpp
@@ -26,6 +27,16 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(googletest)
 
+# cJSON, matching the version bundled with ESP-IDF. We only need its one source file, so
+# SOURCE_SUBDIR points at a nonexistent directory to fetch it without running its CMake.
+FetchContent_Declare(
+    cjson
+    GIT_REPOSITORY https://github.com/DaveGamble/cJSON.git
+    GIT_TAG v1.7.19
+    SOURCE_SUBDIR none
+)
+FetchContent_MakeAvailable(cjson)
+
 # Enable testing
 enable_testing()
 
@@ -33,6 +44,7 @@ enable_testing()
 add_executable(
     unit_tests
     ${TEST_SOURCES}
+    ${cjson_SOURCE_DIR}/cJSON.c
 )
 
 # Target-specific setting
@@ -49,6 +61,8 @@ target_link_libraries(
 target_include_directories(
     unit_tests
     PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../components/controller_app/include
+    PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../components/hass/include
+    PRIVATE ${cjson_SOURCE_DIR}
     PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/helpers/include
     PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../../components/wifi/include
     PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../../components/esp_local_test_helpers/include

@@ -1,9 +1,7 @@
 #pragma once
 
+#include <mutex>
 #include <stdint.h>
-
-#include "freertos/FreeRTOS.h"
-#include "freertos/semphr.h"
 
 #include "AbstractUIManager.h"
 #include "ControllerDomain.h"
@@ -14,12 +12,13 @@
 
 class UIManager : public AbstractUIManager {
   public:
+    // eventCb is called with the UI lock held, so it must not block or call back into
+    // UIManager.
     UIManager(ControllerDomain::Config config, size_t nMsgIds, eventCb_t eventCb);
     ~UIManager() {
         lv_timer_del(clkTimer_);
         delete msgMgr_;
         delete sleepMgr_;
-        vSemaphoreDelete(mutex_);
     }
 
     uint32_t handleTasks();
@@ -39,14 +38,12 @@ class UIManager : public AbstractUIManager {
     }
 
     void setMessage(uint8_t msgID, bool allowCancel, const char *msg) override {
-        xSemaphoreTake(mutex_, portMAX_DELAY);
+        std::lock_guard<std::mutex> lock(mutex_);
         msgMgr_->setMessage(msgID, allowCancel, msg);
-        xSemaphoreGive(mutex_);
     }
     void clearMessage(uint8_t msgID) override {
-        xSemaphoreTake(mutex_, portMAX_DELAY);
+        std::lock_guard<std::mutex> lock(mutex_);
         msgMgr_->clearMessage(msgID);
-        xSemaphoreGive(mutex_);
     }
 
     void bootDone() override;
@@ -108,7 +105,7 @@ class UIManager : public AbstractUIManager {
 
     lv_obj_t *firmwareVersionLabel_, *restartButton_, *continuousFanDropdown_, *exhaustCheckbox_;
 
-    SemaphoreHandle_t mutex_;
+    std::mutex mutex_;
     MessageManager *msgMgr_;
     SleepManager *sleepMgr_;
 

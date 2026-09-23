@@ -5,9 +5,9 @@
 #include <stdint.h>
 
 #define NUM_SCHEDULE_TIMES 2
-#define REL_F_TO_C(t) (t * 5.0 / 9.0)
-#define ABS_F_TO_C(t) REL_F_TO_C((t - 32))
-#define REL_C_TO_F(t) (t * 9.0 / 5.0)
+#define REL_F_TO_C(t) ((t) * 5.0 / 9.0)
+#define ABS_F_TO_C(t) REL_F_TO_C((t) - 32)
+#define REL_C_TO_F(t) ((t) * 9.0 / 5.0)
 #define ABS_C_TO_F(t) (REL_C_TO_F(t) + 32)
 
 // Setpoint bounds (in whole degrees F, matching the UI rollers)

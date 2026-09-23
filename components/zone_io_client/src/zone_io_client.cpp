@@ -1,5 +1,7 @@
 #include "zone_io_client.h"
 
+#include <mutex>
+
 #include "driver/uart.h"
 #include "esp_log.h"
 
@@ -17,7 +19,7 @@
 
 static const char *TAG = "ZIO";
 
-static SemaphoreHandle_t mutex;
+static std::mutex mutex;
 static uint8_t zio_buf_[BUF_SIZE];
 static InputState last_input_state_;
 static QueueHandle_t uart_queue;
@@ -31,8 +33,6 @@ union BitByte {
 };
 
 void zone_io_init() {
-    mutex = xSemaphoreCreateMutex();
-
     uart_config_t uart_config = {
         .baud_rate = 9600,
         .data_bits = UART_DATA_8_BITS,
@@ -94,9 +94,10 @@ bool do_rx(size_t to_rx) {
         return false;
     }
 
-    xSemaphoreTake(mutex, portMAX_DELAY);
-    last_input_state_ = input_state;
-    xSemaphoreGive(mutex);
+    {
+        std::lock_guard<std::mutex> lock(mutex);
+        last_input_state_ = input_state;
+    }
     return true;
 }
 
@@ -148,8 +149,6 @@ void zone_io_task(void *updateCb) {
 }
 
 InputState zone_io_get_state() {
-    assert(xSemaphoreTake(mutex, portMAX_DELAY));
-    InputState state = last_input_state_;
-    xSemaphoreGive(mutex);
-    return state;
+    std::lock_guard<std::mutex> lock(mutex);
+    return last_input_state_;
 }

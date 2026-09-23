@@ -1,15 +1,13 @@
 #pragma once
 
+#include <mutex>
+
 #include "AbstractZCHomeClient.h"
 #include "BaseMqttClient.h"
-
-#include "freertos/FreeRTOS.h"
-#include "freertos/semphr.h"
 
 class MqttZCHomeClient : public BaseMqttClient, public AbstractZCHomeClient {
   public:
     MqttZCHomeClient();
-    ~MqttZCHomeClient();
 
     HomeState state() override;
 
@@ -22,7 +20,7 @@ class MqttZCHomeClient : public BaseMqttClient, public AbstractZCHomeClient {
     void onUserEvent() override;
 
   private:
-    SemaphoreHandle_t mutex_;
+    std::mutex mutex_;
 
     // One flag per sensor: each is published on its own so Home Assistant sees exactly
     // when that value last changed, rather than every sensor refreshing together.

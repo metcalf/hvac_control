@@ -88,9 +88,11 @@ void ESPWifi::reconnect() {
 }
 
 void ESPWifi::retry() {
-    xSemaphoreTake(mutex_, portMAX_DELAY);
-    State state = state_;
-    xSemaphoreGive(mutex_);
+    State state;
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        state = state_;
+    }
 
     if (state != State::Err) {
         ESP_LOGW(TAG, "retry it only valid from the Err state");
@@ -102,14 +104,13 @@ void ESPWifi::retry() {
 }
 
 void ESPWifi::msg(char *msg, size_t n) {
-    xSemaphoreTake(mutex_, portMAX_DELAY);
+    std::lock_guard<std::mutex> lock(mutex_);
     if (reason_ == 0) {
         strncpy(msg, msg_, n);
 
     } else {
         snprintf(msg, n, "%s (%d)", msg_, reason_);
     }
-    xSemaphoreGive(mutex_);
 }
 
 void ESPWifi::updateSTA(const char *ssid, const char *password) {
@@ -191,11 +192,10 @@ void ESPWifi::doRetry(int reason) {
 void ESPWifi::retryTimerCb(void * /*arg*/) { esp_wifi_connect(); }
 
 void ESPWifi::setState(State state, const char *msg, int reason) {
-    xSemaphoreTake(mutex_, portMAX_DELAY);
+    std::lock_guard<std::mutex> lock(mutex_);
     strncpy(msg_, msg, sizeof(msg_));
     reason_ = reason;
     state_ = state;
-    xSemaphoreGive(mutex_);
 }
 
 static const char *stateName(AbstractWifi::State state) {
@@ -214,12 +214,15 @@ static const char *stateName(AbstractWifi::State state) {
 
 void ESPWifi::logDiagnostics() {
     // Snapshot the state machine's own view of the connection.
-    xSemaphoreTake(mutex_, portMAX_DELAY);
-    State state = state_;
-    int reason = reason_;
+    State state;
+    int reason;
     char msg[sizeof(msg_)];
-    strncpy(msg, msg_, sizeof(msg));
-    xSemaphoreGive(mutex_);
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        state = state_;
+        reason = reason_;
+        strncpy(msg, msg_, sizeof(msg));
+    }
 
     int64_t uptimeS = esp_timer_get_time() / 1000000;
 

@@ -6,24 +6,21 @@
 #define FRESH_AIR_TEMP_OFFSET_C -REL_F_TO_C(2.5)
 
 void ModbusController::setHasFancoil(bool has) {
-    xSemaphoreTake(mutex_, portMAX_DELAY);
+    std::lock_guard<std::mutex> lock(mutex_);
     hasFancoil_ = has;
     setFancoilErr_ = ESP_OK;
     fancoilStateErr_ = ESP_OK;
-    xSemaphoreGive(mutex_);
 }
 void ModbusController::setHasMakeupDemand(bool has) {
-    xSemaphoreTake(mutex_, portMAX_DELAY);
+    std::lock_guard<std::mutex> lock(mutex_);
     hasMakeupDemand_ = has;
     makeupDemandErr_ = ESP_OK;
-    xSemaphoreGive(mutex_);
 }
 
 void ModbusController::setHasExhaustCtrl(bool has) {
-    xSemaphoreTake(mutex_, portMAX_DELAY);
+    std::lock_guard<std::mutex> lock(mutex_);
     hasExhaustCtrl_ = has;
     exhaustControlButtonErr_ = ESP_OK;
-    xSemaphoreGive(mutex_);
 }
 
 void ModbusController::doMakeup() {
@@ -31,34 +28,36 @@ void ModbusController::doMakeup() {
 
     esp_err_t err = client_.getMakeupDemand(&makeupDemand);
 
-    xSemaphoreTake(mutex_, portMAX_DELAY);
+    std::lock_guard<std::mutex> lock(mutex_);
     makeupDemandErr_ = err;
     if (makeupDemandErr_ == ESP_OK) {
         makeupDemand_ = makeupDemand;
         lastMakeupDemand_ = std::chrono::steady_clock::now();
     }
-    xSemaphoreGive(mutex_);
 }
 
 void ModbusController::doSetFreshAir() {
-    xSemaphoreTake(mutex_, portMAX_DELAY);
-    const FanSpeed speed = requestFreshAirSpeed_;
-    xSemaphoreGive(mutex_);
+    FanSpeed speed;
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        speed = requestFreshAirSpeed_;
+    }
 
     esp_err_t err = client_.setFreshAirSpeed(speed);
-    xSemaphoreTake(mutex_, portMAX_DELAY);
+    std::lock_guard<std::mutex> lock(mutex_);
     freshAirSpeedErr_ = err;
     if (err == ESP_OK) {
         lastFreshAirSpeed_ = std::chrono::steady_clock::now();
         freshAirSpeed_ = speed;
     }
-    xSemaphoreGive(mutex_);
 }
 
 void ModbusController::doGetFreshAir() {
-    xSemaphoreTake(mutex_, portMAX_DELAY);
-    uint16_t modelId = freshAirModelId_;
-    xSemaphoreGive(mutex_);
+    uint16_t modelId;
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        modelId = freshAirModelId_;
+    }
 
     if (modelId == 0) {
         client_.getFreshAirModelId(&modelId);
@@ -67,7 +66,7 @@ void ModbusController::doGetFreshAir() {
     FreshAirState freshAirState;
     esp_err_t err = client_.getFreshAirState(&freshAirState);
 
-    xSemaphoreTake(mutex_, portMAX_DELAY);
+    std::lock_guard<std::mutex> lock(mutex_);
     freshAirModelId_ = modelId;
     freshAirStateErr_ = err;
     if (freshAirStateErr_ == ESP_OK) {
@@ -78,7 +77,6 @@ void ModbusController::doGetFreshAir() {
         freshAirState_ = freshAirState;
         lastFreshAirState_ = std::chrono::steady_clock::now();
     }
-    xSemaphoreGive(mutex_);
 }
 
 void ModbusController::doSetFancoil() {
@@ -87,35 +85,34 @@ void ModbusController::doSetFancoil() {
     if (!fancoilConfigured_) {
         err = client_.configureFancoil();
         if (err != ESP_OK) {
-            xSemaphoreTake(mutex_, portMAX_DELAY);
+            std::lock_guard<std::mutex> lock(mutex_);
             setFancoilErr_ = err;
-            xSemaphoreGive(mutex_);
             return;
         }
 
         fancoilConfigured_ = true;
     }
 
-    xSemaphoreTake(mutex_, portMAX_DELAY);
-    const FancoilRequest req = requestFancoil_;
-    xSemaphoreGive(mutex_);
+    FancoilRequest req;
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        req = requestFancoil_;
+    }
 
     err = client_.setFancoil(req);
-    xSemaphoreTake(mutex_, portMAX_DELAY);
+    std::lock_guard<std::mutex> lock(mutex_);
     setFancoilErr_ = err;
-    xSemaphoreGive(mutex_);
 }
 
 void ModbusController::doGetFancoil() {
     FancoilState state;
     esp_err_t err = client_.getFancoilState(&state);
-    xSemaphoreTake(mutex_, portMAX_DELAY);
+    std::lock_guard<std::mutex> lock(mutex_);
     fancoilStateErr_ = err;
     if (fancoilStateErr_ == ESP_OK) {
         fancoilState_ = state;
         lastFancoilState_ = std::chrono::steady_clock::now();
     }
-    xSemaphoreGive(mutex_);
 }
 
 void ModbusController::task() {
@@ -153,11 +150,8 @@ void ModbusController::task() {
 }
 
 ControllerDomain::FreshAirModel ModbusController::getFreshAirModelId() {
-    xSemaphoreTake(mutex_, portMAX_DELAY);
-    uint16_t id = freshAirModelId_;
-    xSemaphoreGive(mutex_);
-
-    return (ControllerDomain::FreshAirModel)id;
+    std::lock_guard<std::mutex> lock(mutex_);
+    return (ControllerDomain::FreshAirModel)freshAirModelId_;
 }
 
 esp_err_t ModbusController::getFancoilState(ControllerDomain::FancoilState *state,
@@ -167,39 +161,33 @@ esp_err_t ModbusController::getFancoilState(ControllerDomain::FancoilState *stat
         return ESP_ERR_NOT_SUPPORTED;
     }
 
-    xSemaphoreTake(mutex_, portMAX_DELAY);
+    std::lock_guard<std::mutex> lock(mutex_);
     esp_err_t err = fancoilStateErr_;
     if (err == ESP_OK) {
         *state = fancoilState_;
         *time = lastFancoilState_;
     }
-    xSemaphoreGive(mutex_);
-
     return err;
 }
 
 esp_err_t ModbusController::getFreshAirState(FreshAirState *state,
                                              std::chrono::steady_clock::time_point *time) {
-    xSemaphoreTake(mutex_, portMAX_DELAY);
+    std::lock_guard<std::mutex> lock(mutex_);
     esp_err_t err = freshAirStateErr_;
     if (err == ESP_OK) {
         *state = freshAirState_;
         *time = lastFreshAirState_;
     }
-    xSemaphoreGive(mutex_);
-
     return err;
 }
 esp_err_t ModbusController::getLastFreshAirSpeed(ControllerDomain::FanSpeed *speed,
                                                  std::chrono::steady_clock::time_point *time) {
-    xSemaphoreTake(mutex_, portMAX_DELAY);
+    std::lock_guard<std::mutex> lock(mutex_);
     esp_err_t err = freshAirSpeedErr_;
     if (err == ESP_OK) {
         *speed = freshAirSpeed_;
         *time = lastFreshAirSpeed_;
     }
-    xSemaphoreGive(mutex_);
-
     return err;
 }
 esp_err_t ModbusController::getMakeupDemand(bool *demand,
@@ -210,28 +198,28 @@ esp_err_t ModbusController::getMakeupDemand(bool *demand,
         return ESP_OK;
     }
 
-    xSemaphoreTake(mutex_, portMAX_DELAY);
+    std::lock_guard<std::mutex> lock(mutex_);
     esp_err_t err = makeupDemandErr_;
     if (err == ESP_OK) {
         *demand = makeupDemand_;
         *time = lastMakeupDemand_;
     }
-    xSemaphoreGive(mutex_);
-
     return err;
 }
 
 void ModbusController::setFreshAirSpeed(FanSpeed speed) {
-    xSemaphoreTake(mutex_, portMAX_DELAY);
-    requestFreshAirSpeed_ = speed;
-    xSemaphoreGive(mutex_);
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        requestFreshAirSpeed_ = speed;
+    }
 
     makeRequest(RequestType::SetFreshAirSpeed);
 }
 void ModbusController::setFancoil(FancoilRequest req) {
-    xSemaphoreTake(mutex_, portMAX_DELAY);
-    requestFancoil_ = req;
-    xSemaphoreGive(mutex_);
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        requestFancoil_ = req;
+    }
 
     makeRequest(RequestType::SetFancoil);
 }
@@ -245,16 +233,16 @@ EventBits_t ModbusController::requestBits(RequestType request) {
 }
 
 esp_err_t ModbusController::lastSetFancoilErr() {
-    xSemaphoreTake(mutex_, portMAX_DELAY);
-    esp_err_t err = setFancoilErr_;
-    xSemaphoreGive(mutex_);
-    return err;
+    std::lock_guard<std::mutex> lock(mutex_);
+    return setFancoilErr_;
 }
 
 void ModbusController::doSetExhaustFan() {
-    xSemaphoreTake(mutex_, portMAX_DELAY);
-    const bool on = requestExhaustFan_;
-    xSemaphoreGive(mutex_);
+    bool on;
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        on = requestExhaustFan_;
+    }
 
     client_.setExhaustFan(on);
 }
@@ -263,13 +251,12 @@ void ModbusController::doGetExhaustControlButton() {
     bool pressed;
     esp_err_t err = client_.getExhaustControlButton(&pressed);
 
-    xSemaphoreTake(mutex_, portMAX_DELAY);
+    std::lock_guard<std::mutex> lock(mutex_);
     exhaustControlButtonErr_ = err;
     if (exhaustControlButtonErr_ == ESP_OK) {
         // Latch the pressed state, we clear on read to match the device behavior.
         exhaustControlButton_ |= pressed;
     }
-    xSemaphoreGive(mutex_);
 }
 
 esp_err_t ModbusController::getExhaustControlButton(bool *pressed) {
@@ -278,22 +265,21 @@ esp_err_t ModbusController::getExhaustControlButton(bool *pressed) {
         return ESP_OK;
     }
 
-    xSemaphoreTake(mutex_, portMAX_DELAY);
+    std::lock_guard<std::mutex> lock(mutex_);
     esp_err_t err = exhaustControlButtonErr_;
     if (err == ESP_OK) {
         *pressed = exhaustControlButton_;
         // Clear the latched state after reading, mimicking remote device behavior
         exhaustControlButton_ = false;
     }
-    xSemaphoreGive(mutex_);
-
     return err;
 }
 
 void ModbusController::setExhaustFan(bool on) {
-    xSemaphoreTake(mutex_, portMAX_DELAY);
-    requestExhaustFan_ = on;
-    xSemaphoreGive(mutex_);
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        requestExhaustFan_ = on;
+    }
 
     makeRequest(RequestType::SetExhaustFan);
 }

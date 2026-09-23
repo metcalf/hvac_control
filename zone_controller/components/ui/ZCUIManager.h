@@ -1,9 +1,7 @@
 #pragma once
 
+#include <mutex>
 #include <stdint.h>
-
-#include "freertos/FreeRTOS.h"
-#include "freertos/semphr.h"
 
 #include "AbstractZCUIManager.h"
 #include "MessageManager.h"
@@ -20,27 +18,23 @@ class ZCUIManager : public AbstractZCUIManager {
     ~ZCUIManager() override {
         delete msgMgr_;
         delete sleepMgr_;
-        vSemaphoreDelete(mutex_);
     }
 
     uint32_t handleTasks();
 
     void setMessage(ZCDomain::MsgID msgID, bool allowCancel, const char *msg) override {
-        xSemaphoreTake(mutex_, portMAX_DELAY);
+        std::lock_guard<std::mutex> lock(mutex_);
         msgMgr_->setMessage(static_cast<uint8_t>(msgID), allowCancel, msg);
-        xSemaphoreGive(mutex_);
     }
     void clearMessage(ZCDomain::MsgID msgID) override {
-        xSemaphoreTake(mutex_, portMAX_DELAY);
+        std::lock_guard<std::mutex> lock(mutex_);
         msgMgr_->clearMessage(static_cast<uint8_t>(msgID));
-        xSemaphoreGive(mutex_);
     }
     void updateState(ZCDomain::SystemState state) override;
 
     void setFirmwareVersion(const char *version) {
-        xSemaphoreTake(mutex_, portMAX_DELAY);
+        std::lock_guard<std::mutex> lock(mutex_);
         lv_label_set_text(ui_app_version_label, version);
-        xSemaphoreGive(mutex_);
     }
 
   private:
@@ -52,7 +46,7 @@ class ZCUIManager : public AbstractZCUIManager {
 
     eventCb_t eventCb_;
 
-    SemaphoreHandle_t mutex_;
+    std::mutex mutex_;
     MessageManager *msgMgr_;
     SleepManager *sleepMgr_;
 

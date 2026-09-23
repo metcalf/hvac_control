@@ -1,11 +1,9 @@
 #pragma once
 
 #include <chrono>
+#include <mutex>
 #include <stdint.h>
 #include <sys/time.h>
-
-#include "freertos/FreeRTOS.h"
-#include "freertos/semphr.h"
 
 #include "AbstractSensors.h"
 #include "CO2Calibration.h"
@@ -16,7 +14,6 @@ class Sensors : public AbstractSensors {
     using SensorData = ControllerDomain::SensorData;
 
     Sensors();
-    ~Sensors() { vSemaphoreDelete(mutex_); }
 
     bool init();
     bool poll();
@@ -25,7 +22,7 @@ class Sensors : public AbstractSensors {
 
   private:
     SensorData lastData_ = {};
-    SemaphoreHandle_t mutex_;
+    std::mutex mutex_;
     CO2Calibration *co2Calibration_;
 
     bool pollInternal(SensorData &);
