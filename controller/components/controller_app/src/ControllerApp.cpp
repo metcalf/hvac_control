@@ -930,6 +930,10 @@ Setpoints ControllerApp::getCurrentSetpoints(double currTempC) {
         if (precoolC < setpoints.coolTempC) {
             setpointReason_ = SetpointReason::Precooling;
             setpoints.coolTempC = precoolC;
+            // The current heat setpoint may be above the next schedule's, so lower it if needed
+            // to keep the minimum separation from the precooling setpoint.
+            setpoints.heatTempC =
+                std::min(setpoints.heatTempC, precoolC - MIN_HEAT_COOL_DELTA_C);
             setMessageF(MsgID::Precooling, false, "Cooling to %d by %02d:%02d%s",
                         static_cast<int>(ABS_C_TO_F(nextSchedule.coolC) + 0.5),
                         SCHEDULE_TIME_STR_ARGS(nextSchedule));

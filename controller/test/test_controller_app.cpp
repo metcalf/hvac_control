@@ -722,6 +722,31 @@ TEST_F(ControllerAppTest, Precooling) {
     EXPECT_EQ(FancoilSpeed::High, fcReq.speed);
 }
 
+TEST_F(ControllerAppTest, PrecoolingMaintainsHeatCoolDelta) {
+    // The day heat setpoint is above the night cool setpoint, so precooling toward
+    // the night schedule would push the cool setpoint below the heat setpoint.
+    Config::Schedule schedules[] = {
+        {.heatC = ABS_F_TO_C(74), .coolC = ABS_F_TO_C(78), .startHr = 7, .startMin = 0},
+        {.heatC = ABS_F_TO_C(64), .coolC = ABS_F_TO_C(68), .startHr = 21, .startMin = 0},
+    };
+    updateSchedule(AbstractUIManager::ScheduleUpdate::from(schedules[0]),
+                   AbstractUIManager::ScheduleUpdate::from(schedules[1]));
+
+    sensors_.setLatest({.tempC = ABS_F_TO_C(76), .humidity = 2.0, .co2 = 456});
+    setRealNow(std::tm{
+        .tm_hour = 20,
+        .tm_mday = 1,
+        .tm_year = 2024,
+        .tm_isdst = -1,
+    });
+
+    // One hour out at 0.5F/hr
+    EXPECT_CALL(uiManager_, setCurrentSetpoints(DoubleNear(ABS_F_TO_C(66.5), 0.01),
+                                                DoubleNear(ABS_F_TO_C(68.5), 0.01)));
+    app_->task();
+    EXPECT_EQ(SetpointReason::Precooling, app_->setpointReason());
+}
+
 TEST_F(ControllerAppTest, VacationSetpoints) {
     AbstractHomeClient::HomeState homeState = {
         .vacationOn = true,
