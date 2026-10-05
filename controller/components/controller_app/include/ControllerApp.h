@@ -40,7 +40,8 @@
 // is unknown. This gives wifi time to connect and fetch outdoor temperature information.
 #define AC_WIFI_CONNECT_WAIT_TIME std::chrono::minutes(1)
 
-// Turn A/C on if we have cooling demand and the coil temp is below this
+// Turn A/C on if we have cooling demand and the coil temp is below this, even if the
+// outdoor temp is below the cooling setpoint. This catches a restart while the A/C is running.
 #define COIL_COLD_TEMP_C ABS_F_TO_C(60.0)
 // Turn the A/C on if temp exceeds setpoint by this amount
 #define AC_ON_THRESHOLD_C REL_F_TO_C(4.0)
@@ -53,8 +54,10 @@
 // Turn on the A/C if cooling demand exceeds this and another condition is met
 // (coil is cold or outdoor temp is high enough)
 #define AC_ON_DEMAND_THRESHOLD 0.3
-// Turn off A/C when demand drops below this.
-#define AC_OFF_DEMAND_THRESHOLD 0.2
+// Leave the A/C on until it has gone this long without cooling. Air temp reaching the
+// setpoint doesn't mean the structure has cooled, so only hand off to ventilation once
+// the room has held without the A/C for a while.
+#define AC_OFF_IDLE_TIME std::chrono::hours(1)
 // If fan is above this speed, turn on exhaust fan for extra cooling/pressure balance
 #define FAN_SPEED_EXHAUST_ON_THRESHOLD (ControllerDomain::FanSpeed)170
 // Turn exhaust fan off when fan speed drops below this (hysteresis)
@@ -343,6 +346,8 @@ class ControllerApp {
     int tempOverrideUntilScheduleIdx_ = -1;
 
     ACMode acMode_ = ACMode::Standby;
+    // Last time the A/C was cooling (or turned on), for AC_OFF_IDLE_TIME
+    std::chrono::steady_clock::time_point acLastCooled_{};
 
     // Set to steadyNow() on the first task() call so we can disable heating and
     // delay A/C while the temp sensor warms up and wifi connects after boot.
@@ -386,7 +391,7 @@ class ControllerApp {
     // I then tried to map this to some reasonable cutoffs. But have since adjusted
     // based on actual behavior.
     static constexpr FancoilCutoff fancoilCoolCutoffs_[] = {
-        FancoilCutoff{FancoilSpeed::Off, 0.01},
+        FancoilCutoff{FancoilSpeed::Off, 0.1},
         FancoilCutoff{FancoilSpeed::Low, AC_ON_DEMAND_THRESHOLD},
         FancoilCutoff{FancoilSpeed::Med, 0.7}, FancoilCutoff{FancoilSpeed::High, 0.99}};
     static constexpr FancoilCutoff fancoilHeatCutoffs_[] = {

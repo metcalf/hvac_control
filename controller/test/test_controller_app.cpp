@@ -386,6 +386,59 @@ TEST_F(ControllerAppTest, CallsForACWithColdCoil) {
     EXPECT_EQ(actual.speed, FancoilSpeed::Low); // Turns onn with a cold coil
 }
 
+TEST_F(ControllerAppTest, CallsForACWithColdCoilBelowSetpointOutdoorTemp) {
+    // Simulates restarting while the A/C is running in the evening: the outdoor temp
+    // has dropped below the cooling setpoint (22) but the coil is still cold.
+    sensors_.setLatest({.tempC = 23, .humidity = 2.0, .co2 = 500});
+    setOutdoorTempC(20);
+
+    modbusController_.setFancoilState({.coilTempC = COIL_COLD_TEMP_C + 1}, app_->steadyNow_);
+    app_->task();
+    EXPECT_EQ(modbusController_.getFancoilRequest().speed, FancoilSpeed::Off);
+
+    modbusController_.setFancoilState({.coilTempC = COIL_COLD_TEMP_C}, app_->steadyNow_);
+    app_->task();
+
+    auto actual = modbusController_.getFancoilRequest();
+    EXPECT_TRUE(actual.cool);
+    EXPECT_NE(actual.speed, FancoilSpeed::Off);
+}
+
+TEST_F(ControllerAppTest, ACStaysOnUntilIdle) {
+    // Hot evening: the A/C turns on
+    sensors_.setLatest({.tempC = 25, .humidity = 2.0, .co2 = 500});
+    setOutdoorTempC(30);
+    app_->task();
+    EXPECT_NE(modbusController_.getFancoilRequest().speed, FancoilSpeed::Off);
+
+    // Room reaches setpoint (22) while outdoor drops below it, but not far enough to
+    // force the A/C off.
+    sensors_.setLatest({.tempC = 21.5, .humidity = 2.0, .co2 = 500});
+    setOutdoorTempC(20);
+    app_->steadyNow_ += MIN_HVAC_ON_INTERVAL;
+    app_->task();
+    EXPECT_EQ(modbusController_.getFancoilRequest().speed, FancoilSpeed::Off);
+
+    // Room warms back up before the idle time passes: the A/C is still enabled.
+    app_->steadyNow_ += AC_OFF_IDLE_TIME - MIN_HVAC_ON_INTERVAL - std::chrono::minutes(1);
+    app_->task();
+    sensors_.setLatest({.tempC = 23, .humidity = 2.0, .co2 = 500});
+    app_->task();
+    EXPECT_NE(modbusController_.getFancoilRequest().speed, FancoilSpeed::Off);
+
+    // Room holds at setpoint for the idle time: hand off to ventilation.
+    sensors_.setLatest({.tempC = 21.5, .humidity = 2.0, .co2 = 500});
+    app_->steadyNow_ += MIN_HVAC_ON_INTERVAL;
+    app_->task();
+    app_->steadyNow_ += AC_OFF_IDLE_TIME;
+    app_->task();
+
+    // Now it takes the normal conditions to turn back on.
+    sensors_.setLatest({.tempC = 23, .humidity = 2.0, .co2 = 500});
+    app_->task();
+    EXPECT_EQ(modbusController_.getFancoilRequest().speed, FancoilSpeed::Off);
+}
+
 TEST_F(ControllerAppTest, CallsForACWithoutOutdoorTemp) {
     sensors_.setLatest({.tempC = 25, .humidity = 2.0, .co2 = 500});
     homeCli_.setState({.weatherObsTime = std::chrono::system_clock::time_point(),

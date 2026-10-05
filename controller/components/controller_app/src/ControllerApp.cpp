@@ -71,31 +71,34 @@ void ControllerApp::updateACMode(const double coolDemand, const double coolSetpo
     if (!config_.systemOn) {
         acMode_ = ACMode::Standby;
         clearMessage(MsgID::ACMode);
+        return;
     }
 
     switch (acMode_) {
     case ACMode::Off:
         break;
-    case ACMode::Standby:
-        // If we're too far off the cool setpoint or the coil is cold anyway, turn the A/C on
-        // as long as the outdoor temp is above threshold
-        if (
-            // Outdoor temp and demand must be high enough to turn on at all.
-            // Just after boot we don't allow the A/C on solely because the outdoor
-            // temp is unknown, giving wifi time to connect and fetch the temperature.
-            (outTempC > coolSetpointC ||
-             (std::isnan(outTempC) && (steadyNow() - bootTime_) >= AC_WIFI_CONNECT_WAIT_TIME)) &&
-            coolDemand > AC_ON_DEMAND_THRESHOLD &&
-            ((inTempC - coolSetpointC) > AC_ON_THRESHOLD_C ||           // Indoor temp is high
-             (outTempC - coolSetpointC) > AC_ON_OUT_TEMP_THRESHOLD_C || // Outdoor temp is high
-             isCoilCold()                                               // Coil is cold anyway
+    case ACMode::Standby: {
+        // Just after boot we don't allow the A/C on solely because the outdoor
+        // temp is unknown, giving wifi time to connect and fetch the temperature.
+        bool outTempWarm =
+            outTempC > coolSetpointC ||
+            (std::isnan(outTempC) && (steadyNow() - bootTime_) >= AC_WIFI_CONNECT_WAIT_TIME);
+        bool coilCold = isCoilCold();
+
+        if (coolDemand > AC_ON_DEMAND_THRESHOLD &&
+            (coilCold || // Coil is cold anyway (e.g. we restarted while the A/C was running)
+             (outTempWarm &&
+              ((inTempC - coolSetpointC) > AC_ON_THRESHOLD_C ||          // Indoor temp is high
+               (outTempC - coolSetpointC) > AC_ON_OUT_TEMP_THRESHOLD_C)) // Outdoor temp is high
              )) {
             acMode_ = ACMode::On;
+            acLastCooled_ = steadyNow();
         }
         break;
+    }
     case ACMode::On:
         if (outTempC < (coolSetpointC - AC_OFF_OUT_TEMP_BELOW_SETPOINT_C) ||
-            coolDemand < AC_OFF_DEMAND_THRESHOLD) {
+            steadyNow() - acLastCooled_ >= AC_OFF_IDLE_TIME) {
             clearMessage(MsgID::ACMode);
             acMode_ = ACMode::Standby;
         }
@@ -347,6 +350,7 @@ bool ControllerApp::pollUIEvent(bool wait) {
             break;
         case AbstractUIManager::ACOverride::Force:
             acMode_ = ACMode::On;
+            acLastCooled_ = steadyNow();
             ESP_LOGI(TAG, "ACOverride: ON");
             setMessage(MsgID::ACMode, true, "Forcing A/C on");
             break;
@@ -1155,6 +1159,9 @@ void ControllerApp::task(bool firstTime) {
 
     updateACMode(coolDemand, setpoints.coolTempC, sensorData.tempC, outdoorTempC());
     HVACState hvacState = setHVAC(heatDemand, coolDemand, fanSpeed);
+    if (hvacState == HVACState::ACCool) {
+        acLastCooled_ = steadyNow();
+    }
 
     checkModbusErrors();
 
