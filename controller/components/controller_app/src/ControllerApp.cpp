@@ -54,11 +54,7 @@ void ControllerApp::bootErr(const char *msg) {
 void ControllerApp::updateEquipment(ControllerDomain::Config::Equipment equipment) {
     if (heatAlgo_ == NULL || equipment.heatType != config_.equipment.heatType) {
         delete heatAlgo_;
-        heatAlgo_ = getAlgoForEquipment(equipment.heatType, true);
-    }
-    if (coolAlgo_ == NULL || equipment.coolType != config_.equipment.coolType) {
-        delete coolAlgo_;
-        coolAlgo_ = getAlgoForEquipment(equipment.coolType, false);
+        heatAlgo_ = getHeatAlgoForEquipment(equipment.heatType);
     }
     modbusController_->setHasMakeupDemand(equipment.hasMakeupDemand);
     modbusController_->setHasFancoil(equipment.heatType == Config::HVACType::Fancoil ||
@@ -714,19 +710,15 @@ void ControllerApp::checkWifiState() {
 
 double ControllerApp::outdoorTempC() const { return rawOutdoorTempC_ + config_.outTempOffsetC; }
 
-AbstractDemandAlgorithm *ControllerApp::getAlgoForEquipment(ControllerDomain::Config::HVACType type,
-                                                            bool isHeat) {
+AbstractDemandAlgorithm *
+ControllerApp::getHeatAlgoForEquipment(ControllerDomain::Config::HVACType type) {
     switch (type) {
     case ControllerDomain::Config::HVACType::None:
         return new NullAlgorithm();
     case ControllerDomain::Config::HVACType::Fancoil:
-        if (!isHeat) {
-            // Fancoil cooling takes whatever cooling demand the fan doesn't cover
-            return new NullAlgorithm();
-        }
-        return new PIDAlgorithm(isHeat);
+        return new PIDAlgorithm(true);
     case ControllerDomain::Config::HVACType::Valve:
-        return new ValveAlgorithm(isHeat);
+        return new ValveAlgorithm(true);
     }
 
     __builtin_unreachable();
@@ -1126,7 +1118,7 @@ void ControllerApp::task(bool firstTime) {
     lastSetpoints_ = setpoints;
     uiManager_->setCurrentSetpoints(setpoints.heatTempC, setpoints.coolTempC);
 
-    double ventDemand = 0, fanCoolDemand = 0, heatDemand = 0, coolDemand = 0, acDemand = 0;
+    double ventDemand = 0, fanCoolDemand = 0, heatDemand = 0, coolDemand = 0;
     double fanCapacity = 0;
 
     bool stabilizing = tempStabilizing();
@@ -1147,8 +1139,6 @@ void ControllerApp::task(bool firstTime) {
         }
         coolDemand = coolDemandAlgo_->update(sensorData, setpoints, outdoorTempC(), steadyNow(),
                                              fanCooling_ || (hvacWasOn && hvacLastCool_));
-        acDemand = coolAlgo_->update(sensorData, setpoints, outdoorTempC(), steadyNow(),
-                                     hvacWasOn && hvacLastCool_);
 
         // Run the fan at the speed that delivers the cooling demand, if it can
         fanCapacity = fanCoolCapacity(sensorData.tempC, outdoorTempC());
@@ -1182,7 +1172,8 @@ void ControllerApp::task(bool firstTime) {
     // the fan is running).
     double fanCoolDelivered = fanCapacity * fanSpeed / UINT8_MAX;
     fanCooling_ = fanCoolDelivered > 0;
-    if (config_.equipment.coolType == Config::HVACType::Fancoil) {
+    double acDemand = 0;
+    if (config_.equipment.coolType != Config::HVACType::None) {
         acDemand = std::max(0.0, coolDemand - fanCoolDelivered);
     }
 

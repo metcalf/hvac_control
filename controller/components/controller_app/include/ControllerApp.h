@@ -54,7 +54,8 @@
 // (coil is cold or outdoor temp is high enough)
 #define AC_ON_DEMAND_THRESHOLD 0.3
 // Cooling demand is in units of this much cooling, i.e. a demand of 1.0 means we want
-// at least this many BTU/hr. This is roughly what the fancoil delivers on medium/high.
+// at least this many BTU/hr. This is just a bit above what the fancoil delivers on
+// medium since that's when we want to bump up to high.
 #define COOL_DEMAND_FULL_BTU_HR 3000.0
 // Cooling delivered by the fresh air fan at full speed per degree F that the outdoor temp
 // is below the indoor temp. The fan covers as much of the cooling demand as it can and
@@ -102,7 +103,6 @@ class ControllerApp {
     ~ControllerApp() {
         delete ventAlgo_;
         delete heatAlgo_;
-        delete coolAlgo_;
         delete coolDemandAlgo_;
     }
     void setConfig(ControllerDomain::Config config);
@@ -318,8 +318,7 @@ class ControllerApp {
                   const bool exhaustOn);
     void checkWifiState();
     double outdoorTempC() const;
-    AbstractDemandAlgorithm *getAlgoForEquipment(ControllerDomain::Config::HVACType type,
-                                                 bool isHeat);
+    AbstractDemandAlgorithm *getHeatAlgoForEquipment(ControllerDomain::Config::HVACType type);
     FancoilSpeed getSpeedForDemand(bool cool, double demand);
     bool isCoilCold();
     double fanCoolCapacity(double inTempC, double outTempC) const;
@@ -344,9 +343,8 @@ class ControllerApp {
     AbstractOTAClient *ota_;
     uiEvtRcv_t uiEvtRcv_;
     // coolDemandAlgo_ produces the total cooling demand, which the fan covers as much of as
-    // it can. coolAlgo_ is only used for cooling equipment that can't take the remainder
-    // as a demand (i.e. valves).
-    AbstractDemandAlgorithm *ventAlgo_, *coolDemandAlgo_, *heatAlgo_ = NULL, *coolAlgo_ = NULL;
+    // it can with the A/C taking the remainder.
+    AbstractDemandAlgorithm *ventAlgo_, *coolDemandAlgo_, *heatAlgo_ = NULL;
 
     // Limit on fan cooling speed by delta to indoor (outdoor - indoor). It's not worth
     // pushing a lot of air for minimal temperature differences.
