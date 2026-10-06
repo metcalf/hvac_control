@@ -39,13 +39,13 @@
 // is unknown. This gives wifi time to connect and fetch outdoor temperature information.
 #define AC_WIFI_CONNECT_WAIT_TIME std::chrono::minutes(1)
 
-// A coil temp below this shortly after boot means the A/C was running before we restarted,
-// so we enable the A/C again whatever the cooling demand and outdoor temp. We lose the
-// built up cooling demand in a restart so we can't rely on it to turn the A/C back on.
+// A coil temp below this means the A/C is running, either for another thermostat or for us
+// before a restart. Other rooms needing the A/C is a good sign we will too, so with a cold
+// coil we don't wait for the indoor or outdoor temp to get high before turning it on.
 #define COIL_COLD_TEMP_C ABS_F_TO_C(60.0)
-// How long after boot a cold coil enables the A/C. We turn the fancoil off at boot, so
-// the coil only stays cold briefly. After that a cold coil in standby just means we
-// turned the A/C off recently.
+// For this long after boot a cold coil enables the A/C whatever the cooling demand and
+// outdoor temp. We lose the built up cooling demand in a restart so we can't rely on it
+// to turn the A/C back on if we were the one running it.
 #define AC_BOOT_COLD_COIL_TIME std::chrono::minutes(5)
 // Turn the A/C on if temp exceeds setpoint by this amount
 #define AC_ON_THRESHOLD_C REL_F_TO_C(4.0)
@@ -55,8 +55,8 @@
 // Do not turn A/C on if the outdoor temp is below the cooling setpoint
 // Turn A/C off if the outdoor temp falls this far below the cooling setpoint
 #define AC_OFF_OUT_TEMP_BELOW_SETPOINT_C REL_F_TO_C(10.0)
-// Turn on the A/C if cooling demand exceeds this and the indoor or outdoor temp is
-// high enough
+// Turn on the A/C if cooling demand exceeds this and another condition is met
+// (indoor or outdoor temp is high enough, or the coil is cold)
 #define AC_ON_DEMAND_THRESHOLD 0.3
 // Cooling demand is in units of this much cooling, i.e. a demand of 1.0 means we want
 // at least this many BTU/hr. This is just a bit above what the fancoil delivers on

@@ -79,15 +79,16 @@ void ControllerApp::updateACMode(const double coolDemand, const double coolSetpo
         bool outTempWarm =
             outTempC > coolSetpointC ||
             (std::isnan(outTempC) && (steadyNow() - bootTime_) >= AC_WIFI_CONNECT_WAIT_TIME);
-        // The A/C was running before we restarted
-        bool coilColdAtBoot =
-            (steadyNow() - bootTime_) < AC_BOOT_COLD_COIL_TIME && isCoilCold();
+        bool coilCold = isCoilCold();
+        // We were probably running the A/C before we restarted
+        bool coilColdAtBoot = (steadyNow() - bootTime_) < AC_BOOT_COLD_COIL_TIME && coilCold;
 
         if (coilColdAtBoot ||
             (coolDemand > AC_ON_DEMAND_THRESHOLD && outTempWarm &&
-             ((inTempC - coolSetpointC) > AC_ON_THRESHOLD_C ||          // Indoor temp is high
-              (outTempC - coolSetpointC) > AC_ON_OUT_TEMP_THRESHOLD_C)) // Outdoor temp is high
-        ) {
+             ((inTempC - coolSetpointC) > AC_ON_THRESHOLD_C ||           // Indoor temp is high
+              (outTempC - coolSetpointC) > AC_ON_OUT_TEMP_THRESHOLD_C || // Outdoor temp is high
+              coilCold // Coil is already cold (e.g. another thermostat is running the A/C)
+              ))) {
             acMode_ = ACMode::On;
             acLastCooled_ = steadyNow();
         }
@@ -945,8 +946,7 @@ Setpoints ControllerApp::getCurrentSetpoints(double currTempC) {
             setpoints.coolTempC = precoolC;
             // The current heat setpoint may be above the next schedule's, so lower it if needed
             // to keep the minimum separation from the precooling setpoint.
-            setpoints.heatTempC =
-                std::min(setpoints.heatTempC, precoolC - MIN_HEAT_COOL_DELTA_C);
+            setpoints.heatTempC = std::min(setpoints.heatTempC, precoolC - MIN_HEAT_COOL_DELTA_C);
             setMessageF(MsgID::Precooling, false, "Cooling to %d by %02d:%02d%s",
                         static_cast<int>(ABS_C_TO_F(nextSchedule.coolC) + 0.5),
                         SCHEDULE_TIME_STR_ARGS(nextSchedule));
@@ -1150,9 +1150,9 @@ void ControllerApp::task(bool firstTime) {
         // Otherwise (e.g. the fan is at its limit with the A/C in standby) more demand
         // changes nothing, so integrating would just leave us with built up demand that
         // keeps cooling running after we're back at the setpoint.
-        coolDemand = coolDemandAlgo_->update(sensorData, setpoints, outdoorTempC(), steadyNow(),
-                                             fanCoolingCanIncrease_ ||
-                                                 (hvacWasOn && hvacLastCool_));
+        coolDemand =
+            coolDemandAlgo_->update(sensorData, setpoints, outdoorTempC(), steadyNow(),
+                                    fanCoolingCanIncrease_ || (hvacWasOn && hvacLastCool_));
 
         // Run the fan at the speed that delivers the cooling demand, if it can
         fanCapacity = fanCoolCapacity(sensorData.tempC, outdoorTempC());
@@ -1208,8 +1208,8 @@ void ControllerApp::task(bool firstTime) {
         uiManager_->bootDone();
     }
 
-    logState(freshAirState, sensorData, ventDemand, fanCoolDemand, heatDemand, coolDemand,
-             acDemand, setpoints, hvacState, fanSpeed, exhaustFanOn_);
+    logState(freshAirState, sensorData, ventDemand, fanCoolDemand, heatDemand, coolDemand, acDemand,
+             setpoints, hvacState, fanSpeed, exhaustFanOn_);
 
     homeCli_->updateClimateState(config_.systemOn, hvacState, fanSpeed, lastHvacSpeed_,
                                  sensorData.tempC, setpoints.coolTempC, setpoints.heatTempC);

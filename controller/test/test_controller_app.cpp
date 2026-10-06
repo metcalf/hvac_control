@@ -426,18 +426,33 @@ TEST_F(ControllerAppTest, ColdCoilAtBootEnablesACWithoutDemand) {
     EXPECT_NE(actual.speed, FancoilSpeed::Off);
 }
 
-TEST_F(ControllerAppTest, IgnoresColdCoilAfterBoot) {
+TEST_F(ControllerAppTest, ColdCoilAfterBootEnablesACWithDemand) {
     sensors_.setLatest({.tempC = 22.8, .humidity = 2.0, .co2 = 500});
-    setOutdoorTempC(24);
+    setOutdoorTempC(21);
     modbusController_.setFancoilState({.coilTempC = COIL_COLD_TEMP_C + 1}, app_->steadyNow_);
     app_->task();
     EXPECT_EQ(modbusController_.getFancoilRequest().speed, FancoilSpeed::Off);
 
-    // A cold coil later on doesn't enable the A/C
+    // Another thermostat starts running the A/C, but the outdoor temp is below the
+    // cooling setpoint (22) so we stick with the fan
     app_->steadyNow_ += AC_BOOT_COLD_COIL_TIME;
     modbusController_.setFancoilState({.coilTempC = COIL_COLD_TEMP_C}, app_->steadyNow_);
     app_->task();
     EXPECT_EQ(modbusController_.getFancoilRequest().speed, FancoilSpeed::Off);
+
+    // Warm enough outside, but unlike at boot we need some demand
+    sensors_.setLatest({.tempC = 22.2, .humidity = 2.0, .co2 = 500});
+    setOutdoorTempC(24);
+    app_->task();
+    EXPECT_EQ(modbusController_.getFancoilRequest().speed, FancoilSpeed::Off);
+
+    // With demand the A/C comes on even though the indoor and outdoor temps aren't high
+    // enough to enable it
+    sensors_.setLatest({.tempC = 22.8, .humidity = 2.0, .co2 = 500});
+    app_->task();
+    auto actual = modbusController_.getFancoilRequest();
+    EXPECT_TRUE(actual.cool);
+    EXPECT_NE(actual.speed, FancoilSpeed::Off);
 }
 
 TEST_F(ControllerAppTest, ACStaysOnUntilIdle) {
