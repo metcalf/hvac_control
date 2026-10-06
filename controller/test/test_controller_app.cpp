@@ -759,7 +759,7 @@ TEST_F(ControllerAppTest, MakeupDemand) {
 }
 
 TEST_F(ControllerAppTest, Precooling) {
-    sensors_.setLatest({.tempC = 25.5, .humidity = 2.0, .co2 = 456});
+    sensors_.setLatest({.tempC = 25.3, .humidity = 2.0, .co2 = 456});
     setRealNow(std::tm{
         .tm_hour = 12,
         .tm_min = 1,
@@ -771,8 +771,8 @@ TEST_F(ControllerAppTest, Precooling) {
     // Start normal fan cooling
     setOutdoorTempC(20);
     app_->task();
-    EXPECT_GT(modbusController_.getFreshAirSpeed(), 20);
-    EXPECT_LT(modbusController_.getFreshAirSpeed(), 250);
+    EXPECT_GT(modbusController_.getFreshAirSpeed(), 100);
+    EXPECT_LT(modbusController_.getFreshAirSpeed(), 180);
     EXPECT_EQ(FanSpeedReason::Cool, app_->fanSpeedReason());
     EXPECT_EQ(SetpointReason::Normal, app_->setpointReason());
     auto fcReq = modbusController_.getFancoilRequest();
