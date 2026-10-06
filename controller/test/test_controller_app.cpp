@@ -476,15 +476,15 @@ TEST_F(ControllerAppTest, FanCoversCoolDemandBeforeAC) {
 }
 
 TEST_F(ControllerAppTest, NoCoolDemandWindupWithFanAtLimit) {
-    // Above the setpoint (22) with it only a bit cooler outside. The fan runs as fast as
-    // the outdoor temp allows but can't keep up, and the A/C isn't enabled.
+    // Above the setpoint (22) and cool enough outside for the fan to run at full speed, but
+    // the demand is more than the fan can deliver and the A/C isn't enabled.
     sensors_.setLatest({.tempC = 23, .humidity = 2.0, .co2 = 500});
-    setOutdoorTempC(21);
+    setOutdoorTempC(19);
     for (int i = 0; i < 6; i++) {
         app_->task();
         app_->steadyNow_ += std::chrono::minutes(10);
     }
-    EXPECT_GT(modbusController_.getFreshAirSpeed(), 200);
+    EXPECT_EQ(255, modbusController_.getFreshAirSpeed());
     EXPECT_EQ(FanSpeedReason::Cool, app_->fanSpeedReason());
     EXPECT_EQ(modbusController_.getFancoilRequest().speed, FancoilSpeed::Off);
 

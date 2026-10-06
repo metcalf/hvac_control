@@ -1148,9 +1148,13 @@ void ControllerApp::task(bool firstTime) {
         // Run the fan at the speed that delivers the cooling demand, if it can
         fanCapacity = fanCoolCapacity(sensorData.tempC, outdoorTempC());
         if (fanCapacity > 0) {
+            // The speed needed to deliver the demand, which is more than the fan can do
+            // (> 1) when the demand exceeds its capacity.
+            double fanCoolNeeded = coolDemand / fanCapacity;
+            // At most full speed, less for small indoor/outdoor deltas
             double fanCoolLimit = fanCoolSpeedLimit_.getOutput(outdoorTempC() - sensorData.tempC);
-            fanCoolDemand = std::min(coolDemand / fanCapacity, fanCoolLimit);
-            fanAtLimit = fanCoolDemand >= fanCoolLimit;
+            fanCoolDemand = std::min(fanCoolNeeded, fanCoolLimit);
+            fanAtLimit = fanCoolNeeded >= fanCoolLimit;
         }
 
         clearMessage(MsgID::SensorErr);
