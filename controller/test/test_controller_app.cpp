@@ -705,7 +705,6 @@ TEST_F(ControllerAppTest, TempOverride) {
     EXPECT_EQ(FanSpeedReason::Cool, app_->fanSpeedReason());
     auto fcReq = modbusController_.getFancoilRequest();
     EXPECT_TRUE(fcReq.cool);
-    // The fan covers part of the demand since it's cooler outside than inside
     EXPECT_EQ(FancoilSpeed::Med, fcReq.speed);
     EXPECT_EQ(SetpointReason::Override, app_->setpointReason());
 
@@ -765,7 +764,6 @@ TEST_F(ControllerAppTest, ACOverride) {
     app_->task();
     fcReq = modbusController_.getFancoilRequest();
     EXPECT_TRUE(fcReq.cool);
-    // The fan covers part of the demand since it's cooler outside than inside
     EXPECT_EQ(FancoilSpeed::Low, fcReq.speed);
 }
 
@@ -818,7 +816,6 @@ TEST_F(ControllerAppTest, Precooling) {
     EXPECT_EQ(SetpointReason::Precooling, app_->setpointReason());
     fcReq = modbusController_.getFancoilRequest();
     EXPECT_TRUE(fcReq.cool);
-    // The fan covers part of the demand since it's cooler outside than inside
     EXPECT_EQ(FancoilSpeed::Med, fcReq.speed);
 
     // Becomes normal cooling when the schedule rolls over
@@ -830,7 +827,6 @@ TEST_F(ControllerAppTest, Precooling) {
     EXPECT_EQ(SetpointReason::Normal, app_->setpointReason());
     fcReq = modbusController_.getFancoilRequest();
     EXPECT_TRUE(fcReq.cool);
-    // The fan covers part of the demand since it's cooler outside than inside
     EXPECT_EQ(FancoilSpeed::Med, fcReq.speed);
 }
 
@@ -1062,7 +1058,6 @@ TEST_F(ControllerAppTest, AllowHVACChangeLimit) {
     app_->task();
     fcReq = modbusController_.getFancoilRequest();
     EXPECT_TRUE(fcReq.cool);
-    // The fan covers part of the demand since it's cooler outside than inside
     EXPECT_EQ(FancoilSpeed::Low, fcReq.speed);
 
     // After the minimum interval, turning off should be allowed
