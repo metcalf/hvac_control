@@ -95,7 +95,9 @@ class ControllerApp {
           fancoilPBRCoolHandler_(fancoilPBRCoolCutoffs_, std::size(fancoilPBRCoolCutoffs_)),
           fancoilPBRHeatHandler_(fancoilPBRHeatCutoffs_, std::size(fancoilPBRHeatCutoffs_)) {
         ventAlgo_ = new LinearVentAlgorithm();
-        coolDemandAlgo_ = new PIDAlgorithm(false);
+        // A wider range than the default keeps the fan from jumping to full speed as soon as
+        // we're a little above the cooling setpoint.
+        coolDemandAlgo_ = new PIDAlgorithm(false, REL_F_TO_C(4.0));
 
         tempSensorWarmedUp_ = tempSensorWarmedUp;
 
