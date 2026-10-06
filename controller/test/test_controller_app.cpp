@@ -354,15 +354,17 @@ TEST_F(ControllerAppTest, IncreasesFancoilSpeedOverTime) {
 
 TEST_F(ControllerAppTest, IncreasesFanSpeedOverTime) {
     // Establish cooling demand and outdoor temp
-    sensors_.setLatest({.tempC = 23, .humidity = 2.0, .co2 = 500});
+    sensors_.setLatest({.tempC = 22.3, .humidity = 2.0, .co2 = 500});
     setOutdoorTempC(15);
 
     app_->task();
     EXPECT_LT(modbusController_.getFreshAirSpeed(), 160);
     EXPECT_EQ(FanSpeedReason::Cool, app_->fanSpeedReason());
 
-    app_->steadyNow_ += std::chrono::minutes(60);
-    app_->task();
+    for (int i = 0; i < 6; i++) {
+        app_->steadyNow_ += std::chrono::minutes(10);
+        app_->task();
+    }
     EXPECT_GT(modbusController_.getFreshAirSpeed(), 160);
     EXPECT_EQ(FanSpeedReason::Cool, app_->fanSpeedReason());
 }
@@ -437,6 +439,41 @@ TEST_F(ControllerAppTest, ACStaysOnUntilIdle) {
     sensors_.setLatest({.tempC = 23, .humidity = 2.0, .co2 = 500});
     app_->task();
     EXPECT_EQ(modbusController_.getFancoilRequest().speed, FancoilSpeed::Off);
+}
+
+TEST_F(ControllerAppTest, FanCoversCoolDemandBeforeAC) {
+    // Hot evening: the A/C turns on
+    sensors_.setLatest({.tempC = 25, .humidity = 2.0, .co2 = 500});
+    setOutdoorTempC(30);
+    app_->task();
+    EXPECT_NE(modbusController_.getFancoilRequest().speed, FancoilSpeed::Off);
+
+    // Room reaches setpoint (22) and it cools off outside
+    sensors_.setLatest({.tempC = 21.5, .humidity = 2.0, .co2 = 500});
+    setOutdoorTempC(17);
+    app_->steadyNow_ += MIN_HVAC_ON_INTERVAL;
+    app_->task();
+    EXPECT_EQ(modbusController_.getFancoilRequest().speed, FancoilSpeed::Off);
+
+    // Room warms back up while the A/C is still enabled. The demand is enough to turn
+    // the A/C on, but the fan can cover it.
+    sensors_.setLatest({.tempC = 22.5, .humidity = 2.0, .co2 = 500});
+    app_->task();
+    EXPECT_EQ(modbusController_.getFancoilRequest().speed, FancoilSpeed::Off);
+    EXPECT_GT(modbusController_.getFreshAirSpeed(), 150);
+    EXPECT_LT(modbusController_.getFreshAirSpeed(), 255);
+    EXPECT_EQ(FanSpeedReason::Cool, app_->fanSpeedReason());
+
+    // The fan can't bring the temp down, so demand builds until the fan is maxed out and
+    // the A/C picks up the rest.
+    for (int i = 0; i < 4; i++) {
+        app_->steadyNow_ += std::chrono::minutes(10);
+        app_->task();
+    }
+    EXPECT_EQ(255, modbusController_.getFreshAirSpeed());
+    auto actual = modbusController_.getFancoilRequest();
+    EXPECT_TRUE(actual.cool);
+    EXPECT_EQ(actual.speed, FancoilSpeed::Low);
 }
 
 TEST_F(ControllerAppTest, CallsForACWithoutOutdoorTemp) {
@@ -649,7 +686,8 @@ TEST_F(ControllerAppTest, TempOverride) {
     EXPECT_EQ(FanSpeedReason::Cool, app_->fanSpeedReason());
     auto fcReq = modbusController_.getFancoilRequest();
     EXPECT_TRUE(fcReq.cool);
-    EXPECT_EQ(FancoilSpeed::High, fcReq.speed);
+    // The fan covers part of the demand since it's cooler outside than inside
+    EXPECT_EQ(FancoilSpeed::Med, fcReq.speed);
     EXPECT_EQ(SetpointReason::Override, app_->setpointReason());
 
     // Override expires; demand drops but min-on-time keeps fan running briefly
@@ -708,7 +746,8 @@ TEST_F(ControllerAppTest, ACOverride) {
     app_->task();
     fcReq = modbusController_.getFancoilRequest();
     EXPECT_TRUE(fcReq.cool);
-    EXPECT_EQ(FancoilSpeed::High, fcReq.speed);
+    // The fan covers part of the demand since it's cooler outside than inside
+    EXPECT_EQ(FancoilSpeed::Low, fcReq.speed);
 }
 
 TEST_F(ControllerAppTest, MakeupDemand) {
@@ -734,7 +773,7 @@ TEST_F(ControllerAppTest, Precooling) {
     setOutdoorTempC(20);
     app_->task();
     EXPECT_GT(modbusController_.getFreshAirSpeed(), 20);
-    EXPECT_LT(modbusController_.getFreshAirSpeed(), 100);
+    EXPECT_LT(modbusController_.getFreshAirSpeed(), 250);
     EXPECT_EQ(FanSpeedReason::Cool, app_->fanSpeedReason());
     EXPECT_EQ(SetpointReason::Normal, app_->setpointReason());
     auto fcReq = modbusController_.getFancoilRequest();
@@ -744,8 +783,7 @@ TEST_F(ControllerAppTest, Precooling) {
     app_->realNow_ += std::chrono::hours(2);
     setOutdoorTempC(20);
     app_->task();
-    EXPECT_GT(modbusController_.getFreshAirSpeed(), 100);
-    EXPECT_LT(modbusController_.getFreshAirSpeed(), 250);
+    EXPECT_EQ(255, modbusController_.getFreshAirSpeed());
     EXPECT_EQ(FanSpeedReason::Cool, app_->fanSpeedReason());
     EXPECT_EQ(SetpointReason::Precooling, app_->setpointReason());
     fcReq = modbusController_.getFancoilRequest();
@@ -761,7 +799,8 @@ TEST_F(ControllerAppTest, Precooling) {
     EXPECT_EQ(SetpointReason::Precooling, app_->setpointReason());
     fcReq = modbusController_.getFancoilRequest();
     EXPECT_TRUE(fcReq.cool);
-    EXPECT_EQ(FancoilSpeed::High, fcReq.speed);
+    // The fan covers part of the demand since it's cooler outside than inside
+    EXPECT_EQ(FancoilSpeed::Med, fcReq.speed);
 
     // Becomes normal cooling when the schedule rolls over
     app_->realNow_ += std::chrono::hours(3);
@@ -772,7 +811,8 @@ TEST_F(ControllerAppTest, Precooling) {
     EXPECT_EQ(SetpointReason::Normal, app_->setpointReason());
     fcReq = modbusController_.getFancoilRequest();
     EXPECT_TRUE(fcReq.cool);
-    EXPECT_EQ(FancoilSpeed::High, fcReq.speed);
+    // The fan covers part of the demand since it's cooler outside than inside
+    EXPECT_EQ(FancoilSpeed::Med, fcReq.speed);
 }
 
 TEST_F(ControllerAppTest, PrecoolingMaintainsHeatCoolDelta) {
@@ -1003,7 +1043,8 @@ TEST_F(ControllerAppTest, AllowHVACChangeLimit) {
     app_->task();
     fcReq = modbusController_.getFancoilRequest();
     EXPECT_TRUE(fcReq.cool);
-    EXPECT_EQ(FancoilSpeed::High, fcReq.speed);
+    // The fan covers part of the demand since it's cooler outside than inside
+    EXPECT_EQ(FancoilSpeed::Low, fcReq.speed);
 
     // After the minimum interval, turning off should be allowed
     sensors_.setLatest({.tempC = 20.0, .humidity = 2.0, .co2 = 500});

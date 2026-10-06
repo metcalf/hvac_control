@@ -620,7 +620,7 @@ uint16_t ControllerApp::localMinOfDay() {
 void ControllerApp::logState(const ControllerDomain::FreshAirState &freshAirState,
                              const ControllerDomain::SensorData &sensorData, double ventDemand,
                              double fanCoolDemand, double heatDemand, double coolDemand,
-                             const ControllerDomain::Setpoints &setpoints,
+                             double acDemand, const ControllerDomain::Setpoints &setpoints,
                              const ControllerDomain::HVACState hvacState, const FanSpeed fanSpeed,
                              const bool exhaustOn) {
     esp_log_level_t statusLevel;
@@ -667,7 +667,7 @@ void ControllerApp::logState(const ControllerDomain::FreshAirState &freshAirStat
         // Setpoints
         " set_h=%.2f set_c=%.2f set_co2=%u set_r=%s"
         // DemandRequest
-        " vent_d=%.2f fancool_d=%.2f heat_d=%.2f cool_d=%.2f"
+        " vent_d=%.2f fancool_d=%.2f heat_d=%.2f cool_d=%.2f ac_d=%.2f"
         // HVACState
         " hvac=%s speed=%s ac=%s coil_c=%d exhaust=%d",
         // Sensors
@@ -676,7 +676,7 @@ void ControllerApp::logState(const ControllerDomain::FreshAirState &freshAirStat
         // Setpoints
         setpoints.heatTempC, setpoints.coolTempC, setpoints.co2, setpointReasonToS(setpointReason_),
         // Demands
-        ventDemand, fanCoolDemand, heatDemand, coolDemand,
+        ventDemand, fanCoolDemand, heatDemand, coolDemand, acDemand,
         // HVACState
         ControllerDomain::hvacStateToS(hvacState),
         ControllerDomain::fancoilSpeedToS(lastHvacSpeed_), acModeToS(acMode_), coilTempC,
@@ -720,6 +720,10 @@ AbstractDemandAlgorithm *ControllerApp::getAlgoForEquipment(ControllerDomain::Co
     case ControllerDomain::Config::HVACType::None:
         return new NullAlgorithm();
     case ControllerDomain::Config::HVACType::Fancoil:
+        if (!isHeat) {
+            // Fancoil cooling takes whatever cooling demand the fan doesn't cover
+            return new NullAlgorithm();
+        }
         return new PIDAlgorithm(isHeat);
     case ControllerDomain::Config::HVACType::Valve:
         return new ValveAlgorithm(isHeat);
@@ -769,6 +773,15 @@ bool ControllerApp::isCoilCold() {
     }
 
     return (fcState.coilTempC <= COIL_COLD_TEMP_C);
+}
+
+// The cooling the fan would deliver at full speed, in units of cooling demand.
+double ControllerApp::fanCoolCapacity(double inTempC, double outTempC) const {
+    if (std::isnan(outTempC)) {
+        return 0;
+    }
+    return std::max(0.0, REL_C_TO_F(inTempC - outTempC) * FAN_COOL_BTU_HR_PER_DEG_F /
+                             COOL_DEMAND_FULL_BTU_HR);
 }
 
 // Merges a partial schedule update into the current schedules, clamping temps the same way
@@ -1113,7 +1126,8 @@ void ControllerApp::task(bool firstTime) {
     lastSetpoints_ = setpoints;
     uiManager_->setCurrentSetpoints(setpoints.heatTempC, setpoints.coolTempC);
 
-    double ventDemand = 0, fanCoolDemand = 0, heatDemand = 0, coolDemand = 0;
+    double ventDemand = 0, fanCoolDemand = 0, heatDemand = 0, coolDemand = 0, acDemand = 0;
+    double fanCapacity = 0;
 
     bool stabilizing = tempStabilizing();
     if (stabilizing) {
@@ -1127,14 +1141,21 @@ void ControllerApp::task(bool firstTime) {
 
         ventDemand =
             ventAlgo_->update(sensorData, setpoints, outdoorTempC(), steadyNow(), fanIsOn_);
-        fanCoolDemand =
-            fanCoolLimitAlgo_->update(sensorData, setpoints, outdoorTempC(), steadyNow(), fanIsOn_);
         if (!stabilizing) {
             heatDemand = heatAlgo_->update(sensorData, setpoints, outdoorTempC(), steadyNow(),
                                            hvacWasOn && !hvacLastCool_);
         }
-        coolDemand = coolAlgo_->update(sensorData, setpoints, outdoorTempC(), steadyNow(),
-                                       hvacWasOn && hvacLastCool_);
+        coolDemand = coolDemandAlgo_->update(sensorData, setpoints, outdoorTempC(), steadyNow(),
+                                             fanCooling_ || (hvacWasOn && hvacLastCool_));
+        acDemand = coolAlgo_->update(sensorData, setpoints, outdoorTempC(), steadyNow(),
+                                     hvacWasOn && hvacLastCool_);
+
+        // Run the fan at the speed that delivers the cooling demand, if it can
+        fanCapacity = fanCoolCapacity(sensorData.tempC, outdoorTempC());
+        if (fanCapacity > 0) {
+            fanCoolDemand = std::min(coolDemand / fanCapacity,
+                                     fanCoolSpeedLimit_.getOutput(outdoorTempC() - sensorData.tempC));
+        }
 
         clearMessage(MsgID::SensorErr);
 
@@ -1157,8 +1178,16 @@ void ControllerApp::task(bool firstTime) {
     handleExhaustControlButton();
     setExhaustFan(fanSpeed);
 
-    updateACMode(coolDemand, setpoints.coolTempC, sensorData.tempC, outdoorTempC());
-    HVACState hvacState = setHVAC(heatDemand, coolDemand, fanSpeed);
+    // The A/C covers the cooling demand that the fan isn't delivering (whatever the reason
+    // the fan is running).
+    double fanCoolDelivered = fanCapacity * fanSpeed / UINT8_MAX;
+    fanCooling_ = fanCoolDelivered > 0;
+    if (config_.equipment.coolType == Config::HVACType::Fancoil) {
+        acDemand = std::max(0.0, coolDemand - fanCoolDelivered);
+    }
+
+    updateACMode(acDemand, setpoints.coolTempC, sensorData.tempC, outdoorTempC());
+    HVACState hvacState = setHVAC(heatDemand, acDemand, fanSpeed);
     if (hvacState == HVACState::ACCool) {
         acLastCooled_ = steadyNow();
     }
@@ -1170,7 +1199,7 @@ void ControllerApp::task(bool firstTime) {
     }
 
     logState(freshAirState, sensorData, ventDemand, fanCoolDemand, heatDemand, coolDemand,
-             setpoints, hvacState, fanSpeed, exhaustFanOn_);
+             acDemand, setpoints, hvacState, fanSpeed, exhaustFanOn_);
 
     homeCli_->updateClimateState(config_.systemOn, hvacState, fanSpeed, lastHvacSpeed_,
                                  sensorData.tempC, setpoints.coolTempC, setpoints.heatTempC);

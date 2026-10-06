@@ -13,7 +13,6 @@
 #include "AbstractValveCtrl.h"
 #include "AbstractWifi.h"
 #include "ControllerDomain.h"
-#include "FanCoolLimitAlgorithm.h"
 #include "LinearFanCoolAlgorithm.h"
 #include "LinearVentAlgorithm.h"
 #include "NullAlgorithm.h"
@@ -54,6 +53,13 @@
 // Turn on the A/C if cooling demand exceeds this and another condition is met
 // (coil is cold or outdoor temp is high enough)
 #define AC_ON_DEMAND_THRESHOLD 0.3
+// Cooling demand is in units of this much cooling, i.e. a demand of 1.0 means we want
+// at least this many BTU/hr. This is roughly what the fancoil delivers on medium/high.
+#define COOL_DEMAND_FULL_BTU_HR 3000.0
+// Cooling delivered by the fresh air fan at full speed per degree F that the outdoor temp
+// is below the indoor temp. The fan covers as much of the cooling demand as it can and
+// the A/C is only asked for the remainder.
+#define FAN_COOL_BTU_HR_PER_DEG_F 150.0
 // Leave the A/C on until it has gone this long without cooling. Air temp reaching the
 // setpoint doesn't mean the structure has cooled, so only hand off to ventilation once
 // the room has held without the A/C for a while.
@@ -83,8 +89,7 @@ class ControllerApp {
           fancoilPBRCoolHandler_(fancoilPBRCoolCutoffs_, std::size(fancoilPBRCoolCutoffs_)),
           fancoilPBRHeatHandler_(fancoilPBRHeatCutoffs_, std::size(fancoilPBRHeatCutoffs_)) {
         ventAlgo_ = new LinearVentAlgorithm();
-        fanCoolAlgo_ = new PIDAlgorithm(false, REL_F_TO_C(3.0), 0.7);
-        fanCoolLimitAlgo_ = new FanCoolLimitAlgorithm(fanCoolAlgo_);
+        coolDemandAlgo_ = new PIDAlgorithm(false);
 
         tempSensorWarmedUp_ = tempSensorWarmedUp;
 
@@ -98,8 +103,7 @@ class ControllerApp {
         delete ventAlgo_;
         delete heatAlgo_;
         delete coolAlgo_;
-        delete fanCoolAlgo_;
-        delete fanCoolLimitAlgo_;
+        delete coolDemandAlgo_;
     }
     void setConfig(ControllerDomain::Config config);
 
@@ -308,7 +312,7 @@ class ControllerApp {
     uint16_t localMinOfDay();
     void logState(const ControllerDomain::FreshAirState &freshAirState,
                   const ControllerDomain::SensorData &sensorData, double ventDemand,
-                  double fanCoolDemand, double heatDemand, double coolDemand,
+                  double fanCoolDemand, double heatDemand, double coolDemand, double acDemand,
                   const ControllerDomain::Setpoints &setpoints,
                   const ControllerDomain::HVACState hvacState, const FanSpeed fanSpeed,
                   const bool exhaustOn);
@@ -318,6 +322,7 @@ class ControllerApp {
                                                  bool isHeat);
     FancoilSpeed getSpeedForDemand(bool cool, double demand);
     bool isCoilCold();
+    double fanCoolCapacity(double inTempC, double outTempC) const;
     void setVacation(bool on);
     void setSystemPower(bool on);
     bool allowHVACChange(bool cool, bool on);
@@ -338,8 +343,17 @@ class ControllerApp {
     AbstractHomeClient *homeCli_;
     AbstractOTAClient *ota_;
     uiEvtRcv_t uiEvtRcv_;
-    AbstractDemandAlgorithm *ventAlgo_, *fanCoolAlgo_, *fanCoolLimitAlgo_, *heatAlgo_ = NULL,
-                                                                           *coolAlgo_ = NULL;
+    // coolDemandAlgo_ produces the total cooling demand, which the fan covers as much of as
+    // it can. coolAlgo_ is only used for cooling equipment that can't take the remainder
+    // as a demand (i.e. valves).
+    AbstractDemandAlgorithm *ventAlgo_, *coolDemandAlgo_, *heatAlgo_ = NULL, *coolAlgo_ = NULL;
+
+    // Limit on fan cooling speed by delta to indoor (outdoor - indoor). It's not worth
+    // pushing a lot of air for minimal temperature differences.
+    const AbstractDemandAlgorithm::LinearRange fanCoolSpeedLimit_ = {
+        {REL_F_TO_C(-4), 1.0},
+        {REL_F_TO_C(0), 0},
+    };
     restartCb_t restartCb_;
 
     AbstractUIManager::TempOverride tempOverride_;
@@ -348,6 +362,9 @@ class ControllerApp {
     ACMode acMode_ = ACMode::Standby;
     // Last time the A/C was cooling (or turned on), for AC_OFF_IDLE_TIME
     std::chrono::steady_clock::time_point acLastCooled_{};
+    // True when the fan is delivering some cooling, in which case it counts as an active
+    // output for the cooling demand algorithm.
+    bool fanCooling_ = false;
 
     // Set to steadyNow() on the first task() call so we can disable heating and
     // delay A/C while the temp sensor warms up and wifi connects after boot.
