@@ -79,14 +79,15 @@ void ControllerApp::updateACMode(const double coolDemand, const double coolSetpo
         bool outTempWarm =
             outTempC > coolSetpointC ||
             (std::isnan(outTempC) && (steadyNow() - bootTime_) >= AC_WIFI_CONNECT_WAIT_TIME);
-        bool coilCold = isCoilCold();
+        // The A/C was running before we restarted
+        bool coilColdAtBoot =
+            (steadyNow() - bootTime_) < AC_BOOT_COLD_COIL_TIME && isCoilCold();
 
-        if (coolDemand > AC_ON_DEMAND_THRESHOLD &&
-            (coilCold || // Coil is cold anyway (e.g. we restarted while the A/C was running)
-             (outTempWarm &&
-              ((inTempC - coolSetpointC) > AC_ON_THRESHOLD_C ||          // Indoor temp is high
-               (outTempC - coolSetpointC) > AC_ON_OUT_TEMP_THRESHOLD_C)) // Outdoor temp is high
-             )) {
+        if (coilColdAtBoot ||
+            (coolDemand > AC_ON_DEMAND_THRESHOLD && outTempWarm &&
+             ((inTempC - coolSetpointC) > AC_ON_THRESHOLD_C ||          // Indoor temp is high
+              (outTempC - coolSetpointC) > AC_ON_OUT_TEMP_THRESHOLD_C)) // Outdoor temp is high
+        ) {
             acMode_ = ACMode::On;
             acLastCooled_ = steadyNow();
         }
