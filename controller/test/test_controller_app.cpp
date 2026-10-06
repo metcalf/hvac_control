@@ -475,6 +475,26 @@ TEST_F(ControllerAppTest, FanCoversCoolDemandBeforeAC) {
     EXPECT_EQ(actual.speed, FancoilSpeed::Low);
 }
 
+TEST_F(ControllerAppTest, NoCoolDemandWindupWithFanAtLimit) {
+    // Above the setpoint (22) with it only a bit cooler outside. The fan runs as fast as
+    // the outdoor temp allows but can't keep up, and the A/C isn't enabled.
+    sensors_.setLatest({.tempC = 23, .humidity = 2.0, .co2 = 500});
+    setOutdoorTempC(21);
+    for (int i = 0; i < 6; i++) {
+        app_->task();
+        app_->steadyNow_ += std::chrono::minutes(10);
+    }
+    EXPECT_GT(modbusController_.getFreshAirSpeed(), 200);
+    EXPECT_EQ(FanSpeedReason::Cool, app_->fanSpeedReason());
+    EXPECT_EQ(modbusController_.getFancoilRequest().speed, FancoilSpeed::Off);
+
+    // Once we're back at the setpoint there's no built up demand keeping the fan running
+    sensors_.setLatest({.tempC = 22, .humidity = 2.0, .co2 = 500});
+    app_->task();
+    EXPECT_EQ(0, modbusController_.getFreshAirSpeed());
+    EXPECT_EQ(FanSpeedReason::Off, app_->fanSpeedReason());
+}
+
 TEST_F(ControllerAppTest, CallsForACWithoutOutdoorTemp) {
     sensors_.setLatest({.tempC = 25, .humidity = 2.0, .co2 = 500});
     homeCli_.setState({.weatherObsTime = std::chrono::system_clock::time_point(),

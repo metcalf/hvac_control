@@ -1123,6 +1123,7 @@ void ControllerApp::task(bool firstTime) {
 
     double ventDemand = 0, fanCoolDemand = 0, heatDemand = 0, coolDemand = 0;
     double fanCapacity = 0;
+    bool fanAtLimit = false;
 
     bool stabilizing = tempStabilizing();
     if (stabilizing) {
@@ -1141,13 +1142,15 @@ void ControllerApp::task(bool firstTime) {
                                            hvacWasOn && !hvacLastCool_);
         }
         coolDemand = coolDemandAlgo_->update(sensorData, setpoints, outdoorTempC(), steadyNow(),
-                                             fanCooling_ || (hvacWasOn && hvacLastCool_));
+                                             fanCoolingCanIncrease_ ||
+                                                 (hvacWasOn && hvacLastCool_));
 
         // Run the fan at the speed that delivers the cooling demand, if it can
         fanCapacity = fanCoolCapacity(sensorData.tempC, outdoorTempC());
         if (fanCapacity > 0) {
-            fanCoolDemand = std::min(coolDemand / fanCapacity,
-                                     fanCoolSpeedLimit_.getOutput(outdoorTempC() - sensorData.tempC));
+            double fanCoolLimit = fanCoolSpeedLimit_.getOutput(outdoorTempC() - sensorData.tempC);
+            fanCoolDemand = std::min(coolDemand / fanCapacity, fanCoolLimit);
+            fanAtLimit = fanCoolDemand >= fanCoolLimit;
         }
 
         clearMessage(MsgID::SensorErr);
@@ -1174,13 +1177,13 @@ void ControllerApp::task(bool firstTime) {
     // The A/C covers the cooling demand that the fan isn't delivering (whatever the reason
     // the fan is running).
     double fanCoolDelivered = fanCapacity * fanSpeed / UINT8_MAX;
-    fanCooling_ = fanCoolDelivered > 0;
     double acDemand = 0;
     if (config_.equipment.coolType != Config::HVACType::None) {
         acDemand = std::max(0.0, coolDemand - fanCoolDelivered);
     }
 
     updateACMode(acDemand, setpoints.coolTempC, sensorData.tempC, outdoorTempC());
+    fanCoolingCanIncrease_ = fanCoolDelivered > 0 && (!fanAtLimit || acMode_ == ACMode::On);
     HVACState hvacState = setHVAC(heatDemand, acDemand, fanSpeed);
     if (hvacState == HVACState::ACCool) {
         acLastCooled_ = steadyNow();

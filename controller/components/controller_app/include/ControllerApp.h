@@ -360,9 +360,11 @@ class ControllerApp {
     ACMode acMode_ = ACMode::Standby;
     // Last time the A/C was cooling (or turned on), for AC_OFF_IDLE_TIME
     std::chrono::steady_clock::time_point acLastCooled_{};
-    // True when the fan is delivering some cooling, in which case it counts as an active
-    // output for the cooling demand algorithm.
-    bool fanCooling_ = false;
+    // True when the fan is delivering some cooling and more cooling is available if demand
+    // increases, in which case it counts as an active output for the cooling demand
+    // algorithm. More demand does nothing once the fan is at its limit and the A/C isn't
+    // enabled, so we'd just be winding up the integral.
+    bool fanCoolingCanIncrease_ = false;
 
     // Set to steadyNow() on the first task() call so we can disable heating and
     // delay A/C while the temp sensor warms up and wifi connects after boot.
