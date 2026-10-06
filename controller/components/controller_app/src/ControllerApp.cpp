@@ -768,6 +768,9 @@ bool ControllerApp::isCoilCold() {
 }
 
 // The cooling the fan would deliver at full speed, in units of cooling demand.
+// This is deliberately not capped at 1: with a large enough indoor/outdoor delta the fan
+// can deliver more than a full cooling demand, in which case it only needs to run at
+// partial speed (demand / capacity) to deliver all of it.
 double ControllerApp::fanCoolCapacity(double inTempC, double outTempC) const {
     if (std::isnan(outTempC)) {
         return 0;
