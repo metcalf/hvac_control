@@ -358,14 +358,13 @@ TEST_F(ControllerAppTest, IncreasesFanSpeedOverTime) {
     setOutdoorTempC(15);
 
     app_->task();
-    EXPECT_LT(modbusController_.getFreshAirSpeed(), 160);
+    auto initialSpeed = modbusController_.getFreshAirSpeed();
+    EXPECT_LT(initialSpeed, 160);
     EXPECT_EQ(FanSpeedReason::Cool, app_->fanSpeedReason());
 
-    for (int i = 0; i < 6; i++) {
-        app_->steadyNow_ += std::chrono::minutes(10);
-        app_->task();
-    }
-    EXPECT_GT(modbusController_.getFreshAirSpeed(), 160);
+    app_->steadyNow_ += std::chrono::minutes(10);
+    app_->task();
+    EXPECT_GT(modbusController_.getFreshAirSpeed(), initialSpeed + 20);
     EXPECT_EQ(FanSpeedReason::Cool, app_->fanSpeedReason());
 }
 
