@@ -1141,6 +1141,14 @@ void ControllerApp::task(bool firstTime) {
             heatDemand = heatAlgo_->update(sensorData, setpoints, outdoorTempC(), steadyNow(),
                                            hvacWasOn && !hvacLastCool_);
         }
+        // Only build up (integrate) cooling demand while more demand gets us more cooling:
+        // - The A/C is running, or
+        // - The fan is delivering cooling and is either below its limit or the A/C is
+        //   enabled to take what the fan can't deliver. The latter is what lets demand
+        //   build until the A/C turns on when the fan can't keep up.
+        // Otherwise (e.g. the fan is at its limit with the A/C in standby) more demand
+        // changes nothing, so integrating would just leave us with built up demand that
+        // keeps cooling running after we're back at the setpoint.
         coolDemand = coolDemandAlgo_->update(sensorData, setpoints, outdoorTempC(), steadyNow(),
                                              fanCoolingCanIncrease_ ||
                                                  (hvacWasOn && hvacLastCool_));
