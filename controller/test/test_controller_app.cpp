@@ -462,8 +462,7 @@ TEST_F(ControllerAppTest, ACStaysOnUntilIdle) {
     app_->task();
     EXPECT_NE(modbusController_.getFancoilRequest().speed, FancoilSpeed::Off);
 
-    // Room reaches setpoint (22) while outdoor drops below it, but not far enough to
-    // force the A/C off.
+    // Room reaches setpoint (22) while outdoor drops below it
     sensors_.setLatest({.tempC = 21.5, .humidity = 2.0, .co2 = 500});
     setOutdoorTempC(20);
     app_->steadyNow_ += MIN_HVAC_ON_INTERVAL;

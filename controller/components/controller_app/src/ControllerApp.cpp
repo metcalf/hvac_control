@@ -95,8 +95,9 @@ void ControllerApp::updateACMode(const double coolDemand, const double coolSetpo
         break;
     }
     case ACMode::On:
-        if (outTempC < (coolSetpointC - AC_OFF_OUT_TEMP_BELOW_SETPOINT_C) ||
-            steadyNow() - acLastCooled_ >= AC_OFF_IDLE_TIME) {
+        // We don't turn the A/C off when it gets cold outside. The fan covers more of the
+        // cooling demand the colder it is, so the A/C only runs if the fan can't keep up.
+        if (steadyNow() - acLastCooled_ >= AC_OFF_IDLE_TIME) {
             clearMessage(MsgID::ACMode);
             acMode_ = ACMode::Standby;
         }
