@@ -163,6 +163,24 @@ void OutCtrl::setCalls(ZCDomain::SystemState &state, const InputState &zioState)
     }
 }
 
+InputState OutCtrl::debounceFancoils(const InputState &zioState) {
+    InputState debounced = zioState;
+    std::chrono::steady_clock::time_point now = steadyNow();
+
+    for (int i = 0; i < ZONE_IO_NUM_FC; i++) {
+        if (zioState.fc[i] != fcRaw_[i]) {
+            fcRaw_[i] = zioState.fc[i];
+            fcChanged_[i] = now;
+        }
+        if ((now - fcChanged_[i]) >= FANCOIL_DEBOUNCE) {
+            fcStable_[i] = fcRaw_[i];
+        }
+        debounced.fc[i] = fcStable_[i];
+    }
+
+    return debounced;
+}
+
 void OutCtrl::checkTSConflictingCalls(const InputState &zioState) {
     bool conflict = false;
     for (int i = 0; i < ZONE_IO_NUM_TS; i++) {
@@ -180,8 +198,9 @@ void OutCtrl::checkTSConflictingCalls(const InputState &zioState) {
     }
 }
 
-ZCDomain::SystemState OutCtrl::update(bool systemOn, const InputState &zioState) {
+ZCDomain::SystemState OutCtrl::update(bool systemOn, const InputState &rawZioState) {
     SystemState state{};
+    InputState zioState = debounceFancoils(rawZioState);
 
     checkTSConflictingCalls(zioState);
     setCalls(state, zioState);

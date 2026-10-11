@@ -19,6 +19,16 @@ class TestZCApp : public ZCApp {
     std::chrono::steady_clock::time_point steadyNow() const override { return now_; }
 };
 
+class TestOutCtrl : public OutCtrl {
+  public:
+    using OutCtrl::OutCtrl;
+    std::chrono::steady_clock::time_point now_ =
+        std::chrono::steady_clock::time_point(std::chrono::seconds(1));
+
+  protected:
+    std::chrono::steady_clock::time_point steadyNow() override { return now_; }
+};
+
 class ZCAppTest : public testing::Test {
   public:
     bool uiEvtRcv(AbstractZCUIManager::Event *evt, uint16_t waitMs) {
@@ -41,6 +51,11 @@ class ZCAppTest : public testing::Test {
     }
     void TearDown() override { delete app_; }
 
+    void settleFancoils() {
+        outCtrl_.now_ += FANCOIL_DEBOUNCE;
+        app_->task();
+    }
+
     TestZCApp *app_;
 
     InputState inputState_{.load_control = true};
@@ -52,7 +67,7 @@ class ZCAppTest : public testing::Test {
     FakeZCHomeClient homeClient_;
 
     ValveStateManager valveStateManager_;
-    OutCtrl outCtrl_{valveStateManager_, uiManager_};
+    TestOutCtrl outCtrl_{valveStateManager_, uiManager_};
 };
 
 TEST_F(ZCAppTest, TurnsOnZoneValveAndPump) {
@@ -77,6 +92,7 @@ TEST_F(ZCAppTest, TurnsOnFancoilPump) {
 
     inputState_.fc[0].v = true;
     app_->task();
+    settleFancoils();
     ASSERT_TRUE(outIO_.getFancoilPump());
 }
 
@@ -87,6 +103,7 @@ TEST_F(ZCAppTest, TurnsOnHeatPump) {
     inputState_.fc[0].v = true;
     inputState_.fc[0].ob = true;
     app_->task();
+    settleFancoils();
 
     ASSERT_EQ(1, mbClient_.getTestParam(CxRegister::SwitchOnOff));
     ASSERT_EQ(1, mbClient_.getTestParam(CxRegister::ACMode));
@@ -95,6 +112,7 @@ TEST_F(ZCAppTest, TurnsOnHeatPump) {
 TEST_F(ZCAppTest, TurnsOffHeatPumpWhenLoadShedding) {
     inputState_.fc[0].v = true;
     app_->task();
+    settleFancoils();
 
     ASSERT_EQ(1, mbClient_.getTestParam(CxRegister::SwitchOnOff));
 
@@ -157,12 +175,14 @@ TEST_F(ZCAppTest, RespectsValveAndZonePumpStateChangeRateLimit) {
 TEST_F(ZCAppTest, RespectsFancoilPumpStateChangeRateLimit) {
     inputState_.fc[0].v = true;
     app_->task();
+    settleFancoils();
     ASSERT_TRUE(outIO_.getFancoilPump());
 
     // Attempt to turn off pump before rate limit interval expires
     inputState_.fc[0].v = false;
     app_->setSteadyNow(app_->steadyNow() + std::chrono::seconds(1));
     app_->task();
+    settleFancoils();
     ASSERT_TRUE(outIO_.getFancoilPump());
 
     // Advance past rate limit interval and try again
