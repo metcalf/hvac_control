@@ -5,7 +5,13 @@ if [[ ! -f "sdkconfig" ]]; then
     exit 1
 fi
 
-if ! command -v idf.py &> /dev/null; then
+# Outside an ESP IDF shell, fall back to the project's build.sh, which sets up
+# the IDF environment itself before running idf.py.
+if command -v idf.py &> /dev/null; then
+    IDF_CMD=(idf.py)
+elif [[ -f "build.sh" ]]; then
+    IDF_CMD=(bash build.sh)
+else
     echo "Please run this script within an ESP IDF shell"
     exit 1
 fi
@@ -55,7 +61,7 @@ else
 fi
 
 echo "removing old firmware and running build"
-idf.py build
+"${IDF_CMD[@]}" build
 
 if ! strings "${FIRMWARE_PATH}" | grep "${version}"; then
     echo "version ${version} not found in ${FIRMWARE_PATH}"
