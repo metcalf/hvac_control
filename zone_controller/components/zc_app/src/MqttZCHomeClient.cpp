@@ -1,6 +1,7 @@
 #include "MqttZCHomeClient.h"
 
 #include <cstdio>
+#include <cstring>
 #include <optional>
 
 #include "BaseModbusClient.h"
@@ -128,9 +129,25 @@ void MqttZCHomeClient::updateState(const ZCDomain::SystemState &state, const Hea
     esp_mqtt_dispatch_custom_event(client_, nullptr);
 }
 
-void MqttZCHomeClient::onMsg(char *topic, int topicLen, char *, int) {
-    // We don't subscribe to any topics, so any received message is unexpected.
-    ESP_LOGW(TAG, "Received message on unknown topic: %.*s", topicLen, topic);
+void MqttZCHomeClient::onMsg(char *topic, int topicLen, char *data, int dataLen) {
+    if (topicLen != strlen(AVAILABILITY_TOPIC) ||
+        strncmp(topic, AVAILABILITY_TOPIC, topicLen) != 0) {
+        ESP_LOGW(TAG, "Received message on unknown topic: %.*s", topicLen, topic);
+        return;
+    }
+    if (dataLen == 1 && data[0] == '1') {
+        return;
+    }
+
+    // Something marked us unavailable while we're connected. After a reboot the broker can
+    // deliver the last will of our previous connection after our own "1", and nothing else
+    // would correct the retained value until the next reconnect.
+    ESP_LOGW(TAG, "Marked unavailable while connected, republishing availability");
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        updatedFields_ |= updatedFieldMask(UpdatedFields::Availability);
+    }
+    esp_mqtt_dispatch_custom_event(client_, nullptr);
 }
 
 void MqttZCHomeClient::onErr(esp_mqtt_error_codes_t err) {
@@ -167,6 +184,11 @@ void MqttZCHomeClient::onConnected() {
         }
         updatedFields_ |= updatedFieldMask(UpdatedFields::Availability);
         updatedFields_ |= updatedFieldMask(UpdatedFields::Discovery);
+    }
+
+    // Watch our own availability so onMsg can correct it
+    if (esp_mqtt_client_subscribe_single(client_, AVAILABILITY_TOPIC, 0) < 0) {
+        ESP_LOGE(TAG, "Failed to subscribe to %s", AVAILABILITY_TOPIC);
     }
 
     esp_mqtt_dispatch_custom_event(client_, nullptr);

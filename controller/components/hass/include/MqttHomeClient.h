@@ -76,7 +76,7 @@ class MqttHomeClient : public BaseMqttClient, public AbstractHomeClient {
     HassMessages::Topics topics_;
     char discoveryStr_[HassMessages::DISCOVERY_LEN] = "";
 
-    esp_mqtt_topic_t subscriptions_[7] = {
+    esp_mqtt_topic_t subscriptions_[8] = {
         {.filter = vacationTopic_, .qos = 0},
         {.filter = outdoorTempTopic_, .qos = 0},
         {.filter = airQualityTopic_, .qos = 0},
@@ -84,6 +84,7 @@ class MqttHomeClient : public BaseMqttClient, public AbstractHomeClient {
         {}, // Temp High command
         {}, // Temp Low command
         {}, // Schedule command
+        {}, // Our own availability
     };
 
     static const char *climateModeToS(ClimateMode mode);

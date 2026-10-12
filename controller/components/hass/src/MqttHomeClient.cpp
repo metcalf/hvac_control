@@ -208,6 +208,19 @@ void MqttHomeClient::onMsg(char *topic, int topicLen, char *data, int dataLen) {
         parseTempCmdMessage(false, data, dataLen);
     } else if (matchesTopic(topic, topicLen, topics_.scheduleCmd)) {
         parseScheduleCmdMessage(data, dataLen);
+    } else if (matchesTopic(topic, topicLen, topics_.availability)) {
+        if (dataLen == 1 && data[0] == '1') {
+            return;
+        }
+        // Something marked us unavailable while we're connected. After a reboot the broker
+        // can deliver the last will of our previous connection after our own "1", and
+        // nothing else would correct the retained value until the next reconnect.
+        ESP_LOGW(TAG, "Marked unavailable while connected, republishing availability");
+        {
+            std::lock_guard<std::mutex> lock(mutex_);
+            updatedFields_ |= updatedFieldMask(UpdatedFields::Availability);
+        }
+        esp_mqtt_dispatch_custom_event(client_, nullptr);
     } else {
         ESP_LOGW(TAG, "Received message on unknown topic: %.*s", topicLen, topic);
     }
@@ -380,6 +393,7 @@ void MqttHomeClient::updateTopics(const char *name) {
     subscriptions_[4].filter = topics_.highTempCmd;
     subscriptions_[5].filter = topics_.lowTempCmd;
     subscriptions_[6].filter = topics_.scheduleCmd;
+    subscriptions_[7].filter = topics_.availability;
 }
 
 int MqttHomeClient::publishDiscoveryMessage() {
