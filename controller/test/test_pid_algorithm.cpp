@@ -45,14 +45,15 @@ TEST_F(PIDAlgorithmTest, KeepsIntegralWhileSetpointRampsTowardHarder) {
     EXPECT_GT(runCool(30, coolC, -REL_F_TO_C(0.5) / 60), 0.4);
 }
 
-TEST_F(PIDAlgorithmTest, ResetsIntegralOnLargeHarderStep) {
+TEST_F(PIDAlgorithmTest, KeepsIntegralOnLargeHarderStep) {
     double coolC = sensorData_.tempC - REL_F_TO_C(1);
     update(cool_, coolC - 2, coolC);
     runCool(30, coolC);
 
     now_ += minutes(1);
     coolC -= REL_F_TO_C(1);
-    EXPECT_NEAR(justReset(2), update(cool_, coolC - 2, coolC), 0.001);
+    // 0.5 from the 2F error plus the ~0.25 integral built up before the step
+    EXPECT_GT(update(cool_, coolC - 2, coolC), justReset(2) + 0.2);
 }
 
 TEST_F(PIDAlgorithmTest, ResetsIntegralOnSmallEasierMove) {
