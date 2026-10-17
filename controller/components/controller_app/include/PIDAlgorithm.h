@@ -17,6 +17,9 @@ class PIDAlgorithm : public AbstractDemandAlgorithm {
                   std::chrono::steady_clock::time_point now, bool outputActive) override;
 
   private:
+    // Setpoint changes at least this large reset the integral regardless of direction
+    static constexpr double SETPOINT_STEP_C = REL_F_TO_C(0.5);
+
     const bool isHeater_;
     const double pRangeC_, maxIDemand_, tiSecs_;
     double i_ = 0, lastSetpointC_ = std::nan("");

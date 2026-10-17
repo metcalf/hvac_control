@@ -10,11 +10,14 @@ double PIDAlgorithm::update(const ControllerDomain::SensorData &sensorData,
     double deltaC = setpoint_c - sensorData.tempC;
     int sign = isHeater_ ? 1 : -1;
 
-    // Reset the integral when the setpoint changes
-    if (setpoint_c != lastSetpointC_) {
+    // Reset the integral when the setpoint steps or moves in the direction that reduces
+    // demand. Small moves that increase demand keep the integral, since a ramping setpoint
+    // (e.g. precooling) would otherwise reset it every update and leave only the P term.
+    double changeC = setpoint_c - lastSetpointC_;
+    if (std::abs(changeC) >= SETPOINT_STEP_C || sign * changeC < 0) {
         i_ = 0;
-        lastSetpointC_ = setpoint_c;
     }
+    lastSetpointC_ = setpoint_c;
 
     return getDemand(sign * deltaC, now, outputActive);
 }
