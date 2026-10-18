@@ -25,6 +25,7 @@ using ::testing::IsNan;
 using ::testing::Le;
 using Config = ControllerDomain::Config;
 using FancoilSpeed = ControllerDomain::FancoilSpeed;
+using HVACState = ControllerDomain::HVACState;
 using SetpointReason = ControllerApp::SetpointReason;
 using FanSpeedReason = ControllerApp::FanSpeedReason;
 
@@ -317,6 +318,17 @@ ControllerDomain::FancoilRequest fcReqSeq[] = {
     {FancoilSpeed::Off, false},  // 7
 };
 
+ControllerDomain::HVACState hvacStateSeq[] = {
+    HVACState::Off,    // 0
+    HVACState::Heat,   // 1
+    HVACState::Heat,   // 2
+    HVACState::Heat,   // 3
+    HVACState::Off,    // 4: cooling demand, but too little to run the fancoil
+    HVACState::ACCool, // 5
+    HVACState::ACCool, // 6
+    HVACState::Off,    // 7
+};
+
 TEST_F(ControllerAppTest, CallsForFancoilHVAC) {
     using FancoilSpeed = ControllerDomain::FancoilSpeed;
     using FancoilRequest = ControllerDomain::FancoilRequest;
@@ -327,6 +339,7 @@ TEST_F(ControllerAppTest, CallsForFancoilHVAC) {
     for (int i = 0; i < nHvacCalls; i++) {
         sensors_.setLatest({.tempC = fcCallTempSeq[i], .humidity = 2.0, .co2 = 500});
         app_->steadyNow_ += MIN_HVAC_ON_INTERVAL; // allowHVACChange
+        EXPECT_CALL(uiManager_, setHVACState(hvacStateSeq[i])).Times(1);
         app_->task();
 
         auto actual = modbusController_.getFancoilRequest();
@@ -334,6 +347,24 @@ TEST_F(ControllerAppTest, CallsForFancoilHVAC) {
         EXPECT_EQ(actual.speed, expect.speed) << "i=" << i;
         EXPECT_EQ(actual.cool, expect.cool) << "i=" << i;
     }
+}
+
+TEST_F(ControllerAppTest, HVACStateOffWhenCoolingFancoilIsOff) {
+    // Outdoor temp above the cooling setpoint so the A/C is allowed on
+    setOutdoorTempC(24);
+
+    // Cooling with the A/C on
+    sensors_.setLatest({.tempC = 25.0, .humidity = 2.0, .co2 = 500});
+    EXPECT_CALL(uiManager_, setHVACState(HVACState::ACCool));
+    app_->task();
+    EXPECT_EQ(modbusController_.getFancoilRequest().speed, FancoilSpeed::High);
+
+    // The A/C stays on but there's too little cooling demand to run the fancoil
+    sensors_.setLatest({.tempC = 22.1, .humidity = 2.0, .co2 = 500});
+    app_->steadyNow_ += MIN_HVAC_ON_INTERVAL; // allowHVACChange
+    EXPECT_CALL(uiManager_, setHVACState(HVACState::Off));
+    app_->task();
+    EXPECT_EQ(modbusController_.getFancoilRequest().speed, FancoilSpeed::Off);
 }
 
 TEST_F(ControllerAppTest, IncreasesFancoilSpeedOverTime) {

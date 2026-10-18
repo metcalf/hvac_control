@@ -432,14 +432,6 @@ ControllerDomain::HVACState ControllerApp::setHVAC(const double heatDemand, cons
         }
     }
 
-    HVACState state;
-    if (demand > ON_DEMAND_THRESHOLD) {
-        state = cool ? HVACState::ACCool : HVACState::Heat;
-    } else {
-        state = HVACState::Off;
-    }
-    uiManager_->setHVACState(state);
-
     Config::HVACType hvacType, otherType;
     if (cool) {
         hvacType = config_.equipment.coolType;
@@ -479,7 +471,7 @@ ControllerDomain::HVACState ControllerApp::setHVAC(const double heatDemand, cons
     case Config::HVACType::Valve:
         const bool wantOn = demand > ON_DEMAND_THRESHOLD;
         if (allowHVACChange(cool, wantOn)) {
-            lastHvacSpeed_ = FancoilSpeed::High; // Use `high` for valve on
+            lastHvacSpeed_ = wantOn ? FancoilSpeed::High : FancoilSpeed::Off; // `high` for on
             valveCtrl_->setMode(cool, wantOn);
             if (otherType == Config::HVACType::Fancoil) {
                 modbusController_->setFancoil(FancoilRequest{FancoilSpeed::Off, false});
@@ -487,6 +479,14 @@ ControllerDomain::HVACState ControllerApp::setHVAC(const double heatDemand, cons
         }
         break;
     }
+
+    // Report what's actually running rather than what was asked for: demand can be too low
+    // to turn on a fancoil, and a change can be delayed by `allowHVACChange`.
+    HVACState state = HVACState::Off;
+    if (lastHvacSpeed_ != FancoilSpeed::Off) {
+        state = hvacLastCool_ ? HVACState::ACCool : HVACState::Heat;
+    }
+    uiManager_->setHVACState(state);
 
     return state;
 }
