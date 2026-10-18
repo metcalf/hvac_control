@@ -1136,6 +1136,23 @@ TEST_F(ControllerAppTest, AllowHVACChangeLimit) {
     EXPECT_EQ(FancoilSpeed::Off, fcReq.speed);
 }
 
+TEST_F(ControllerAppTest, AllowHVACChangeLimitNotExtendedByStayingOn) {
+    sensors_.setLatest({.tempC = 16.0, .humidity = 2.0, .co2 = 500});
+    app_->task();
+    EXPECT_EQ(FancoilSpeed::High, modbusController_.getFancoilRequest().speed);
+
+    // Still heating once the minimum interval has passed
+    app_->steadyNow_ += MIN_HVAC_ON_INTERVAL;
+    app_->task();
+    EXPECT_EQ(FancoilSpeed::High, modbusController_.getFancoilRequest().speed);
+
+    // It's been on for the minimum interval, so turning off is allowed immediately
+    sensors_.setLatest({.tempC = 22.0, .humidity = 2.0, .co2 = 500});
+    app_->steadyNow_ += std::chrono::seconds(1);
+    app_->task();
+    EXPECT_EQ(FancoilSpeed::Off, modbusController_.getFancoilRequest().speed);
+}
+
 TEST_F(ControllerAppTest, ExhaustOnWithSupplyFan) {
     // Enable exhaust control
     auto cfg = default_test_config();

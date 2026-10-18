@@ -561,6 +561,13 @@ bool ControllerApp::allowHVACChange(bool cool, bool on) {
             hvacLastCool_ = cool;
             hvacLastTurnedOn_ = now;
         }
+    } else if (on && hvacLastCool_ == cool) {
+        // Allow transitions within the same mode (heat->heat, cool->cool)
+        // no need to update the tracking variables here since we're staying within
+        // the same state. This must be checked before the interval so that staying on
+        // doesn't restart the timer.
+
+        allow = true;
     } else if (now - hvacLastTurnedOn_ >= MIN_HVAC_ON_INTERVAL) {
         // Always allow transitions if the last turn on time was long enough ago
         allow = true;
@@ -571,12 +578,6 @@ bool ControllerApp::allowHVACChange(bool cool, bool on) {
         } else {
             hvacLastTurnedOn_ = {};
         }
-    } else if (on && hvacLastCool_ == cool) {
-        // Allow transitions within the same mode (heat->heat, cool->cool)
-        // no need to update the tracking variables here since we're staying within
-        // the same state.
-
-        allow = true;
     } else {
         allow = false;
     }
