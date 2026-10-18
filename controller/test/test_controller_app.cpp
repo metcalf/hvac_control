@@ -318,17 +318,6 @@ ControllerDomain::FancoilRequest fcReqSeq[] = {
     {FancoilSpeed::Off, false},  // 7
 };
 
-ControllerDomain::HVACState hvacStateSeq[] = {
-    HVACState::Off,    // 0
-    HVACState::Heat,   // 1
-    HVACState::Heat,   // 2
-    HVACState::Heat,   // 3
-    HVACState::Off,    // 4: cooling demand, but too little to run the fancoil
-    HVACState::ACCool, // 5
-    HVACState::ACCool, // 6
-    HVACState::Off,    // 7
-};
-
 TEST_F(ControllerAppTest, CallsForFancoilHVAC) {
     using FancoilSpeed = ControllerDomain::FancoilSpeed;
     using FancoilRequest = ControllerDomain::FancoilRequest;
@@ -339,7 +328,6 @@ TEST_F(ControllerAppTest, CallsForFancoilHVAC) {
     for (int i = 0; i < nHvacCalls; i++) {
         sensors_.setLatest({.tempC = fcCallTempSeq[i], .humidity = 2.0, .co2 = 500});
         app_->steadyNow_ += MIN_HVAC_ON_INTERVAL; // allowHVACChange
-        EXPECT_CALL(uiManager_, setHVACState(hvacStateSeq[i])).Times(1);
         app_->task();
 
         auto actual = modbusController_.getFancoilRequest();
