@@ -4,8 +4,8 @@ file(GLOB TEST_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/helpers/src/*.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/../components/controller_app/src/*.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/../components/hass/src/HassMessages.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../components/wifi/Abstract*.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../components/wifi/Fake*.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../components/esp-iot-core/Abstract*.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../components/esp-iot-core/Fake*.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/../../components/esp_local_test_helpers/src/*.cpp
 )
 
@@ -64,7 +64,7 @@ target_include_directories(
     PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../components/hass/include
     PRIVATE ${cjson_SOURCE_DIR}
     PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/helpers/include
-    PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../../components/wifi/include
+    PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../../components/esp-iot-core/include
     PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../../components/esp_local_test_helpers/include
 )
 

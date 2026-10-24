@@ -29,7 +29,7 @@ Devices update themselves over the air. To release, commit your changes and
 run from this directory:
 
 ```bash
-../components/wifi/release.sh
+../components/esp-iot-core/release.sh
 ```
 
 The script refuses to run with uncommitted changes (the version is
